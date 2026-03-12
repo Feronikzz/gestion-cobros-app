@@ -6,6 +6,7 @@ import { CobroForm } from '@/components/cobro-form';
 import { Modal } from '@/components/modal';
 import { useCobros } from '@/lib/hooks/use-cobros';
 import { useClientes } from '@/lib/hooks/use-clientes';
+import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import type { Cobro } from '@/lib/supabase/types';
 import { eur } from '@/lib/utils';
 import { Plus, FileText, DollarSign } from 'lucide-react';
@@ -13,6 +14,7 @@ import { Plus, FileText, DollarSign } from 'lucide-react';
 export default function CobrosPage() {
   const { cobros, loading, error, createCobro, updateCobro, deleteCobro } = useCobros();
   const { clientes } = useClientes();
+  const { procedimientos } = useProcedimientos();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCobro, setEditingCobro] = useState<Cobro | null>(null);
 
@@ -53,6 +55,11 @@ export default function CobrosPage() {
   const getClienteNombre = (clienteId: string) => {
     const cliente = clientes.find(c => c.id === clienteId);
     return cliente?.nombre || 'Cliente desconocido';
+  };
+
+  const getProcedimientoTitulo = (procedimientoId: string) => {
+    const procedimiento = procedimientos.find(p => p.id === procedimientoId);
+    return procedimiento?.titulo || 'Procedimiento desconocido';
   };
 
   const isEntrada = (cobro: Cobro) => {
@@ -121,6 +128,7 @@ export default function CobrosPage() {
               <th>Fecha</th>
               <th>Cliente</th>
               <th>Tipo</th>
+              <th>Procedimiento</th>
               <th>Método</th>
               <th>Importe</th>
               <th>Notas</th>
@@ -130,7 +138,7 @@ export default function CobrosPage() {
           <tbody>
             {cobros.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-gray-500">
+                <td colSpan={8} className="text-center py-8 text-gray-500">
                   No hay cobros registrados
                 </td>
               </tr>
@@ -149,6 +157,16 @@ export default function CobrosPage() {
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                         Normal
                       </span>
+                    )}
+                  </td>
+                  <td>
+                    {cobro.procedimiento_id ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                        <FileText className="w-3 h-3 mr-1" />
+                        {getProcedimientoTitulo(cobro.procedimiento_id)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 text-xs">-</span>
                     )}
                   </td>
                   <td>

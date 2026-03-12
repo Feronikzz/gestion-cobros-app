@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation';
 import { LayoutShell } from '@/components/layout-shell';
 import { Modal } from '@/components/modal';
 import { CobroForm } from '@/components/cobro-form';
+import { ProcedimientoForm } from '@/components/procedimiento-form';
+import { ClienteNotas } from '@/components/cliente-notas';
 import { createClient } from '@/lib/supabase/client';
 import { eur } from '@/lib/utils';
 import type { Cliente, Procedimiento, Cobro } from '@/lib/supabase/types';
@@ -514,6 +516,11 @@ export default function ClienteDetallePage() {
           </div>
         </form>
       </Modal>
+
+      {/* Sección de Notas */}
+      <div className="section">
+        <ClienteNotas clienteId={id!} />
+      </div>
     </LayoutShell>
   );
 }

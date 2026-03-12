@@ -25,6 +25,7 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [procedimientos, setProcedimientos] = useState<Procedimiento[]>([]);
   const [loading, setLoading] = useState(false);
+  const [avisoSuperacion, setAvisoSuperacion] = useState<string | null>(null);
 
   useEffect(() => {
     if (!clienteIdFijo) {
@@ -47,6 +48,60 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
       setProcedimientos([]);
     }
   }, [formData.cliente_id]);
+
+  // Verificar si el importe supera el pendiente
+  useEffect(() => {
+    const verificarSuperacion = async () => {
+      if (!formData.procedimiento_id || formData.importe <= 0) {
+        setAvisoSuperacion(null);
+        return;
+      }
+
+      const supabase = createClient();
+      
+      // Obtener datos del procedimiento
+      const { data: procedimiento } = await supabase
+        .from('procedimientos')
+        .select('*')
+        .eq('id', formData.procedimiento_id)
+        .single();
+
+      if (!procedimiento) return;
+
+      // Obtener cobros existentes del procedimiento
+      const { data: cobrosExistentes } = await supabase
+        .from('cobros')
+        .select('*')
+        .eq('procedimiento_id', formData.procedimiento_id);
+
+      // Calcular pendiente
+      const totalCobrado = cobrosExistentes?.reduce((sum, c) => sum + c.importe, 0) || 0;
+      const entradas = procedimiento.tiene_entrada ? procedimiento.importe_entrada : 0;
+      
+      // Verificar si la entrada ya está incluida en los cobros
+      const entradaYaCobrada = cobrosExistentes?.some(c => 
+        c.notas && c.notas.includes('Entrada del procedimiento')
+      );
+      
+      const totalPagado = totalCobrado + (procedimiento.tiene_entrada && !entradaYaCobrada ? entradas : 0);
+      const pendiente = procedimiento.presupuesto - totalPagado;
+
+      // Si estamos editando, restar el importe original del cobro
+      const importeActual = cobro ? cobro.importe : 0;
+      const pendienteConCobroActual = pendiente + importeActual;
+
+      if (formData.importe > pendienteConCobroActual) {
+        setAvisoSuperacion(
+          `⚠️ El importe (${formData.importe.toFixed(2)}€) supera el pendiente del procedimiento (${pendienteConCobroActual.toFixed(2)}€). ` +
+          `El exceso sería de ${(formData.importe - pendienteConCobroActual).toFixed(2)}€.`
+        );
+      } else {
+        setAvisoSuperacion(null);
+      }
+    };
+
+    verificarSuperacion();
+  }, [formData.importe, formData.procedimiento_id, cobro]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,6 +151,11 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
         <div>
           <label className="form-label">Importe *</label>
           <input type="number" step="0.01" min="0" value={formData.importe} onChange={(e) => setFormData({ ...formData, importe: parseFloat(e.target.value) || 0 })} className="form-input" required />
+          {avisoSuperacion && (
+            <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800 font-medium">{avisoSuperacion}</p>
+            </div>
+          )}
         </div>
         <div>
           <label className="form-label">Método de pago *</label>

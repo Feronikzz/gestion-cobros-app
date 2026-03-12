@@ -184,6 +184,15 @@ export type DocumentoInsert = Omit<Documento, 'id' | 'created_at'>;
 export type FacturaInsert = Omit<Factura, 'id' | 'created_at'>;
 export type DatosEmisorInsert = Omit<DatosEmisor, 'id' | 'created_at'>;
 
+// ─── Cliente Nota ───────────────────────────────────────────
+export interface ClienteNota {
+  id: string;
+  user_id: string;
+  cliente_id: string;
+  nota: string;
+  created_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {

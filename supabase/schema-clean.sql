@@ -424,6 +424,9 @@ CREATE INDEX IF NOT EXISTS idx_facturas_user_id ON public.facturas(user_id);
 CREATE INDEX IF NOT EXISTS idx_facturas_cliente_id ON public.facturas(cliente_id);
 CREATE INDEX IF NOT EXISTS idx_facturas_fecha ON public.facturas(fecha);
 CREATE INDEX IF NOT EXISTS idx_facturas_numero ON public.facturas(numero);
+CREATE INDEX IF NOT EXISTS idx_cliente_notas_user_id ON public.cliente_notas(user_id);
+CREATE INDEX IF NOT EXISTS idx_cliente_notas_cliente_id ON public.cliente_notas(cliente_id);
+CREATE INDEX IF NOT EXISTS idx_cliente_notas_created_at ON public.cliente_notas(created_at DESC);
 
 -- Verificación
 SELECT table_name FROM information_schema.tables 
