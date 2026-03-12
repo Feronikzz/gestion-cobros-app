@@ -119,6 +119,8 @@ export default function ClienteDetallePage() {
           importe: procForm.importe_entrada,
           metodo_pago: 'efectivo',
           notas: `Entrada del procedimiento: ${procForm.titulo}`,
+          iva_tipo: 'iva_incluido',
+          iva_porcentaje: 21,
         });
       }
     } else {
@@ -134,6 +136,8 @@ export default function ClienteDetallePage() {
           importe: procForm.importe_entrada,
           metodo_pago: 'efectivo',
           notas: `Entrada del procedimiento: ${procForm.titulo}`,
+          iva_tipo: 'iva_incluido',
+          iva_porcentaje: 21,
         });
       }
     }

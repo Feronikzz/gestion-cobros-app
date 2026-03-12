@@ -57,66 +57,87 @@ export default function FacturasPage() {
 
   // Prellenar formulario desde parámetros de cobro
   useEffect(() => {
-    const clienteId = searchParams.get('cliente_id');
-    const clienteNombre = searchParams.get('cliente_nombre');
-    const clienteNif = searchParams.get('cliente_nif');
-    const clienteDireccion = searchParams.get('cliente_direccion');
-    const importe = searchParams.get('importe');
-    const concepto = searchParams.get('concepto');
-    const fecha = searchParams.get('fecha');
-    const ivaTipo = searchParams.get('iva_tipo');
-    const ivaPorcentaje = searchParams.get('iva_porcentaje');
-    const cobroId = searchParams.get('cobro_id');
+    const prellenarDesdeCobro = async () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const clienteId = searchParams.get('cliente_id');
+      const clienteNombre = searchParams.get('cliente_nombre');
+      const clienteNif = searchParams.get('cliente_nif');
+      const clienteDireccion = searchParams.get('cliente_direccion');
+      const importe = searchParams.get('importe');
+      const concepto = searchParams.get('concepto');
+      const fecha = searchParams.get('fecha');
+      const ivaTipo = searchParams.get('iva_tipo');
+      const ivaPorcentaje = searchParams.get('iva_porcentaje');
+      const cobroId = searchParams.get('cobro_id');
 
-    if (clienteId && clienteNombre) {
-      const importeNum = parseFloat(importe || '0') || 0;
-      const ivaPorc = parseFloat(ivaPorcentaje || '21') || 21;
-      
-      // Calcular importe base según tipo de IVA del cobro
-      let baseImponible = importeNum;
-      let incluirIva = true;
-      
-      if (ivaTipo === 'sin_iva') {
-        baseImponible = importeNum;
-        incluirIva = false;
-      } else if (ivaTipo === 'iva_incluido') {
-        // Si el IVA está incluido, hay que desglosarlo
-        // Ejemplo: 50€ con 21% IVA incluido → Base 41,32€ + IVA 8,68€
-        baseImponible = importeNum / (1 + ivaPorc / 100);
-        incluirIva = true;
-      } else if (ivaTipo === 'iva_sobre_precio') {
-        // El IVA se suma al precio
-        // Ejemplo: 50€ sin IVA → Base 50€ + IVA 10,50€ = Total 60,50€
-        baseImponible = importeNum;
-        incluirIva = true;
-      }
-      
-      setFacForm({
-        cliente_id: clienteId,
-        procedimiento_id: '',
-        tipo: 'normal',
-        fecha: fecha || new Date().toISOString().slice(0, 10),
-        receptor_nombre: clienteNombre,
-        receptor_nif: clienteNif || '',
-        receptor_direccion: clienteDireccion || '',
-        incluir_iva: incluirIva,
-        iva_porcentaje: ivaPorc,
-        incluir_irpf: false,
-        irpf_porcentaje: 15,
-        lineas: [
-          {
-            descripcion: concepto || 'Servicio profesional',
-            cantidad: 1,
-            precio_unitario: baseImponible,
-            importe: baseImponible
+      if (clienteId && clienteNombre) {
+        const importeNum = parseFloat(importe || '0') || 0;
+        const ivaPorc = parseFloat(ivaPorcentaje || '21') || 21;
+        
+        // Verificar si ya existe una factura para este cobro
+        if (cobroId) {
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
+          const { data: facturaExistente } = await supabase
+            .from('facturas')
+            .select('*')
+            .eq('notas', `Factura generada desde cobro ID: ${cobroId}`)
+            .single();
+          
+          if (facturaExistente) {
+            alert('Ya existe una factura para este cobro. No se puede crear otra factura.');
+            return;
           }
-        ],
-        factura_rectificada_id: '',
-        motivo_rectificacion: '',
-        notas: cobroId ? `Factura generada desde cobro ID: ${cobroId}` : '',
-      });
-      setShowFacturaModal(true);
-    }
+        }
+        
+        // Calcular importe base según tipo de IVA del cobro
+        let baseImponible = importeNum;
+        let incluirIva = true;
+        
+        if (ivaTipo === 'sin_iva') {
+          baseImponible = importeNum;
+          incluirIva = false;
+        } else if (ivaTipo === 'iva_incluido') {
+          // Si el IVA está incluido, hay que desglosarlo
+          // Ejemplo: 50€ con 21% IVA incluido → Base 41,32€ + IVA 8,68€
+          baseImponible = importeNum / (1 + ivaPorc / 100);
+          incluirIva = true;
+        } else if (ivaTipo === 'iva_sobre_precio') {
+          // El IVA se suma al precio
+          // Ejemplo: 50€ sin IVA → Base 50€ + IVA 10,50€ = Total 60,50€
+          baseImponible = importeNum;
+          incluirIva = true;
+        }
+        
+        setFacForm({
+          cliente_id: clienteId,
+          procedimiento_id: '',
+          tipo: 'normal',
+          fecha: fecha || new Date().toISOString().slice(0, 10),
+          receptor_nombre: clienteNombre,
+          receptor_nif: clienteNif || '',
+          receptor_direccion: clienteDireccion || '',
+          incluir_iva: incluirIva,
+          iva_porcentaje: ivaPorc,
+          incluir_irpf: false,
+          irpf_porcentaje: 15,
+          lineas: [
+            {
+              descripcion: concepto || 'Servicio profesional',
+              cantidad: 1,
+              precio_unitario: baseImponible,
+              importe: baseImponible
+            }
+          ],
+          factura_rectificada_id: '',
+          motivo_rectificacion: '',
+          notas: cobroId ? `Factura generada desde cobro ID: ${cobroId}` : '',
+        });
+        setShowFacturaModal(true);
+      }
+    };
+
+    prellenarDesdeCobro();
   }, [searchParams]);
 
   // Auto-fill receptor from client

@@ -78,50 +78,46 @@ export function ClienteNotas({ clienteId }: ClienteNotasProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-blue-600" />
-            <h3 className="text-lg font-semibold text-gray-900">Notas del cliente</h3>
-            <span className="text-sm text-gray-500">({notas.length})</span>
-          </div>
-          <button
-            onClick={() => setIsAddingNota(true)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Añadir nota
-          </button>
+    <div className="section-block">
+      <div className="section-header">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-4 h-4" />
+          <h3>Notas del cliente</h3>
+          <span className="text-sm text-gray-500">({notas.length})</span>
         </div>
+        <button
+          onClick={() => setIsAddingNota(true)}
+          className="btn btn-primary btn-sm"
+        >
+          <Plus className="w-4 h-4" /> Añadir nota
+        </button>
       </div>
 
       {/* Add new nota */}
       {isAddingNota && (
-        <div className="p-4 bg-blue-50 border-b border-blue-200">
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg mb-4">
           <textarea
             value={newNotaText}
             onChange={(e) => setNewNotaText(e.target.value)}
             placeholder="Escribe una nota..."
-            className="w-full p-3 border border-blue-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="form-input"
             rows={3}
             autoFocus
           />
-          <div className="flex justify-end gap-2 mt-3">
+          <div className="flex justify-end gap-3 mt-3">
             <button
               onClick={() => {
                 setIsAddingNota(false);
                 setNewNotaText('');
               }}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+              className="btn btn-secondary"
             >
               Cancelar
             </button>
             <button
               onClick={handleAddNota}
               disabled={!newNotaText.trim()}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="btn btn-primary"
             >
               Guardar nota
             </button>
@@ -130,23 +126,23 @@ export function ClienteNotas({ clienteId }: ClienteNotasProps) {
       )}
 
       {/* Notas list */}
-      <div className="divide-y divide-gray-100">
-        {displayNotas.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p>No hay notas registradas</p>
-            <p className="text-sm mt-1">Añade la primera nota para este cliente</p>
-          </div>
-        ) : (
-          displayNotas.map((nota) => (
-            <div key={nota.id} className="p-4 hover:bg-gray-50 transition-colors">
+      {displayNotas.length === 0 ? (
+        <div className="empty-state">
+          <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+          <p>No hay notas registradas</p>
+          <p className="text-sm mt-1">Añade la primera nota para este cliente</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {displayNotas.map((nota) => (
+            <div key={nota.id} className="bg-gray-50 p-4 rounded-lg">
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1">
                   {editingNota?.id === nota.id ? (
                     <textarea
                       value={editingNota.nota}
                       onChange={(e) => setEditingNota({ ...editingNota, nota: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="form-input"
                       rows={3}
                       autoFocus
                     />
@@ -160,14 +156,14 @@ export function ClienteNotas({ clienteId }: ClienteNotasProps) {
                     <div className="flex gap-1">
                       <button
                         onClick={() => handleEditNota(editingNota)}
-                        className="p-1.5 text-green-600 hover:bg-green-50 rounded transition-colors"
+                        className="action-btn action-view"
                         title="Guardar"
                       >
                         ✓
                       </button>
                       <button
                         onClick={() => setEditingNota(null)}
-                        className="p-1.5 text-gray-600 hover:bg-gray-50 rounded transition-colors"
+                        className="action-btn action-delete"
                         title="Cancelar"
                       >
                         ✕
@@ -177,42 +173,42 @@ export function ClienteNotas({ clienteId }: ClienteNotasProps) {
                     <>
                       <button
                         onClick={() => setEditingNota(nota)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        className="action-btn action-edit"
                         title="Editar"
                       >
-                        <Edit3 className="w-4 h-4" />
+                        <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDeleteNota(nota.id)}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        className="action-btn action-delete"
                         title="Eliminar"
                       >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </>
                   )}
                 </div>
               </div>
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Show more/less button */}
       {notas.length > 3 && (
-        <div className="p-4 border-t border-gray-100 bg-gray-50">
+        <div className="mt-4 text-center">
           <button
             onClick={() => setShowAll(!showAll)}
-            className="flex items-center gap-2 mx-auto text-blue-600 hover:text-blue-700 transition-colors"
+            className="text-blue-600 hover:text-blue-700 transition-colors text-sm"
           >
             {showAll ? (
               <>
-                <ChevronUp className="w-4 h-4" />
+                <ChevronUp className="w-4 h-4 inline mr-1" />
                 Mostrar menos
               </>
             ) : (
               <>
-                <ChevronDown className="w-4 h-4" />
+                <ChevronDown className="w-4 h-4 inline mr-1" />
                 Mostrar {notas.length - 3} notas más
               </>
             )}

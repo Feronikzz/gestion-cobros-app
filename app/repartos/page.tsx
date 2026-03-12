@@ -5,13 +5,22 @@ import { LayoutShell } from '@/components/layout-shell';
 import { RepartoForm } from '@/components/reparto-form';
 import { Modal } from '@/components/modal';
 import { useRepartos } from '@/lib/hooks/use-repartos';
+import { useCierreMensual } from '@/lib/hooks/use-cierre-mensual';
 import type { Reparto } from '@/lib/supabase/types';
 import { eur, monthLabel } from '@/lib/utils';
 
 export default function RepartosPage() {
   const { repartos, loading, error, createReparto, updateReparto, deleteReparto } = useRepartos();
+  const { cierres } = useCierreMensual();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingReparto, setEditingReparto] = useState<Reparto | null>(null);
+
+  // Obtener el mes actual
+  const mesActual = new Date().toISOString().slice(0, 7); // YYYY-MM
+  
+  // Obtener el saldo del mes actual
+  const cierreMesActual = cierres.find((c: any) => c.mes === mesActual);
+  const saldoDisponible = cierreMesActual ? cierreMesActual.saldo_final : 0;
 
   const handleCreate = () => {
     setEditingReparto(null);
@@ -69,9 +78,17 @@ export default function RepartosPage() {
   return (
     <LayoutShell title="Repartos">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900">
-          Gestión de Repartos
-        </h2>
+        <div>
+          <h2 className="text-2xl font-semibold text-gray-900">
+            Gestión de Repartos
+          </h2>
+          <div className="mt-2">
+            <span className="text-sm text-gray-600">Saldo disponible para {monthLabel(mesActual)}: </span>
+            <span className={`text-lg font-bold ${saldoDisponible >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {eur(saldoDisponible)}
+            </span>
+          </div>
+        </div>
         <button
           onClick={handleCreate}
           className="btn btn-primary"
