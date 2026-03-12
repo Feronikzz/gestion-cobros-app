@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { LayoutShell } from '@/components/layout-shell';
 import { Modal } from '@/components/modal';
 import { useFacturas } from '@/lib/hooks/use-facturas';
@@ -11,6 +12,7 @@ import type { TipoFactura, FacturaLinea, Factura } from '@/lib/supabase/types';
 import { Plus, Trash2, Settings, FileText, Copy, Eye, Download } from 'lucide-react';
 
 export default function FacturasPage() {
+  const searchParams = useSearchParams();
   const { facturas, emisor, loading, error, saveEmisor, createFactura, deleteFactura } = useFacturas();
   const { clientes } = useClientes();
   const { procedimientos } = useProcedimientos();
@@ -52,6 +54,45 @@ export default function FacturasPage() {
     if (!filterTipo) return facturas;
     return facturas.filter(f => f.tipo === filterTipo);
   }, [facturas, filterTipo]);
+
+  // Prellenar formulario desde parámetros de cobro
+  useEffect(() => {
+    const clienteId = searchParams.get('cliente_id');
+    const clienteNombre = searchParams.get('cliente_nombre');
+    const clienteNif = searchParams.get('cliente_nif');
+    const clienteDireccion = searchParams.get('cliente_direccion');
+    const importe = searchParams.get('importe');
+    const concepto = searchParams.get('concepto');
+    const fecha = searchParams.get('fecha');
+
+    if (clienteId && clienteNombre) {
+      setFacForm({
+        cliente_id: clienteId,
+        procedimiento_id: '',
+        tipo: 'normal',
+        fecha: fecha || new Date().toISOString().slice(0, 10),
+        receptor_nombre: clienteNombre,
+        receptor_nif: clienteNif || '',
+        receptor_direccion: clienteDireccion || '',
+        incluir_iva: true,
+        iva_porcentaje: 21,
+        incluir_irpf: false,
+        irpf_porcentaje: 15,
+        lineas: [
+          {
+            descripcion: concepto || 'Servicio profesional',
+            cantidad: 1,
+            precio_unitario: parseFloat(importe || '0') || 0,
+            importe: parseFloat(importe || '0') || 0
+          }
+        ],
+        factura_rectificada_id: '',
+        motivo_rectificacion: '',
+        notas: '',
+      });
+      setShowFacturaModal(true);
+    }
+  }, [searchParams]);
 
   // Auto-fill receptor from client
   const handleClienteChange = (clienteId: string) => {

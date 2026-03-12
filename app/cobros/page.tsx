@@ -8,6 +8,7 @@ import { useCobros } from '@/lib/hooks/use-cobros';
 import { useClientes } from '@/lib/hooks/use-clientes';
 import type { Cobro } from '@/lib/supabase/types';
 import { eur } from '@/lib/utils';
+import { Plus, FileText, DollarSign } from 'lucide-react';
 
 export default function CobrosPage() {
   const { cobros, loading, error, createCobro, updateCobro, deleteCobro } = useCobros();
@@ -54,6 +55,28 @@ export default function CobrosPage() {
     return cliente?.nombre || 'Cliente desconocido';
   };
 
+  const isEntrada = (cobro: Cobro) => {
+    return cobro.notas?.includes('Entrada del procedimiento:') || cobro.procedimiento_id !== null;
+  };
+
+  const handleCreateFacturaFromCobro = (cobro: Cobro) => {
+    const cliente = clientes.find(c => c.id === cobro.cliente_id);
+    if (!cliente) return;
+    
+    // Redirigir a página de facturas con parámetros prellenados
+    const params = new URLSearchParams({
+      cliente_id: cobro.cliente_id,
+      cliente_nombre: cliente.nombre,
+      cliente_nif: cliente.nif || '',
+      cliente_direccion: cliente.direccion || '',
+      importe: cobro.importe.toString(),
+      concepto: cobro.notas || 'Cobro sin concepto específico',
+      fecha: cobro.fecha_cobro,
+    });
+    
+    window.open(`/facturas?${params.toString()}`, '_blank');
+  };
+
   if (loading) {
     return (
       <LayoutShell title="Cobros">
@@ -94,6 +117,7 @@ export default function CobrosPage() {
             <tr>
               <th>Fecha</th>
               <th>Cliente</th>
+              <th>Tipo</th>
               <th>Método</th>
               <th>Importe</th>
               <th>Notas</th>
@@ -103,7 +127,7 @@ export default function CobrosPage() {
           <tbody>
             {cobros.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-gray-500">
+                <td colSpan={7} className="text-center py-8 text-gray-500">
                   No hay cobros registrados
                 </td>
               </tr>
@@ -113,6 +137,18 @@ export default function CobrosPage() {
                   <td>{cobro.fecha_cobro}</td>
                   <td className="font-medium">{getClienteNombre(cobro.cliente_id)}</td>
                   <td>
+                    {isEntrada(cobro) ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                        <DollarSign className="w-3 h-3 mr-1" />
+                        Entrada
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        Normal
+                      </span>
+                    )}
+                  </td>
+                  <td>
                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                       {cobro.metodo_pago}
                     </span>
@@ -121,6 +157,13 @@ export default function CobrosPage() {
                   <td className="subtle-text">{cobro.notas || '-'}</td>
                   <td>
                     <div className="flex gap-2">
+                      <button
+                        onClick={() => handleCreateFacturaFromCobro(cobro)}
+                        className="btn btn-secondary btn-sm"
+                        title="Crear factura"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={() => handleEdit(cobro)}
                         className="text-blue-600 hover:text-blue-800"
