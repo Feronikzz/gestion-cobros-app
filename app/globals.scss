@@ -370,10 +370,18 @@ body {
   padding: 0.125rem 0.5rem; border-radius: var(--radius-sm);
   font-size: 0.6875rem; background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe;
 }
+.proc-doc-actions {
+  display: inline-flex; align-items: center; gap: 0.125rem; margin-left: 0.25rem;
+}
+.proc-doc-download {
+  background: none; border: none; cursor: pointer; color: #059669;
+  font-size: 0.75rem; line-height: 1; padding: 0.125rem; border-radius: 2px;
+  &:hover { color: #047857; background: rgba(5, 150, 105, 0.1); }
+}
 .proc-doc-remove {
   background: none; border: none; cursor: pointer; color: #dc2626;
-  font-size: 0.875rem; line-height: 1; padding: 0 0.125rem; margin-left: 0.125rem;
-  &:hover { color: #991b1b; }
+  font-size: 0.875rem; line-height: 1; padding: 0 0.125rem; border-radius: 2px;
+  &:hover { color: #991b1b; background: rgba(220, 38, 38, 0.1); }
 }
 
 // =============================================================================

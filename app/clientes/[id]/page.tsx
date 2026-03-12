@@ -11,7 +11,7 @@ import { createClient } from '@/lib/supabase/client';
 import { eur } from '@/lib/utils';
 import type { Cliente, Procedimiento, Cobro } from '@/lib/supabase/types';
 import type { Documento, EstadoProcedimiento } from '@/lib/supabase/types';
-import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download } from 'lucide-react';
 
 export default function ClienteDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -259,6 +259,32 @@ export default function ClienteDetallePage() {
     fetchData();
   };
 
+  const handleDownloadDoc = async (documento: Documento) => {
+    if (!documento.archivo_url) {
+      alert('Este documento no tiene archivo adjunto.');
+      return;
+    }
+
+    try {
+      // Extraer el nombre del archivo de la URL
+      const url = new URL(documento.archivo_url);
+      const pathParts = url.pathname.split('/');
+      const fileName = pathParts[pathParts.length - 1];
+
+      // Abrir la URL en una nueva pestaña para descargar
+      const link = document.createElement('a');
+      link.href = documento.archivo_url;
+      link.download = fileName;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error al descargar documento:', error);
+      alert('Error al descargar el documento. Por favor, inténtalo de nuevo.');
+    }
+  };
+
   const docsForProc = (procId: string) => documentos.filter(d => d.procedimiento_id === procId);
 
   // Calcular pendiente por procedimiento
@@ -373,7 +399,18 @@ export default function ClienteDetallePage() {
                       {docs.map(d => (
                         <span key={d.id} className="proc-doc-tag">
                           <Paperclip className="w-3 h-3" /> {d.nombre} ({d.tipo})
-                          <button onClick={() => handleDeleteDoc(d.id)} className="proc-doc-remove" title="Eliminar">&times;</button>
+                          <div className="proc-doc-actions">
+                            {d.archivo_url && (
+                              <button 
+                                onClick={() => handleDownloadDoc(d)} 
+                                className="proc-doc-download" 
+                                title="Descargar archivo"
+                              >
+                                <Download className="w-3 h-3" />
+                              </button>
+                            )}
+                            <button onClick={() => handleDeleteDoc(d.id)} className="proc-doc-remove" title="Eliminar">&times;</button>
+                          </div>
                         </span>
                       ))}
                     </div>
