@@ -81,10 +81,12 @@ export default function FacturasPage() {
         incluirIva = false;
       } else if (ivaTipo === 'iva_incluido') {
         // Si el IVA está incluido, hay que desglosarlo
+        // Ejemplo: 50€ con 21% IVA incluido → Base 41,32€ + IVA 8,68€
         baseImponible = importeNum / (1 + ivaPorc / 100);
         incluirIva = true;
       } else if (ivaTipo === 'iva_sobre_precio') {
         // El IVA se suma al precio
+        // Ejemplo: 50€ sin IVA → Base 50€ + IVA 10,50€ = Total 60,50€
         baseImponible = importeNum;
         incluirIva = true;
       }

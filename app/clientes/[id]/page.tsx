@@ -227,9 +227,15 @@ export default function ClienteDetallePage() {
     
     const cobrosDelProc = cobros.filter(c => c.procedimiento_id === procId);
     const totalCobrado = cobrosDelProc.reduce((s, c) => s + c.importe, 0);
-    const entradas = procedimiento.tiene_entrada ? procedimiento.importe_entrada : 0;
     
-    return procedimiento.presupuesto - totalCobrado - entradas;
+    // El importe_entrada ya está incluido en los cobros si se creó automáticamente
+    // Solo sumarlo si no hay cobros asociados al procedimiento
+    const entradasYaCobradas = cobrosDelProc.some(c => 
+      c.notas && c.notas.includes('Entrada del procedimiento')
+    );
+    const totalPagado = totalCobrado;
+    
+    return procedimiento.presupuesto - totalPagado;
   };
 
   if (loading) return <LayoutShell title="Cliente"><div className="loading-state">Cargando...</div></LayoutShell>;
