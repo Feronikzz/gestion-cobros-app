@@ -16,6 +16,7 @@ export function ClienteForm({ cliente, onSubmit, onCancel }: ClienteFormProps) {
     telefono: cliente?.telefono ?? '',
     email: cliente?.email ?? '',
     direccion: cliente?.direccion ?? '',
+    anio_nacimiento: cliente?.anio_nacimiento?.toString() ?? '',
     fecha_entrada: cliente?.fecha_entrada ?? new Date().toISOString().split('T')[0],
     documento_tipo: cliente?.documento_tipo ?? 'DNI',
     documento_caducidad: cliente?.documento_caducidad ?? '',
@@ -34,6 +35,7 @@ export function ClienteForm({ cliente, onSubmit, onCancel }: ClienteFormProps) {
         telefono: formData.telefono || null,
         email: formData.email || null,
         direccion: formData.direccion || null,
+        anio_nacimiento: formData.anio_nacimiento ? parseInt(formData.anio_nacimiento) : null,
         documento_tipo: formData.documento_tipo || null,
         documento_caducidad: formData.documento_caducidad || null,
         notas: formData.notas || null,
@@ -57,6 +59,18 @@ export function ClienteForm({ cliente, onSubmit, onCancel }: ClienteFormProps) {
           <div>
             <label className="form-label">Nombre completo *</label>
             <input type="text" value={formData.nombre} onChange={(e) => set('nombre', e.target.value)} className="form-input" required />
+          </div>
+          <div>
+            <label className="form-label">Año de nacimiento</label>
+            <input 
+              type="number" 
+              value={formData.anio_nacimiento} 
+              onChange={(e) => set('anio_nacimiento', e.target.value)} 
+              className="form-input" 
+              placeholder="1990"
+              min="1900"
+              max={new Date().getFullYear()}
+            />
           </div>
           <div>
             <label className="form-label">NIF / NIE / CIF</label>

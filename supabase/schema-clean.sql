@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS public.clientes (
     telefono text,
     email text,
     direccion text,
+    anio_nacimiento integer,
     fecha_entrada date NOT NULL,
     documento_tipo text,
     documento_caducidad date,
@@ -44,6 +45,9 @@ DO $$ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='direccion') THEN
         ALTER TABLE public.clientes ADD COLUMN direccion text;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='anio_nacimiento') THEN
+        ALTER TABLE public.clientes ADD COLUMN anio_nacimiento integer;
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='clientes' AND column_name='documento_tipo') THEN
         ALTER TABLE public.clientes ADD COLUMN documento_tipo text;

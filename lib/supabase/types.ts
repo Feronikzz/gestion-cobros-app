@@ -18,6 +18,7 @@ export interface Cliente {
   telefono: string | null;
   email: string | null;
   direccion: string | null;
+  anio_nacimiento: number | null;
   fecha_entrada: string;
   documento_tipo: string | null;
   documento_caducidad: string | null;

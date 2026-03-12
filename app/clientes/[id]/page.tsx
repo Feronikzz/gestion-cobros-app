@@ -330,6 +330,7 @@ export default function ClienteDetallePage() {
         </div>
         <div className="detail-grid">
           <div><span className="detail-label">Nombre</span><span className="detail-value">{cliente.nombre}</span></div>
+          <div><span className="detail-label">Año de nacimiento</span><span className="detail-value">{cliente.anio_nacimiento || '—'}</span></div>
           <div><span className="detail-label">NIF</span><span className="detail-value">{cliente.nif || '—'}</span></div>
           <div><span className="detail-label">Teléfono</span><span className="detail-value">{cliente.telefono || '—'}</span></div>
           <div><span className="detail-label">Email</span><span className="detail-value">{cliente.email || '—'}</span></div>
