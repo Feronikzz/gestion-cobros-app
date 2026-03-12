@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { LayoutShell } from '@/components/layout-shell';
+import { Nav } from '@/components/nav';
 import { CobroForm } from '@/components/cobro-form';
 import { Modal } from '@/components/modal';
 import { useCobros } from '@/lib/hooks/use-cobros';
@@ -181,27 +181,33 @@ export default function CobrosPage() {
 
   if (loading) {
     return (
-      <LayoutShell title="Cobros">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+        <Nav />
         <div className="flex justify-center items-center h-64">
           <div className="text-gray-500">Cargando cobros...</div>
         </div>
-      </LayoutShell>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <LayoutShell title="Cobros">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+        <Nav />
         <div className="bg-red-50 border border-red-200 rounded-xl p-4">
           <div className="text-red-700">Error: {error}</div>
         </div>
-      </LayoutShell>
+      </div>
     );
   }
 
   return (
-    <LayoutShell title="Cobros">
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+      {/* Navigation */}
+      <Nav />
+      
+      {/* Main Content */}
+      <div className="relative overflow-hidden">
         {/* Header Editorial con Gradiente y Estadísticas */}
         <div className="relative overflow-hidden">
           {/* Background Pattern */}
@@ -635,6 +641,6 @@ export default function CobrosPage() {
           onCancel={() => setIsModalOpen(false)}
         />
       </Modal>
-    </LayoutShell>
+    </div>
   );
 }
