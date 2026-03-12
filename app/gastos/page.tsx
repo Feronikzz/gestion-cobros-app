@@ -10,7 +10,7 @@ import { eur, monthLabel } from '@/lib/utils';
 import { FileText, Download, Eye, Edit, Trash2, Receipt, TrendingUp, TrendingDown, Calendar, DollarSign, ShoppingCart, Building, Zap, Car, Phone, Mail, CreditCard, Search, Filter, ChevronDown, X } from 'lucide-react';
 
 export default function GastosPage() {
-  const { gastos, loading, error, createGasto, updateGasto, deleteGasto } = useGastos();
+  const { gastos, loading, error, createGasto, updateGasto, deleteGasto, uploadFactura } = useGastos();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGasto, setEditingGasto] = useState<Gasto | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -154,14 +154,27 @@ export default function GastosPage() {
 
   const handleSubmit = async (data: Omit<Gasto, 'id' | 'user_id' | 'created_at'>) => {
     try {
+      console.log('Enviando datos del gasto:', data);
+      
       if (editingGasto) {
+        console.log('Actualizando gasto existente:', editingGasto.id);
         await updateGasto(editingGasto.id, data);
       } else {
+        console.log('Creando nuevo gasto');
         await createGasto(data);
       }
+      
+      console.log('Gasto guardado exitosamente');
       setIsModalOpen(false);
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error completo al guardar gasto:', error);
+      
+      // Mostrar error más detallado
+      if (error instanceof Error) {
+        alert(`Error al guardar el gasto: ${error.message}`);
+      } else {
+        alert('Error inesperado al guardar el gasto. Por favor, revisa la consola para más detalles.');
+      }
     }
   };
 
@@ -527,6 +540,7 @@ export default function GastosPage() {
           gasto={editingGasto || undefined}
           onSubmit={handleSubmit}
           onCancel={() => setIsModalOpen(false)}
+          onUploadFactura={uploadFactura}
         />
       </Modal>
     </LayoutShell>

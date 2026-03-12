@@ -8,9 +8,10 @@ interface GastoFormProps {
   gasto?: Gasto;
   onSubmit: (data: Omit<Gasto, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
   onCancel: () => void;
+  onUploadFactura?: (file: File) => Promise<string>;
 }
 
-export function GastoForm({ gasto, onSubmit, onCancel }: GastoFormProps) {
+export function GastoForm({ gasto, onSubmit, onCancel, onUploadFactura }: GastoFormProps) {
   const [formData, setFormData] = useState({
     fecha: gasto?.fecha || new Date().toISOString().split('T')[0],
     mes: gasto?.mes || new Date().toISOString().slice(0, 7),
@@ -40,20 +41,45 @@ export function GastoForm({ gasto, onSubmit, onCancel }: GastoFormProps) {
     setLoading(true);
 
     try {
+      console.log('Iniciando submit del formulario de gasto');
+      
       const conceptosArray = formData.conceptos
         .split(',')
         .map(c => c.trim())
         .filter(c => c.length > 0);
 
-      await onSubmit({
+      console.log('Conceptos procesados:', conceptosArray);
+      console.log('Factura file:', facturaFile);
+      console.log('Factura URL existente:', facturaUrl);
+
+      let finalFacturaUrl = facturaUrl;
+
+      // Si hay un nuevo archivo de factura, subirlo
+      if (facturaFile && onUploadFactura) {
+        console.log('Subiendo nueva factura:', facturaFile.name);
+        try {
+          finalFacturaUrl = await onUploadFactura(facturaFile);
+          console.log('Factura subida exitosamente:', finalFacturaUrl);
+        } catch (uploadError) {
+          console.error('Error al subir factura:', uploadError);
+          throw new Error(`Error al subir la factura: ${uploadError instanceof Error ? uploadError.message : 'Error desconocido'}`);
+        }
+      }
+
+      const gastoData = {
         ...formData,
         conceptos: conceptosArray,
-        factura_url: facturaUrl,
+        factura_url: finalFacturaUrl,
         numero_factura: '', // Campo vacío ya que no se necesita
         fecha_factura: '' // Campo vacío ya que no se necesita
-      });
+      };
+
+      console.log('Datos finales del gasto:', gastoData);
+      await onSubmit(gastoData);
+      console.log('Gasto enviado exitosamente');
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error completo en handleSubmit:', error);
+      throw error; // Re-lanzar el error para que lo maneje el componente padre
     } finally {
       setLoading(false);
     }

@@ -39,6 +39,8 @@ export function useGastos() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
 
+      console.log('Creando gasto:', { ...gasto, user_id: user.id });
+
       const { data, error: insertError } = await supabase
         .from('gastos')
         .insert({
@@ -48,14 +50,30 @@ export function useGastos() {
         .select()
         .single();
 
-      if (insertError) throw insertError;
-
+      if (insertError) {
+        console.error('Error Supabase detallado:', {
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          code: insertError.code
+        });
+        throw new Error(`Error de base de datos: ${insertError.message || 'Error desconocido'}`);
+      }
+      
+      if (!data) {
+        throw new Error('No se devolvieron datos al crear el gasto');
+      }
+      
       setGastos(prev => [data, ...prev]);
       return data;
-    } catch (err: any) {
-      setError(err.message);
-      console.error('Error creating gasto:', err);
-      throw err;
+    } catch (error) {
+      console.error('Error completo al crear gasto:', error);
+      
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Error inesperado al crear gasto');
+      }
     }
   };
 
