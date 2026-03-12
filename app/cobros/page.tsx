@@ -212,160 +212,199 @@ export default function CobrosPage() {
         </div>
       </div>
 
-      {/* Filtros Visuales */}
+      {/* Filtros Visuales Modernos */}
       <div className="mb-6">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
-            <Filter className="w-4 h-4" />
-            Filtros rápidos:
+        <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-2xl p-6 shadow-sm border border-gray-100">
+          <div className="flex flex-wrap items-center gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl">
+                <Filter className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-sm font-semibold text-gray-800">Filtros inteligentes</span>
+            </div>
           </div>
           
-          {/* Filtro de Cliente */}
-          <div className="relative">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`px-4 py-2 rounded-full border-2 transition-all duration-200 ${
-                filterCliente 
-                  ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' 
-                  : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4" />
-                <span>{filterCliente ? getClienteNombre(filterCliente) : 'Cliente'}</span>
-                <ChevronDown className={`w-3 h-3 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-              </div>
-            </button>
-
-            {showFilters && (
-              <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                <div className="p-3 max-h-64 overflow-y-auto">
-                  <div className="text-xs font-medium text-gray-500 mb-2">Seleccionar cliente</div>
-                  {clientes.map(cliente => (
-                    <button
-                      key={cliente.id}
-                      onClick={() => {
-                        setFilterCliente(filterCliente === cliente.id ? '' : cliente.id);
-                        setShowFilters(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                        filterCliente === cliente.id 
-                          ? 'bg-blue-50 text-blue-700 font-medium' 
-                          : 'hover:bg-gray-50 text-gray-700'
-                      }`}
-                    >
-                      {cliente.nombre}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Filtro de Método */}
-          <div className="flex flex-wrap gap-2">
-            {['transferencia', 'efectivo', 'tarjeta', 'bizum'].map(metodo => (
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Filtro de Cliente */}
+            <div className="relative">
               <button
-                key={metodo}
-                onClick={() => setFilterMetodo(filterMetodo === metodo ? '' : metodo)}
-                className={`px-4 py-2 rounded-full border-2 transition-all duration-200 ${
-                  filterMetodo === metodo 
-                    ? 'border-green-500 bg-green-50 text-green-700 font-medium' 
-                    : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+                onClick={() => setShowFilters(!showFilters)}
+                className={`group px-4 py-2.5 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 ${
+                  filterCliente 
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25' 
+                    : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-blue-300 hover:shadow-md'
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <CreditCard className="w-4 h-4" />
-                  <span className="capitalize">{metodo}</span>
+                  <div className={`p-1 rounded-lg ${
+                    filterCliente ? 'bg-white/20' : 'bg-blue-100'
+                  }`}>
+                    <Users className={`w-4 h-4 ${filterCliente ? 'text-white' : 'text-blue-600'}`} />
+                  </div>
+                  <span>{filterCliente ? getClienteNombre(filterCliente) : 'Cliente'}</span>
+                  <ChevronDown className={`w-3 h-3 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
                 </div>
               </button>
-            ))}
-          </div>
 
-          {/* Filtro de Tipo */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setFilterTipo(filterTipo === 'entrada' ? '' : 'entrada')}
-              className={`px-4 py-2 rounded-full border-2 transition-all duration-200 ${
-                filterTipo === 'entrada' 
-                  ? 'border-amber-500 bg-amber-50 text-amber-700 font-medium' 
-                  : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-4 h-4" />
-                <span>Entrada</span>
-              </div>
-            </button>
-            <button
-              onClick={() => setFilterTipo(filterTipo === 'normal' ? '' : 'normal')}
-              className={`px-4 py-2 rounded-full border-2 transition-all duration-200 ${
-                filterTipo === 'normal' 
-                  ? 'border-purple-500 bg-purple-50 text-purple-700 font-medium' 
-                  : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                <span>Normal</span>
-              </div>
-            </button>
-          </div>
-
-          {/* Filtro de Mes */}
-          <div className="relative">
-            <button
-              onClick={() => setShowMonthFilter(!showMonthFilter)}
-              className={`px-4 py-2 rounded-full border-2 transition-all duration-200 ${
-                filterMes 
-                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-medium' 
-                  : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                <span>{filterMes ? mesesDisponibles.find(m => m.value === filterMes)?.label || 'Mes' : 'Mes'}</span>
-                <ChevronDown className={`w-3 h-3 transition-transform ${showMonthFilter ? 'rotate-180' : ''}`} />
-              </div>
-            </button>
-
-            {showMonthFilter && (
-              <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                <div className="p-3 max-h-64 overflow-y-auto">
-                  <div className="text-xs font-medium text-gray-500 mb-2">Seleccionar mes</div>
-                  {mesesDisponibles.map(mes => (
-                    <button
-                      key={mes.value}
-                      onClick={() => {
-                        setFilterMes(filterMes === mes.value ? '' : mes.value);
-                        setShowMonthFilter(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                        filterMes === mes.value 
-                          ? 'bg-indigo-50 text-indigo-700 font-medium' 
-                          : 'hover:bg-gray-50 text-gray-700'
-                      }`}
-                    >
-                      {mes.label}
-                    </button>
-                  ))}
+              {showFilters && (
+                <div className="absolute top-full left-0 mt-3 w-72 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+                  <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3">
+                    <div className="text-white font-medium text-sm">Seleccionar cliente</div>
+                  </div>
+                  <div className="p-2 max-h-64 overflow-y-auto">
+                    {clientes.map(cliente => (
+                      <button
+                        key={cliente.id}
+                        onClick={() => {
+                          setFilterCliente(filterCliente === cliente.id ? '' : cliente.id);
+                          setShowFilters(false);
+                        }}
+                        className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 ${
+                          filterCliente === cliente.id 
+                            ? 'bg-blue-50 text-blue-700 font-medium border-l-4 border-blue-500' 
+                            : 'hover:bg-gray-50 text-gray-700'
+                        }`}
+                      >
+                        {cliente.nombre}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
+            </div>
+
+            {/* Filtro de Método */}
+            <div className="flex flex-wrap gap-2">
+              {[
+                { value: 'transferencia', label: 'Transferencia', color: 'green' },
+                { value: 'efectivo', label: 'Efectivo', color: 'emerald' },
+                { value: 'tarjeta', label: 'Tarjeta', color: 'blue' },
+                { value: 'bizum', label: 'Bizum', color: 'purple' }
+              ].map(metodo => (
+                <button
+                  key={metodo.value}
+                  onClick={() => setFilterMetodo(filterMetodo === metodo.value ? '' : metodo.value)}
+                  className={`group px-4 py-2.5 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 ${
+                    filterMetodo === metodo.value 
+                      ? `bg-gradient-to-r from-${metodo.color}-500 to-${metodo.color}-600 text-white shadow-lg shadow-${metodo.color}-500/25` 
+                      : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-gray-300 hover:shadow-md'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={`p-1 rounded-lg ${
+                      filterMetodo === metodo.value ? 'bg-white/20' : `bg-${metodo.color}-100`
+                    }`}>
+                      <CreditCard className={`w-4 h-4 ${
+                        filterMetodo === metodo.value ? 'text-white' : `text-${metodo.color}-600`
+                      }`} />
+                    </div>
+                    <span>{metodo.label}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Filtro de Tipo */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setFilterTipo(filterTipo === 'entrada' ? '' : 'entrada')}
+                className={`group px-4 py-2.5 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 ${
+                  filterTipo === 'entrada' 
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25' 
+                    : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-amber-300 hover:shadow-md'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className={`p-1 rounded-lg ${
+                    filterTipo === 'entrada' ? 'bg-white/20' : 'bg-amber-100'
+                  }`}>
+                    <DollarSign className={`w-4 h-4 ${filterTipo === 'entrada' ? 'text-white' : 'text-amber-600'}`} />
+                  </div>
+                  <span>Entrada</span>
+                </div>
+              </button>
+              <button
+                onClick={() => setFilterTipo(filterTipo === 'normal' ? '' : 'normal')}
+                className={`group px-4 py-2.5 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 ${
+                  filterTipo === 'normal' 
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg shadow-purple-500/25' 
+                    : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-purple-300 hover:shadow-md'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className={`p-1 rounded-lg ${
+                    filterTipo === 'normal' ? 'bg-white/20' : 'bg-purple-100'
+                  }`}>
+                    <FileText className={`w-4 h-4 ${filterTipo === 'normal' ? 'text-white' : 'text-purple-600'}`} />
+                  </div>
+                  <span>Normal</span>
+                </div>
+              </button>
+            </div>
+
+            {/* Filtro de Mes */}
+            <div className="relative">
+              <button
+                onClick={() => setShowMonthFilter(!showMonthFilter)}
+                className={`group px-4 py-2.5 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 ${
+                  filterMes 
+                    ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25' 
+                    : 'bg-white text-gray-700 border-2 border-gray-200 hover:border-indigo-300 hover:shadow-md'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <div className={`p-1 rounded-lg ${
+                    filterMes ? 'bg-white/20' : 'bg-indigo-100'
+                  }`}>
+                    <Calendar className={`w-4 h-4 ${filterMes ? 'text-white' : 'text-indigo-600'}`} />
+                  </div>
+                  <span>{filterMes ? mesesDisponibles.find(m => m.value === filterMes)?.label || 'Mes' : 'Mes'}</span>
+                  <ChevronDown className={`w-3 h-3 transition-transform ${showMonthFilter ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+
+              {showMonthFilter && (
+                <div className="absolute top-full left-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+                  <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 px-4 py-3">
+                    <div className="text-white font-medium text-sm">Seleccionar mes</div>
+                  </div>
+                  <div className="p-2 max-h-64 overflow-y-auto">
+                    {mesesDisponibles.map(mes => (
+                      <button
+                        key={mes.value}
+                        onClick={() => {
+                          setFilterMes(filterMes === mes.value ? '' : mes.value);
+                          setShowMonthFilter(false);
+                        }}
+                        className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 ${
+                          filterMes === mes.value 
+                            ? 'bg-indigo-50 text-indigo-700 font-medium border-l-4 border-indigo-500' 
+                            : 'hover:bg-gray-50 text-gray-700'
+                        }`}
+                      >
+                        {mes.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Botón Limpiar */}
+            {activeFiltersCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="group px-4 py-2.5 rounded-xl font-medium bg-gradient-to-r from-red-500 to-pink-600 text-white shadow-lg shadow-red-500/25 transition-all duration-300 transform hover:scale-105"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="p-1 bg-white/20 rounded-lg">
+                    <X className="w-4 h-4 text-white" />
+                  </div>
+                  <span>Limpiar ({activeFiltersCount})</span>
+                </div>
+              </button>
             )}
           </div>
-
-          {/* Botón Limpiar */}
-          {activeFiltersCount > 0 && (
-            <button
-              onClick={clearFilters}
-              className="px-4 py-2 rounded-full border-2 border-red-300 bg-red-50 text-red-700 font-medium hover:bg-red-100 transition-all duration-200"
-            >
-              <div className="flex items-center gap-2">
-                <X className="w-4 h-4" />
-                <span>Limpiar ({activeFiltersCount})</span>
-              </div>
-            </button>
-          )}
         </div>
       </div>
 
