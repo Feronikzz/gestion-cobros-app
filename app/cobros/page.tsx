@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { LayoutShell } from '@/components/layout-shell';
 import { CobroForm } from '@/components/cobro-form';
 import { Modal } from '@/components/modal';
@@ -9,18 +10,60 @@ import { useClientes } from '@/lib/hooks/use-clientes';
 import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import type { Cobro } from '@/lib/supabase/types';
 import { eur } from '@/lib/utils';
-import { Plus, FileText, DollarSign, Edit3, Trash2 } from 'lucide-react';
+import { Plus, FileText, DollarSign, Edit3, Trash2, Search, Filter } from 'lucide-react';
 
 export default function CobrosPage() {
+  const router = useRouter();
   const { cobros, loading, error, createCobro, updateCobro, deleteCobro } = useCobros();
   const { clientes } = useClientes();
   const { procedimientos } = useProcedimientos();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCobro, setEditingCobro] = useState<Cobro | null>(null);
+  
+  // Filtros
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCliente, setFilterCliente] = useState('');
+  const [filterMetodo, setFilterMetodo] = useState('');
+  const [filterTipo, setFilterTipo] = useState('');
+
+  // Filtrado de cobros
+  const filteredCobros = useMemo(() => {
+    return cobros.filter(cobro => {
+      // Búsqueda por texto
+      const searchMatch = !searchTerm || 
+        getClienteNombre(cobro.cliente_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (cobro.notas && cobro.notas.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (cobro.procedimiento_id && getProcedimientoTitulo(cobro.procedimiento_id).toLowerCase().includes(searchTerm.toLowerCase()));
+
+      // Filtro por cliente
+      const clienteMatch = !filterCliente || cobro.cliente_id === filterCliente;
+
+      // Filtro por método
+      const metodoMatch = !filterMetodo || cobro.metodo_pago === filterMetodo;
+
+      // Filtro por tipo (entrada/normal)
+      const tipoMatch = !filterTipo || 
+        (filterTipo === 'entrada' && isEntrada(cobro)) ||
+        (filterTipo === 'normal' && !isEntrada(cobro));
+
+      return searchMatch && clienteMatch && metodoMatch && tipoMatch;
+    });
+  }, [cobros, searchTerm, filterCliente, filterMetodo, filterTipo]);
 
   const handleCreate = () => {
     setEditingCobro(null);
     setIsModalOpen(true);
+  };
+
+  const handleClienteClick = (clienteId: string) => {
+    router.push(`/clientes/${clienteId}`);
+  };
+
+  const clearFilters = () => {
+    setSearchTerm('');
+    setFilterCliente('');
+    setFilterMetodo('');
+    setFilterTipo('');
   };
 
   const handleEdit = (cobro: Cobro) => {
@@ -116,6 +159,93 @@ export default function CobrosPage() {
         </button>
       </div>
 
+      {/* Filtros */}
+      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Filter className="w-4 h-4 text-gray-500" />
+          <h3 className="text-sm font-medium text-gray-700">Filtros</h3>
+          {(searchTerm || filterCliente || filterMetodo || filterTipo) && (
+            <button
+              onClick={clearFilters}
+              className="text-xs text-blue-600 hover:text-blue-700 ml-2"
+            >
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Búsqueda */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Buscar</label>
+            <div className="relative">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Cliente, notas o procedimiento..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="form-input pl-10"
+              />
+            </div>
+          </div>
+
+          {/* Filtro por cliente */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Cliente</label>
+            <select
+              value={filterCliente}
+              onChange={(e) => setFilterCliente(e.target.value)}
+              className="form-input"
+            >
+              <option value="">Todos los clientes</option>
+              {clientes.map(cliente => (
+                <option key={cliente.id} value={cliente.id}>
+                  {cliente.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Filtro por método */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Método de pago</label>
+            <select
+              value={filterMetodo}
+              onChange={(e) => setFilterMetodo(e.target.value)}
+              className="form-input"
+            >
+              <option value="">Todos los métodos</option>
+              <option value="transferencia">Transferencia</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta</option>
+              <option value="bizum">Bizum</option>
+            </select>
+          </div>
+
+          {/* Filtro por tipo */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
+            <select
+              value={filterTipo}
+              onChange={(e) => setFilterTipo(e.target.value)}
+              className="form-input"
+            >
+              <option value="">Todos los tipos</option>
+              <option value="normal">Normal</option>
+              <option value="entrada">Entrada</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Contador de resultados */}
+      {(searchTerm || filterCliente || filterMetodo || filterTipo) && (
+        <div className="mb-4 text-sm text-gray-600">
+          Mostrando {filteredCobros.length} de {cobros.length} cobros
+        </div>
+      )}
+
       <div className="table-container">
         <table className="table">
           <thead>
@@ -131,17 +261,25 @@ export default function CobrosPage() {
             </tr>
           </thead>
           <tbody>
-            {cobros.length === 0 ? (
+            {filteredCobros.length === 0 ? (
               <tr>
                 <td colSpan={8} className="text-center py-8 text-gray-500">
-                  No hay cobros registrados
+                  {cobros.length === 0 ? 'No hay cobros registrados' : 'No hay cobros que coincidan con los filtros'}
                 </td>
               </tr>
             ) : (
-              cobros.map((cobro) => (
+              filteredCobros.map((cobro) => (
                 <tr key={cobro.id}>
                   <td>{cobro.fecha_cobro}</td>
-                  <td className="font-medium">{getClienteNombre(cobro.cliente_id)}</td>
+                  <td>
+                    <button
+                      onClick={() => handleClienteClick(cobro.cliente_id)}
+                      className="font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                      title="Ver detalles del cliente"
+                    >
+                      {getClienteNombre(cobro.cliente_id)}
+                    </button>
+                  </td>
                   <td>
                     {isEntrada(cobro) ? (
                       <span className="badge badge-amber">
