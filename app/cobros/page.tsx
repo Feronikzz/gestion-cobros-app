@@ -72,6 +72,9 @@ export default function CobrosPage() {
       importe: cobro.importe.toString(),
       concepto: cobro.notas || 'Cobro sin concepto específico',
       fecha: cobro.fecha_cobro,
+      iva_tipo: cobro.iva_tipo,
+      iva_porcentaje: cobro.iva_porcentaje.toString(),
+      cobro_id: cobro.id,
     });
     
     window.open(`/facturas?${params.toString()}`, '_blank');

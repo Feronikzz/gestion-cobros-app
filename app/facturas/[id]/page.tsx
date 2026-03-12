@@ -86,21 +86,34 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
 
           {/* Factura */}
           <div className="factura-container" style={{ 
-          background: 'var(--color-surface)', 
-          boxShadow: 'var(--shadow-lg)', 
-          borderRadius: 'var(--radius-xl)', 
-          padding: '3rem',
-          border: '1px solid var(--color-border)'
+          background: 'white', 
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)', 
+          borderRadius: '8px', 
+          padding: '2rem',
+          border: '1px solid #e5e7eb'
         }}>
             {/* Header */}
-            <div className="flex justify-between items-start mb-12">
-              <div>
-                <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>FACTURA</h1>
-                <p style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{factura.numero}</p>
-              </div>
-              <div className="text-right">
-                <p style={{ fontSize: '0.875rem', color: 'var(--color-text-tertiary)' }}>Fecha</p>
-                <p style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>{new Date(factura.fecha).toLocaleDateString('es-ES')}</p>
+            <div style={{ borderBottom: '2px solid #1f2937', paddingBottom: '1rem', marginBottom: '2rem' }}>
+              <div className="flex justify-between items-start">
+                <div>
+                  <h1 style={{ fontSize: '2rem', fontWeight: 'bold', color: '#1f2937', margin: 0, marginBottom: '0.25rem' }}>FACTURA</h1>
+                  <p style={{ fontSize: '1.125rem', fontWeight: 600, color: '#6b7280', margin: 0 }}>{factura.numero}</p>
+                  {factura.tipo === 'rectificativa' && (
+                    <p style={{ fontSize: '0.875rem', color: '#dc2626', marginTop: '0.5rem' }}>
+                      FACTURA RECTIFICATIVA - {factura.motivo_rectificacion}
+                    </p>
+                  )}
+                </div>
+                <div className="text-right">
+                  <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>Fecha</p>
+                  <p style={{ fontSize: '1rem', fontWeight: 600, color: '#1f2937', margin: '0.25rem 0' }}>
+                    {new Date(factura.fecha).toLocaleDateString('es-ES', { 
+                      day: '2-digit', 
+                      month: 'long', 
+                      year: 'numeric' 
+                    })}
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -137,23 +150,23 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
             )}
 
             {/* Líneas */}
-            <div className="mb-8">
-              <table className="w-full">
+            <div style={{ marginBottom: '2rem' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr className="border-b-2 border-gray-300">
-                    <th className="text-left py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Descripción</th>
-                    <th className="text-center py-3 text-xs font-bold text-gray-600 uppercase tracking-wider w-20">Cant.</th>
-                    <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider w-28">Precio</th>
-                    <th className="text-right py-3 text-xs font-bold text-gray-600 uppercase tracking-wider w-28">Importe</th>
+                  <tr style={{ borderBottom: '2px solid #374151' }}>
+                    <th style={{ textAlign: 'left', padding: '0.75rem 0.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Descripción</th>
+                    <th style={{ textAlign: 'center', padding: '0.75rem 0.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', width: '5rem' }}>Cant.</th>
+                    <th style={{ textAlign: 'right', padding: '0.75rem 0.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', width: '7rem' }}>Precio</th>
+                    <th style={{ textAlign: 'right', padding: '0.75rem 0.5rem', fontSize: '0.75rem', fontWeight: 'bold', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', width: '7rem' }}>Importe</th>
                   </tr>
                 </thead>
                 <tbody>
                   {factura.lineas.map((linea, idx) => (
-                    <tr key={idx} className="border-b border-gray-200">
-                      <td className="py-3 text-sm text-gray-900">{linea.descripcion}</td>
-                      <td className="py-3 text-sm text-center text-gray-700">{linea.cantidad}</td>
-                      <td className="py-3 text-sm text-right text-gray-700">{eur(linea.precio_unitario)}</td>
-                      <td className="py-3 text-sm text-right font-medium text-gray-900">{eur(linea.importe)}</td>
+                    <tr key={idx} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                      <td style={{ padding: '0.75rem 0.5rem', fontSize: '0.875rem', color: '#1f2937', verticalAlign: 'top' }}>{linea.descripcion}</td>
+                      <td style={{ padding: '0.75rem 0.5rem', fontSize: '0.875rem', textAlign: 'center', color: '#6b7280' }}>{linea.cantidad}</td>
+                      <td style={{ padding: '0.75rem 0.5rem', fontSize: '0.875rem', textAlign: 'right', color: '#6b7280' }}>{eur(linea.precio_unitario)}</td>
+                      <td style={{ padding: '0.75rem 0.5rem', fontSize: '0.875rem', textAlign: 'right', fontWeight: '600', color: '#1f2937' }}>{eur(linea.importe)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -161,27 +174,36 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
             </div>
 
             {/* Totales */}
-            <div className="flex justify-end">
-              <div className="w-80">
-                <div className="flex justify-between py-2 text-sm">
-                  <span className="text-gray-600">Base imponible:</span>
-                  <span className="font-medium text-gray-900">{eur(factura.base_imponible)}</span>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '2rem' }}>
+              <div style={{ width: '20rem', borderTop: '2px solid #374151', paddingTop: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', fontSize: '0.875rem' }}>
+                  <span style={{ color: '#6b7280' }}>Base imponible:</span>
+                  <span style={{ fontWeight: '500', color: '#1f2937' }}>{eur(factura.base_imponible)}</span>
                 </div>
                 {factura.incluir_iva && (
-                  <div className="flex justify-between py-2 text-sm">
-                    <span className="text-gray-600">IVA ({factura.iva_porcentaje}%):</span>
-                    <span className="font-medium text-gray-900">{eur(factura.iva_importe)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', fontSize: '0.875rem' }}>
+                    <span style={{ color: '#6b7280' }}>IVA ({factura.iva_porcentaje}%):</span>
+                    <span style={{ fontWeight: '500', color: '#1f2937' }}>{eur(factura.iva_importe)}</span>
                   </div>
                 )}
                 {factura.incluir_irpf && (
-                  <div className="flex justify-between py-2 text-sm">
-                    <span className="text-gray-600">IRPF (-{factura.irpf_porcentaje}%):</span>
-                    <span className="font-medium text-red-600">-{eur(factura.irpf_importe)}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', fontSize: '0.875rem' }}>
+                    <span style={{ color: '#6b7280' }}>IRPF (-{factura.irpf_porcentaje}%):</span>
+                    <span style={{ fontWeight: '500', color: '#dc2626' }}>-{eur(factura.irpf_importe)}</span>
                   </div>
                 )}
-                <div className="flex justify-between py-3 border-t-2 border-gray-300 mt-2">
-                  <span className="text-lg font-bold text-gray-900">TOTAL:</span>
-                  <span className="text-lg font-bold text-gray-900">{eur(factura.total)}</span>
+                <div style={{ 
+                  display: 'flex', 
+                  justifyContent: 'space-between', 
+                  padding: '0.75rem 0', 
+                  marginTop: '0.5rem',
+                  borderTop: '2px solid #374151',
+                  fontSize: '1.125rem',
+                  fontWeight: 'bold',
+                  color: '#1f2937'
+                }}>
+                  <span>TOTAL:</span>
+                  <span>{eur(factura.total)}</span>
                 </div>
               </div>
             </div>

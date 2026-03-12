@@ -185,6 +185,9 @@ export default function ClienteDetallePage() {
       importe: cobro.importe.toString(),
       concepto: cobro.notas || 'Cobro sin concepto específico',
       fecha: cobro.fecha_cobro,
+      iva_tipo: cobro.iva_tipo,
+      iva_porcentaje: cobro.iva_porcentaje.toString(),
+      cobro_id: cobro.id,
     });
     
     window.open(`/facturas?${params.toString()}`, '_blank');
@@ -216,6 +219,18 @@ export default function ClienteDetallePage() {
   };
 
   const docsForProc = (procId: string) => documentos.filter(d => d.procedimiento_id === procId);
+
+  // Calcular pendiente por procedimiento
+  const getPendienteProcedimiento = (procId: string) => {
+    const procedimiento = procedimientos.find(p => p.id === procId);
+    if (!procedimiento) return 0;
+    
+    const cobrosDelProc = cobros.filter(c => c.procedimiento_id === procId);
+    const totalCobrado = cobrosDelProc.reduce((s, c) => s + c.importe, 0);
+    const entradas = procedimiento.tiene_entrada ? procedimiento.importe_entrada : 0;
+    
+    return procedimiento.presupuesto - totalCobrado - entradas;
+  };
 
   if (loading) return <LayoutShell title="Cliente"><div className="loading-state">Cargando...</div></LayoutShell>;
   if (!cliente) return <LayoutShell title="Cliente"><div className="error-state">Cliente no encontrado</div></LayoutShell>;
@@ -291,6 +306,9 @@ export default function ClienteDetallePage() {
                   <div className="proc-details">
                     <span>Presupuesto: <strong>{eur(p.presupuesto)}</strong></span>
                     {p.tiene_entrada && <span>Entrada: <strong>{eur(p.importe_entrada)}</strong></span>}
+                    <span>Pendiente: <strong className={getPendienteProcedimiento(p.id) > 0 ? "text-red-600" : "text-green-600"}>
+                      {eur(getPendienteProcedimiento(p.id))}
+                    </strong></span>
                     {p.nie_interesado && <span>NIE: {p.nie_interesado}</span>}
                     {p.nombre_interesado && <span>Interesado: {p.nombre_interesado}</span>}
                     {p.expediente_referencia && <span>Ref: {p.expediente_referencia}</span>}

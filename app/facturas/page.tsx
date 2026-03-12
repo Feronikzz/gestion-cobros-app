@@ -64,8 +64,31 @@ export default function FacturasPage() {
     const importe = searchParams.get('importe');
     const concepto = searchParams.get('concepto');
     const fecha = searchParams.get('fecha');
+    const ivaTipo = searchParams.get('iva_tipo');
+    const ivaPorcentaje = searchParams.get('iva_porcentaje');
+    const cobroId = searchParams.get('cobro_id');
 
     if (clienteId && clienteNombre) {
+      const importeNum = parseFloat(importe || '0') || 0;
+      const ivaPorc = parseFloat(ivaPorcentaje || '21') || 21;
+      
+      // Calcular importe base según tipo de IVA del cobro
+      let baseImponible = importeNum;
+      let incluirIva = true;
+      
+      if (ivaTipo === 'sin_iva') {
+        baseImponible = importeNum;
+        incluirIva = false;
+      } else if (ivaTipo === 'iva_incluido') {
+        // Si el IVA está incluido, hay que desglosarlo
+        baseImponible = importeNum / (1 + ivaPorc / 100);
+        incluirIva = true;
+      } else if (ivaTipo === 'iva_sobre_precio') {
+        // El IVA se suma al precio
+        baseImponible = importeNum;
+        incluirIva = true;
+      }
+      
       setFacForm({
         cliente_id: clienteId,
         procedimiento_id: '',
@@ -74,21 +97,21 @@ export default function FacturasPage() {
         receptor_nombre: clienteNombre,
         receptor_nif: clienteNif || '',
         receptor_direccion: clienteDireccion || '',
-        incluir_iva: true,
-        iva_porcentaje: 21,
+        incluir_iva: incluirIva,
+        iva_porcentaje: ivaPorc,
         incluir_irpf: false,
         irpf_porcentaje: 15,
         lineas: [
           {
             descripcion: concepto || 'Servicio profesional',
             cantidad: 1,
-            precio_unitario: parseFloat(importe || '0') || 0,
-            importe: parseFloat(importe || '0') || 0
+            precio_unitario: baseImponible,
+            importe: baseImponible
           }
         ],
         factura_rectificada_id: '',
         motivo_rectificacion: '',
-        notas: '',
+        notas: cobroId ? `Factura generada desde cobro ID: ${cobroId}` : '',
       });
       setShowFacturaModal(true);
     }
