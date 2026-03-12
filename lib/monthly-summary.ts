@@ -1,0 +1,3 @@
+import { Cobro,Reparto } from '@/types';
+import { monthFromDate,monthLabel } from '@/lib/utils';
+export function buildMonthlySummary(months:string[],cobros:Cobro[],repartos:Reparto[]){let carry=0;return months.map((mes)=>{const cobradoMes=cobros.filter((c)=>monthFromDate(c.fecha_cobro)===mes).reduce((a,b)=>a+Number(b.importe||0),0);const repartidoMes=repartos.filter((r)=>r.mes===mes).reduce((a,b)=>a+Number(b.importe||0),0);const arrastreAnterior=carry;const totalDisponible=arrastreAnterior+cobradoMes;const saldoFinal=totalDisponible-repartidoMes;carry=saldoFinal;return{mes,label:monthLabel(mes),cobradoMes,arrastreAnterior,totalDisponible,repartidoMes,saldoFinal};});}

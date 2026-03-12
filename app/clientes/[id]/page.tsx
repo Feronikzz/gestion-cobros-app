@@ -1,0 +1,433 @@
+'use client';
+
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import { LayoutShell } from '@/components/layout-shell';
+import { Modal } from '@/components/modal';
+import { CobroForm } from '@/components/cobro-form';
+import { createClient } from '@/lib/supabase/client';
+import { eur } from '@/lib/utils';
+import type { Cliente, Procedimiento, Cobro } from '@/lib/supabase/types';
+import type { Documento, EstadoProcedimiento } from '@/lib/supabase/types';
+import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload } from 'lucide-react';
+
+export default function ClienteDetallePage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+  const supabase = createClient();
+
+  const [cliente, setCliente] = useState<Cliente | null>(null);
+  const [procedimientos, setProcedimientos] = useState<Procedimiento[]>([]);
+  const [cobros, setCobros] = useState<Cobro[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const [documentos, setDocumentos] = useState<Documento[]>([]);
+
+  // Modales
+  const [showCobroModal, setShowCobroModal] = useState(false);
+  const [showProcModal, setShowProcModal] = useState(false);
+  const [showDocModal, setShowDocModal] = useState(false);
+  const [docProcId, setDocProcId] = useState<string | null>(null);
+  const [editingProc, setEditingProc] = useState<Procedimiento | null>(null);
+
+  // Form procedimiento
+  const defaultProcForm = {
+    titulo: '', concepto: '', presupuesto: 0, tiene_entrada: false, importe_entrada: 0,
+    nie_interesado: '', nombre_interesado: '',
+    expediente_referencia: '', fecha_presentacion: '', fecha_resolucion: '',
+    estado: 'pendiente_presentar' as EstadoProcedimiento, notas: '',
+  };
+  const [procForm, setProcForm] = useState(defaultProcForm);
+
+  // Form documento
+  const [docForm, setDocForm] = useState({ nombre: '', tipo: 'justificante', notas: '' });
+
+  const fetchData = async () => {
+    setLoading(true);
+    const [{ data: cli }, { data: procs }, { data: cobs }, { data: docs }] = await Promise.all([
+      supabase.from('clientes').select('*').eq('id', id).single(),
+      supabase.from('procedimientos').select('*').eq('cliente_id', id).order('created_at', { ascending: false }),
+      supabase.from('cobros').select('*').eq('cliente_id', id).order('fecha_cobro', { ascending: false }),
+      supabase.from('documentos').select('*').order('created_at', { ascending: false }),
+    ]);
+    setCliente(cli);
+    setProcedimientos(procs || []);
+    setCobros(cobs || []);
+    setDocumentos(docs || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { if (id) fetchData(); }, [id]);
+
+  // Totales
+  const procsAbiertas = useMemo(() => procedimientos.filter(p => p.estado !== 'cerrado' && p.estado !== 'archivado'), [procedimientos]);
+  const totalPresupuesto = useMemo(() => procsAbiertas.reduce((s, p) => s + p.presupuesto, 0), [procsAbiertas]);
+  const totalEntradas = useMemo(() => procedimientos.filter(p => p.tiene_entrada).reduce((s, p) => s + p.importe_entrada, 0), [procedimientos]);
+  const totalCobrado = useMemo(() => cobros.reduce((s, c) => s + c.importe, 0), [cobros]);
+  const totalPendiente = totalPresupuesto - totalCobrado;
+
+  const estadoProcLabel: Record<EstadoProcedimiento, string> = {
+    pendiente_presentar: 'Pte. presentar',
+    presentado: 'Presentado',
+    pendiente_resolucion: 'Pte. resolución',
+    pendiente_recurso: 'Pte. recurso',
+    resuelto: 'Resuelto',
+    cerrado: 'Cerrado',
+    archivado: 'Archivado',
+  };
+  const estadoProcBadge: Record<EstadoProcedimiento, string> = {
+    pendiente_presentar: 'badge-yellow',
+    presentado: 'badge-blue',
+    pendiente_resolucion: 'badge-yellow',
+    pendiente_recurso: 'badge-red',
+    resuelto: 'badge-green',
+    cerrado: 'badge-gray',
+    archivado: 'badge-gray',
+  };
+
+  // Guardar procedimiento
+  const handleSaveProc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const payload = {
+      ...procForm,
+      nie_interesado: procForm.nie_interesado || null,
+      nombre_interesado: procForm.nombre_interesado || null,
+      expediente_referencia: procForm.expediente_referencia || null,
+      fecha_presentacion: procForm.fecha_presentacion || null,
+      fecha_resolucion: procForm.fecha_resolucion || null,
+      notas: procForm.notas || null,
+      cliente_id: id,
+      user_id: user.id,
+    };
+
+    if (editingProc) {
+      const { cliente_id, user_id, ...updates } = payload;
+      await supabase.from('procedimientos').update(updates).eq('id', editingProc.id);
+    } else {
+      await supabase.from('procedimientos').insert(payload);
+    }
+    setShowProcModal(false);
+    setEditingProc(null);
+    setProcForm(defaultProcForm);
+    fetchData();
+  };
+
+  const handleEditProc = (p: Procedimiento) => {
+    setEditingProc(p);
+    setProcForm({
+      titulo: p.titulo, concepto: p.concepto, presupuesto: p.presupuesto,
+      tiene_entrada: p.tiene_entrada, importe_entrada: p.importe_entrada,
+      nie_interesado: p.nie_interesado || '', nombre_interesado: p.nombre_interesado || '',
+      expediente_referencia: p.expediente_referencia || '',
+      fecha_presentacion: p.fecha_presentacion || '', fecha_resolucion: p.fecha_resolucion || '',
+      estado: p.estado, notas: p.notas || '',
+    });
+    setShowProcModal(true);
+  };
+
+  const handleDeleteProc = async (procId: string) => {
+    if (!window.confirm('¿Eliminar este procedimiento?')) return;
+    await supabase.from('procedimientos').delete().eq('id', procId);
+    fetchData();
+  };
+
+  // Guardar cobro
+  const handleSaveCobro = async (data: Omit<Cobro, 'id' | 'user_id' | 'created_at'>) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('cobros').insert({ ...data, user_id: user.id });
+    setShowCobroModal(false);
+    fetchData();
+  };
+
+  const handleDeleteCobro = async (cobroId: string) => {
+    if (!window.confirm('¿Eliminar este cobro?')) return;
+    await supabase.from('cobros').delete().eq('id', cobroId);
+    fetchData();
+  };
+
+  // Documentos
+  const handleSaveDoc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!docProcId) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase.from('documentos').insert({
+      procedimiento_id: docProcId,
+      nombre: docForm.nombre,
+      tipo: docForm.tipo,
+      archivo_url: null,
+      notas: docForm.notas || null,
+      user_id: user.id,
+    });
+    setShowDocModal(false);
+    setDocForm({ nombre: '', tipo: 'justificante', notas: '' });
+    fetchData();
+  };
+
+  const handleDeleteDoc = async (docId: string) => {
+    if (!window.confirm('¿Eliminar este documento?')) return;
+    await supabase.from('documentos').delete().eq('id', docId);
+    fetchData();
+  };
+
+  const docsForProc = (procId: string) => documentos.filter(d => d.procedimiento_id === procId);
+
+  if (loading) return <LayoutShell title="Cliente"><div className="loading-state">Cargando...</div></LayoutShell>;
+  if (!cliente) return <LayoutShell title="Cliente"><div className="error-state">Cliente no encontrado</div></LayoutShell>;
+
+  return (
+    <LayoutShell title={cliente.nombre}>
+      {/* Navegación */}
+      <button onClick={() => router.push('/clientes')} className="back-link">
+        <ArrowLeft className="w-4 h-4" /> Volver a clientes
+      </button>
+
+      {/* ── Ficha del cliente ── */}
+      <div className="detail-card">
+        <div className="detail-card-header">
+          <User className="w-5 h-5" />
+          <h2>Datos del cliente</h2>
+        </div>
+        <div className="detail-grid">
+          <div><span className="detail-label">Nombre</span><span className="detail-value">{cliente.nombre}</span></div>
+          <div><span className="detail-label">NIF</span><span className="detail-value">{cliente.nif || '—'}</span></div>
+          <div><span className="detail-label">Teléfono</span><span className="detail-value">{cliente.telefono || '—'}</span></div>
+          <div><span className="detail-label">Email</span><span className="detail-value">{cliente.email || '—'}</span></div>
+          <div><span className="detail-label">Dirección</span><span className="detail-value">{cliente.direccion || '—'}</span></div>
+          <div><span className="detail-label">Documento</span><span className="detail-value">{cliente.documento_tipo || '—'} {cliente.documento_caducidad ? `(cad. ${cliente.documento_caducidad})` : ''}</span></div>
+          <div><span className="detail-label">Fecha entrada</span><span className="detail-value">{cliente.fecha_entrada}</span></div>
+          <div><span className="detail-label">Estado</span><span className={`badge badge-${cliente.estado === 'activo' ? 'green' : cliente.estado === 'pendiente' ? 'yellow' : cliente.estado === 'pagado' ? 'blue' : 'gray'}`}>{cliente.estado}</span></div>
+          {cliente.notas && <div className="col-span-full"><span className="detail-label">Notas</span><span className="detail-value">{cliente.notas}</span></div>}
+        </div>
+      </div>
+
+      {/* ── Resumen económico ── */}
+      <div className="dashboard-metrics" style={{ marginTop: 'var(--space-xl)' }}>
+        <div className="metric-card metric-amber">
+          <div><p className="metric-label">Presupuesto total</p><p className="metric-value">{eur(totalPresupuesto)}</p></div>
+        </div>
+        <div className="metric-card metric-green">
+          <div><p className="metric-label">Entradas pagadas</p><p className="metric-value">{eur(totalEntradas)}</p></div>
+        </div>
+        <div className="metric-card metric-blue">
+          <div><p className="metric-label">Total cobrado</p><p className="metric-value">{eur(totalCobrado)}</p></div>
+        </div>
+        <div className={`metric-card ${totalPendiente > 0 ? 'metric-red' : 'metric-green'}`}>
+          <div><p className="metric-label">Pendiente</p><p className="metric-value">{eur(totalPendiente)}</p></div>
+        </div>
+      </div>
+
+      {/* ── Procedimientos / Expedientes ── */}
+      <div className="section-block">
+        <div className="section-header">
+          <h3><FileText className="w-4 h-4 inline mr-1" /> Procedimientos / Expedientes</h3>
+          <button className="btn btn-primary btn-sm" onClick={() => { setEditingProc(null); setProcForm(defaultProcForm); setShowProcModal(true); }}>
+            <Plus className="w-4 h-4" /> Nuevo
+          </button>
+        </div>
+
+        {procedimientos.length === 0 ? (
+          <p className="empty-state-inline">No hay procedimientos. Añade uno para gestionar presupuestos y expedientes.</p>
+        ) : (
+          <div className="proc-list">
+            {procedimientos.map(p => {
+              const docs = docsForProc(p.id);
+              return (
+                <div key={p.id} className="proc-card">
+                  <div className="proc-card-header">
+                    <h4>{p.titulo}</h4>
+                    <div className="action-buttons">
+                      <button onClick={() => { setDocProcId(p.id); setShowDocModal(true); }} className="action-btn action-view" title="Adjuntar documento"><Paperclip className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => handleEditProc(p)} className="action-btn action-edit"><Edit className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => handleDeleteProc(p.id)} className="action-btn action-delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </div>
+                  <p className="proc-concepto">{p.concepto}</p>
+                  <div className="proc-details">
+                    <span>Presupuesto: <strong>{eur(p.presupuesto)}</strong></span>
+                    {p.tiene_entrada && <span>Entrada: <strong>{eur(p.importe_entrada)}</strong></span>}
+                    {p.nie_interesado && <span>NIE: {p.nie_interesado}</span>}
+                    {p.nombre_interesado && <span>Interesado: {p.nombre_interesado}</span>}
+                    {p.expediente_referencia && <span>Ref: {p.expediente_referencia}</span>}
+                    {p.fecha_presentacion && <span>Presentado: {p.fecha_presentacion}</span>}
+                    {p.fecha_resolucion && <span>Resolución: {p.fecha_resolucion}</span>}
+                    <span className={`badge ${estadoProcBadge[p.estado]}`}>{estadoProcLabel[p.estado]}</span>
+                  </div>
+                  {p.notas && <p className="proc-notas">{p.notas}</p>}
+                  {docs.length > 0 && (
+                    <div className="proc-docs">
+                      {docs.map(d => (
+                        <span key={d.id} className="proc-doc-tag">
+                          <Paperclip className="w-3 h-3" /> {d.nombre} ({d.tipo})
+                          <button onClick={() => handleDeleteDoc(d.id)} className="proc-doc-remove" title="Eliminar">&times;</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Cobros del cliente ── */}
+      <div className="section-block">
+        <div className="section-header">
+          <h3><CreditCard className="w-4 h-4 inline mr-1" /> Cobros</h3>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowCobroModal(true)}>
+            <Plus className="w-4 h-4" /> Nuevo cobro
+          </button>
+        </div>
+
+        {cobros.length === 0 ? (
+          <p className="empty-state-inline">No hay cobros registrados para este cliente.</p>
+        ) : (
+          <div className="table-container">
+            <table className="table">
+              <thead><tr><th>Fecha</th><th>Importe</th><th>Método</th><th>Notas</th><th></th></tr></thead>
+              <tbody>
+                {cobros.map(c => (
+                  <tr key={c.id}>
+                    <td>{c.fecha_cobro}</td>
+                    <td className="font-medium text-green-700">{eur(c.importe)}</td>
+                    <td>{c.metodo_pago}</td>
+                    <td className="subtle-text">{c.notas || '—'}</td>
+                    <td><button onClick={() => handleDeleteCobro(c.id)} className="action-btn action-delete"><Trash2 className="w-3.5 h-3.5" /></button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Modal: Nuevo Cobro ── */}
+      <Modal isOpen={showCobroModal} onClose={() => setShowCobroModal(false)} title="Nuevo cobro">
+        <CobroForm clienteIdFijo={id} onSubmit={handleSaveCobro} onCancel={() => setShowCobroModal(false)} />
+      </Modal>
+
+      {/* ── Modal: Procedimiento ── */}
+      <Modal isOpen={showProcModal} onClose={() => setShowProcModal(false)} title={editingProc ? 'Editar procedimiento' : 'Nuevo procedimiento'}>
+        <form onSubmit={handleSaveProc} className="form-grid">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="form-label">Título *</label>
+              <input type="text" value={procForm.titulo} onChange={e => setProcForm({ ...procForm, titulo: e.target.value })} className="form-input" required />
+            </div>
+            <div>
+              <label className="form-label">Concepto *</label>
+              <input type="text" value={procForm.concepto} onChange={e => setProcForm({ ...procForm, concepto: e.target.value })} className="form-input" required />
+            </div>
+            <div>
+              <label className="form-label">Presupuesto *</label>
+              <input type="number" step="0.01" min="0" value={procForm.presupuesto} onChange={e => setProcForm({ ...procForm, presupuesto: parseFloat(e.target.value) || 0 })} className="form-input" required />
+            </div>
+            <div>
+              <label className="form-label">Estado</label>
+              <select value={procForm.estado} onChange={e => setProcForm({ ...procForm, estado: e.target.value as EstadoProcedimiento })} className="form-input">
+                <option value="pendiente_presentar">Pte. presentar</option>
+                <option value="presentado">Presentado</option>
+                <option value="pendiente_resolucion">Pte. resolución</option>
+                <option value="pendiente_recurso">Pte. recurso</option>
+                <option value="resuelto">Resuelto</option>
+                <option value="cerrado">Cerrado</option>
+                <option value="archivado">Archivado</option>
+              </select>
+            </div>
+          </div>
+
+          <fieldset className="form-fieldset">
+            <legend className="form-legend">Interesado</legend>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="form-label">NIE interesado</label>
+                <input type="text" value={procForm.nie_interesado} onChange={e => setProcForm({ ...procForm, nie_interesado: e.target.value })} className="form-input" placeholder="Y1234567X" />
+              </div>
+              <div>
+                <label className="form-label">Nombre interesado</label>
+                <input type="text" value={procForm.nombre_interesado} onChange={e => setProcForm({ ...procForm, nombre_interesado: e.target.value })} className="form-input" />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset className="form-fieldset">
+            <legend className="form-legend">Entrada</legend>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center gap-3">
+                <input type="checkbox" id="tiene_entrada" checked={procForm.tiene_entrada} onChange={e => setProcForm({ ...procForm, tiene_entrada: e.target.checked })} className="form-checkbox" />
+                <label htmlFor="tiene_entrada" className="form-label" style={{ marginBottom: 0 }}>¿Paga entrada?</label>
+              </div>
+              {procForm.tiene_entrada && (
+                <div>
+                  <label className="form-label">Importe de entrada</label>
+                  <input type="number" step="0.01" min="0" value={procForm.importe_entrada} onChange={e => setProcForm({ ...procForm, importe_entrada: parseFloat(e.target.value) || 0 })} className="form-input" />
+                </div>
+              )}
+            </div>
+          </fieldset>
+
+          <fieldset className="form-fieldset">
+            <legend className="form-legend">Expediente</legend>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="form-label">Referencia expediente</label>
+                <input type="text" value={procForm.expediente_referencia} onChange={e => setProcForm({ ...procForm, expediente_referencia: e.target.value })} className="form-input" placeholder="EXP-2024/001" />
+              </div>
+              <div>
+                <label className="form-label">Fecha presentación</label>
+                <input type="date" value={procForm.fecha_presentacion} onChange={e => setProcForm({ ...procForm, fecha_presentacion: e.target.value })} className="form-input" />
+              </div>
+              <div>
+                <label className="form-label">Fecha resolución</label>
+                <input type="date" value={procForm.fecha_resolucion} onChange={e => setProcForm({ ...procForm, fecha_resolucion: e.target.value })} className="form-input" />
+              </div>
+            </div>
+          </fieldset>
+
+          <div>
+            <label className="form-label">Notas</label>
+            <textarea value={procForm.notas} onChange={e => setProcForm({ ...procForm, notas: e.target.value })} className="form-input" rows={2} />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setShowProcModal(false)} className="btn btn-secondary">Cancelar</button>
+            <button type="submit" className="btn btn-primary">{editingProc ? 'Actualizar' : 'Crear'}</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── Modal: Documento ── */}
+      <Modal isOpen={showDocModal} onClose={() => setShowDocModal(false)} title="Adjuntar documento">
+        <form onSubmit={handleSaveDoc} className="form-grid">
+          <div>
+            <label className="form-label">Nombre del documento *</label>
+            <input type="text" value={docForm.nombre} onChange={e => setDocForm({ ...docForm, nombre: e.target.value })} className="form-input" required placeholder="Justificante de presentación" />
+          </div>
+          <div>
+            <label className="form-label">Tipo</label>
+            <select value={docForm.tipo} onChange={e => setDocForm({ ...docForm, tipo: e.target.value })} className="form-input">
+              <option value="justificante">Justificante</option>
+              <option value="notificacion">Notificación</option>
+              <option value="recurso">Recurso</option>
+              <option value="resolucion">Resolución</option>
+              <option value="otro">Otro</option>
+            </select>
+          </div>
+          <div>
+            <label className="form-label">Notas</label>
+            <textarea value={docForm.notas} onChange={e => setDocForm({ ...docForm, notas: e.target.value })} className="form-input" rows={2} />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setShowDocModal(false)} className="btn btn-secondary">Cancelar</button>
+            <button type="submit" className="btn btn-primary"><Upload className="w-4 h-4" /> Guardar</button>
+          </div>
+        </form>
+      </Modal>
+    </LayoutShell>
+  );
+}

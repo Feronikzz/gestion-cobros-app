@@ -1,0 +1,382 @@
+'use client';
+
+import { useState, useMemo } from 'react';
+import { LayoutShell } from '@/components/layout-shell';
+import { Modal } from '@/components/modal';
+import { useFacturas } from '@/lib/hooks/use-facturas';
+import { useClientes } from '@/lib/hooks/use-clientes';
+import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
+import { eur } from '@/lib/utils';
+import type { TipoFactura, FacturaLinea, Factura } from '@/lib/supabase/types';
+import { Plus, Trash2, Settings, FileText, Copy } from 'lucide-react';
+
+export default function FacturasPage() {
+  const { facturas, emisor, loading, error, saveEmisor, createFactura, deleteFactura } = useFacturas();
+  const { clientes } = useClientes();
+  const { procedimientos } = useProcedimientos();
+
+  const [showEmisorModal, setShowEmisorModal] = useState(false);
+  const [showFacturaModal, setShowFacturaModal] = useState(false);
+  const [filterTipo, setFilterTipo] = useState('');
+
+  // Emisor form
+  const [emisorForm, setEmisorForm] = useState({
+    nombre: emisor?.nombre || '',
+    nif_cif: emisor?.nif_cif || '',
+    direccion: emisor?.direccion || '',
+    telefono: emisor?.telefono || '',
+    email: emisor?.email || '',
+  });
+
+  // Factura form
+  const emptyLinea: FacturaLinea = { descripcion: '', cantidad: 1, precio_unitario: 0, importe: 0 };
+  const [facForm, setFacForm] = useState({
+    cliente_id: '',
+    procedimiento_id: '',
+    tipo: 'normal' as TipoFactura,
+    fecha: new Date().toISOString().slice(0, 10),
+    receptor_nombre: '',
+    receptor_nif: '',
+    receptor_direccion: '',
+    iva_porcentaje: 21,
+    lineas: [{ ...emptyLinea }] as FacturaLinea[],
+    factura_rectificada_id: '',
+    motivo_rectificacion: '',
+    notas: '',
+  });
+
+  const filteredFacturas = useMemo(() => {
+    if (!filterTipo) return facturas;
+    return facturas.filter(f => f.tipo === filterTipo);
+  }, [facturas, filterTipo]);
+
+  // Auto-fill receptor from client
+  const handleClienteChange = (clienteId: string) => {
+    const cli = clientes.find(c => c.id === clienteId);
+    setFacForm(prev => ({
+      ...prev,
+      cliente_id: clienteId,
+      receptor_nombre: cli?.nombre || '',
+      receptor_nif: cli?.nif || '',
+      receptor_direccion: cli?.direccion || '',
+    }));
+  };
+
+  // Líneas calc
+  const updateLinea = (idx: number, field: keyof FacturaLinea, value: string | number) => {
+    const lineas = [...facForm.lineas];
+    const l = { ...lineas[idx], [field]: value };
+    l.importe = l.cantidad * l.precio_unitario;
+    lineas[idx] = l;
+    setFacForm(prev => ({ ...prev, lineas }));
+  };
+
+  const addLinea = () => setFacForm(prev => ({ ...prev, lineas: [...prev.lineas, { ...emptyLinea }] }));
+  const removeLinea = (idx: number) => setFacForm(prev => ({ ...prev, lineas: prev.lineas.filter((_, i) => i !== idx) }));
+
+  const baseImponible = facForm.lineas.reduce((s, l) => s + l.importe, 0);
+  const ivaImporte = baseImponible * facForm.iva_porcentaje / 100;
+  const total = baseImponible + ivaImporte;
+
+  // Generar número factura
+  const nextNumero = () => {
+    const year = new Date().getFullYear();
+    const count = facturas.filter(f => f.numero.startsWith(`FAC-${year}`)).length + 1;
+    return `FAC-${year}/${String(count).padStart(4, '0')}`;
+  };
+
+  const handleSaveEmisor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await saveEmisor({
+      nombre: emisorForm.nombre,
+      nif_cif: emisorForm.nif_cif,
+      direccion: emisorForm.direccion || null,
+      telefono: emisorForm.telefono || null,
+      email: emisorForm.email || null,
+    });
+    setShowEmisorModal(false);
+  };
+
+  const handleCreateFactura = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emisor) { alert('Configura primero los datos del emisor'); return; }
+
+    await createFactura({
+      numero: nextNumero(),
+      cliente_id: facForm.cliente_id,
+      procedimiento_id: facForm.procedimiento_id || null,
+      tipo: facForm.tipo,
+      fecha: facForm.fecha,
+      emisor_nombre: emisor.nombre,
+      emisor_nif: emisor.nif_cif,
+      emisor_direccion: emisor.direccion,
+      receptor_nombre: facForm.receptor_nombre,
+      receptor_nif: facForm.receptor_nif || null,
+      receptor_direccion: facForm.receptor_direccion || null,
+      lineas: facForm.lineas,
+      base_imponible: baseImponible,
+      iva_porcentaje: facForm.iva_porcentaje,
+      iva_importe: ivaImporte,
+      total,
+      factura_rectificada_id: facForm.factura_rectificada_id || null,
+      motivo_rectificacion: facForm.motivo_rectificacion || null,
+      notas: facForm.notas || null,
+    });
+    setShowFacturaModal(false);
+    setFacForm({
+      cliente_id: '', procedimiento_id: '', tipo: 'normal', fecha: new Date().toISOString().slice(0, 10),
+      receptor_nombre: '', receptor_nif: '', receptor_direccion: '',
+      iva_porcentaje: 21, lineas: [{ ...emptyLinea }],
+      factura_rectificada_id: '', motivo_rectificacion: '', notas: '',
+    });
+  };
+
+  const handleDelete = async (f: Factura) => {
+    if (window.confirm(`¿Eliminar factura ${f.numero}?`)) {
+      await deleteFactura(f.id);
+    }
+  };
+
+  const openEmisorModal = () => {
+    setEmisorForm({
+      nombre: emisor?.nombre || '',
+      nif_cif: emisor?.nif_cif || '',
+      direccion: emisor?.direccion || '',
+      telefono: emisor?.telefono || '',
+      email: emisor?.email || '',
+    });
+    setShowEmisorModal(true);
+  };
+
+  const tipoBadge: Record<TipoFactura, string> = {
+    normal: 'badge-green',
+    rectificativa: 'badge-red',
+    no_contable: 'badge-gray',
+  };
+  const tipoLabel: Record<TipoFactura, string> = {
+    normal: 'Normal',
+    rectificativa: 'Rectificativa',
+    no_contable: 'No contable',
+  };
+
+  if (loading) return <LayoutShell title="Facturas"><div className="loading-state">Cargando...</div></LayoutShell>;
+  if (error) return <LayoutShell title="Facturas"><div className="error-state">Error: {error}</div></LayoutShell>;
+
+  return (
+    <LayoutShell title="Facturas">
+      <div className="page-toolbar">
+        <div className="flex items-center gap-3 flex-wrap">
+          <button onClick={openEmisorModal} className="btn btn-secondary">
+            <Settings className="w-4 h-4" /> Datos emisor
+          </button>
+          <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)} className="form-input search-select">
+            <option value="">Todas</option>
+            <option value="normal">Normal</option>
+            <option value="rectificativa">Rectificativa</option>
+            <option value="no_contable">No contable</option>
+          </select>
+        </div>
+        <button onClick={() => setShowFacturaModal(true)} className="btn btn-primary">
+          <Plus className="w-4 h-4" /> Nueva factura
+        </button>
+      </div>
+
+      {!emisor && (
+        <div className="error-state" style={{ padding: '1rem', marginBottom: '1rem' }}>
+          Configura los datos del emisor antes de crear facturas.
+        </div>
+      )}
+
+      <p className="result-count">{filteredFacturas.length} facturas</p>
+
+      <div className="table-container">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Número</th>
+              <th>Fecha</th>
+              <th>Cliente</th>
+              <th>Tipo</th>
+              <th>Base</th>
+              <th>IVA</th>
+              <th>Total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredFacturas.length === 0 ? (
+              <tr><td colSpan={8} className="empty-state">No hay facturas</td></tr>
+            ) : (
+              filteredFacturas.map(f => (
+                <tr key={f.id}>
+                  <td className="font-medium">{f.numero}</td>
+                  <td>{f.fecha}</td>
+                  <td>{f.receptor_nombre}</td>
+                  <td><span className={`badge ${tipoBadge[f.tipo]}`}>{tipoLabel[f.tipo]}</span></td>
+                  <td>{eur(f.base_imponible)}</td>
+                  <td className="subtle-text">{eur(f.iva_importe)}</td>
+                  <td className="font-medium">{eur(f.total)}</td>
+                  <td>
+                    <div className="action-buttons">
+                      <button onClick={() => handleDelete(f)} className="action-btn action-delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Modal: Datos emisor ── */}
+      <Modal isOpen={showEmisorModal} onClose={() => setShowEmisorModal(false)} title="Datos del emisor">
+        <form onSubmit={handleSaveEmisor} className="form-grid">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="form-label">Nombre / Razón social *</label>
+              <input type="text" value={emisorForm.nombre} onChange={e => setEmisorForm({ ...emisorForm, nombre: e.target.value })} className="form-input" required />
+            </div>
+            <div>
+              <label className="form-label">NIF / CIF *</label>
+              <input type="text" value={emisorForm.nif_cif} onChange={e => setEmisorForm({ ...emisorForm, nif_cif: e.target.value })} className="form-input" required />
+            </div>
+            <div>
+              <label className="form-label">Dirección</label>
+              <input type="text" value={emisorForm.direccion} onChange={e => setEmisorForm({ ...emisorForm, direccion: e.target.value })} className="form-input" />
+            </div>
+            <div>
+              <label className="form-label">Teléfono</label>
+              <input type="text" value={emisorForm.telefono} onChange={e => setEmisorForm({ ...emisorForm, telefono: e.target.value })} className="form-input" />
+            </div>
+            <div>
+              <label className="form-label">Email</label>
+              <input type="email" value={emisorForm.email} onChange={e => setEmisorForm({ ...emisorForm, email: e.target.value })} className="form-input" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setShowEmisorModal(false)} className="btn btn-secondary">Cancelar</button>
+            <button type="submit" className="btn btn-primary">Guardar</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* ── Modal: Nueva factura ── */}
+      <Modal isOpen={showFacturaModal} onClose={() => setShowFacturaModal(false)} title="Nueva factura">
+        <form onSubmit={handleCreateFactura} className="form-grid">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="form-label">Tipo *</label>
+              <select value={facForm.tipo} onChange={e => setFacForm({ ...facForm, tipo: e.target.value as TipoFactura })} className="form-input">
+                <option value="normal">Normal</option>
+                <option value="rectificativa">Rectificativa</option>
+                <option value="no_contable">No contable (solo cliente)</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Fecha *</label>
+              <input type="date" value={facForm.fecha} onChange={e => setFacForm({ ...facForm, fecha: e.target.value })} className="form-input" required />
+            </div>
+            <div>
+              <label className="form-label">Cliente *</label>
+              <select value={facForm.cliente_id} onChange={e => handleClienteChange(e.target.value)} className="form-input" required>
+                <option value="">Seleccionar...</option>
+                {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {facForm.tipo === 'rectificativa' && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="form-label">Factura a rectificar</label>
+                <select value={facForm.factura_rectificada_id} onChange={e => setFacForm({ ...facForm, factura_rectificada_id: e.target.value })} className="form-input">
+                  <option value="">Seleccionar...</option>
+                  {facturas.filter(f => f.tipo === 'normal').map(f => <option key={f.id} value={f.id}>{f.numero}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Motivo rectificación</label>
+                <input type="text" value={facForm.motivo_rectificacion} onChange={e => setFacForm({ ...facForm, motivo_rectificacion: e.target.value })} className="form-input" />
+              </div>
+            </div>
+          )}
+
+          <fieldset className="form-fieldset">
+            <legend className="form-legend">Datos receptor</legend>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="form-label">Nombre *</label>
+                <input type="text" value={facForm.receptor_nombre} onChange={e => setFacForm({ ...facForm, receptor_nombre: e.target.value })} className="form-input" required />
+              </div>
+              <div>
+                <label className="form-label">NIF</label>
+                <input type="text" value={facForm.receptor_nif} onChange={e => setFacForm({ ...facForm, receptor_nif: e.target.value })} className="form-input" />
+              </div>
+              <div>
+                <label className="form-label">Dirección</label>
+                <input type="text" value={facForm.receptor_direccion} onChange={e => setFacForm({ ...facForm, receptor_direccion: e.target.value })} className="form-input" />
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset className="form-fieldset">
+            <legend className="form-legend">Líneas</legend>
+            {facForm.lineas.map((l, i) => (
+              <div key={i} className="grid grid-cols-12 gap-2 items-end mb-2">
+                <div className="col-span-5">
+                  {i === 0 && <label className="form-label">Descripción</label>}
+                  <input type="text" value={l.descripcion} onChange={e => updateLinea(i, 'descripcion', e.target.value)} className="form-input" required />
+                </div>
+                <div className="col-span-2">
+                  {i === 0 && <label className="form-label">Cant.</label>}
+                  <input type="number" min="1" value={l.cantidad} onChange={e => updateLinea(i, 'cantidad', parseInt(e.target.value) || 1)} className="form-input" />
+                </div>
+                <div className="col-span-2">
+                  {i === 0 && <label className="form-label">Precio</label>}
+                  <input type="number" step="0.01" min="0" value={l.precio_unitario} onChange={e => updateLinea(i, 'precio_unitario', parseFloat(e.target.value) || 0)} className="form-input" />
+                </div>
+                <div className="col-span-2">
+                  {i === 0 && <label className="form-label">Importe</label>}
+                  <input type="text" value={eur(l.importe)} className="form-input" readOnly />
+                </div>
+                <div className="col-span-1">
+                  {facForm.lineas.length > 1 && (
+                    <button type="button" onClick={() => removeLinea(i)} className="action-btn action-delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                  )}
+                </div>
+              </div>
+            ))}
+            <button type="button" onClick={addLinea} className="btn btn-secondary btn-sm" style={{ marginTop: '0.5rem' }}>
+              <Plus className="w-3.5 h-3.5" /> Añadir línea
+            </button>
+          </fieldset>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="form-label">IVA %</label>
+              <input type="number" min="0" max="100" value={facForm.iva_porcentaje} onChange={e => setFacForm({ ...facForm, iva_porcentaje: parseFloat(e.target.value) || 0 })} className="form-input" />
+            </div>
+            <div>
+              <label className="form-label">Base imponible</label>
+              <input type="text" value={eur(baseImponible)} className="form-input" readOnly />
+            </div>
+            <div>
+              <label className="form-label">Total</label>
+              <input type="text" value={eur(total)} className="form-input font-bold" readOnly />
+            </div>
+          </div>
+
+          <div>
+            <label className="form-label">Notas</label>
+            <textarea value={facForm.notas} onChange={e => setFacForm({ ...facForm, notas: e.target.value })} className="form-input" rows={2} />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setShowFacturaModal(false)} className="btn btn-secondary">Cancelar</button>
+            <button type="submit" className="btn btn-primary"><FileText className="w-4 h-4" /> Crear factura</button>
+          </div>
+        </form>
+      </Modal>
+    </LayoutShell>
+  );
+}
