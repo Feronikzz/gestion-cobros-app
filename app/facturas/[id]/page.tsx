@@ -67,7 +67,7 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
         }
       `}</style>
 
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <div className="min-h-screen bg-gray-50 py-8 px-4" style={{ backgroundColor: 'var(--color-background)' }}>
         <div className="max-w-4xl mx-auto">
           {/* Actions bar */}
           <div className="no-print mb-6 flex items-center justify-between">
@@ -85,16 +85,22 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
           </div>
 
           {/* Factura */}
-          <div className="factura-container bg-white shadow-lg rounded-lg p-12">
+          <div className="factura-container" style={{ 
+          background: 'var(--color-surface)', 
+          boxShadow: 'var(--shadow-lg)', 
+          borderRadius: 'var(--radius-xl)', 
+          padding: '3rem',
+          border: '1px solid var(--color-border)'
+        }}>
             {/* Header */}
             <div className="flex justify-between items-start mb-12">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">FACTURA</h1>
-                <p className="text-xl font-semibold text-gray-700">{factura.numero}</p>
+                <h1 style={{ fontSize: '1.875rem', fontWeight: 'bold', color: 'var(--color-text-primary)', marginBottom: '0.5rem' }}>FACTURA</h1>
+                <p style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--color-text-secondary)' }}>{factura.numero}</p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-600">Fecha</p>
-                <p className="text-lg font-semibold">{new Date(factura.fecha).toLocaleDateString('es-ES')}</p>
+                <p style={{ fontSize: '0.875rem', color: 'var(--color-text-tertiary)' }}>Fecha</p>
+                <p style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--color-text-primary)' }}>{new Date(factura.fecha).toLocaleDateString('es-ES')}</p>
               </div>
             </div>
 

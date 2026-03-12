@@ -19,6 +19,8 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
     importe: cobro?.importe || 0,
     metodo_pago: cobro?.metodo_pago || 'transferencia',
     notas: cobro?.notas || '',
+    iva_incluido: cobro?.iva_incluido || false,
+    iva_porcentaje: cobro?.iva_porcentaje || 21,
   });
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(false);
@@ -74,6 +76,33 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
             <option value="cheque">Cheque</option>
             <option value="otro">Otro</option>
           </select>
+        </div>
+        <div>
+          <label className="form-label">IVA</label>
+          <div className="flex items-center gap-3">
+            <input 
+              type="checkbox" 
+              checked={formData.iva_incluido} 
+              onChange={(e) => setFormData({ ...formData, iva_incluido: e.target.checked })} 
+              className="form-checkbox" 
+              id="iva_incluido" 
+            />
+            <label htmlFor="iva_incluido" className="form-label" style={{ marginBottom: 0 }}>
+              El importe ya incluye IVA
+            </label>
+            {formData.iva_incluido && (
+              <input 
+                type="number" 
+                min="0" 
+                max="100" 
+                value={formData.iva_porcentaje} 
+                onChange={(e) => setFormData({ ...formData, iva_porcentaje: parseFloat(e.target.value) || 0 })} 
+                className="form-input" 
+                style={{ width: '80px' }} 
+                placeholder="%" 
+              />
+            )}
+          </div>
         </div>
         <div className="md:col-span-2">
           <label className="form-label">Notas</label>

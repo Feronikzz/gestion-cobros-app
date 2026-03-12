@@ -113,13 +113,21 @@ CREATE TABLE IF NOT EXISTS public.cobros (
     importe numeric(12,2) NOT NULL,
     metodo_pago text CHECK (metodo_pago IN ('transferencia', 'efectivo', 'tarjeta', 'bizum', 'cheque', 'otro')),
     notas text,
+    iva_incluido boolean NOT NULL DEFAULT false,
+    iva_porcentaje numeric(5,2) NOT NULL DEFAULT 21,
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Migración: añadir procedimiento_id a cobros si no existe
+-- Migración: añadir campos a cobros si no existen
 DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cobros' AND column_name='procedimiento_id') THEN
         ALTER TABLE public.cobros ADD COLUMN procedimiento_id uuid REFERENCES public.procedimientos(id) ON DELETE SET NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cobros' AND column_name='iva_incluido') THEN
+        ALTER TABLE public.cobros ADD COLUMN iva_incluido boolean NOT NULL DEFAULT false;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cobros' AND column_name='iva_porcentaje') THEN
+        ALTER TABLE public.cobros ADD COLUMN iva_porcentaje numeric(5,2) NOT NULL DEFAULT 21;
     END IF;
 END $$;
 
