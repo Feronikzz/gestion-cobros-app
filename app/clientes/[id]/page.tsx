@@ -43,6 +43,7 @@ export default function ClienteDetallePage() {
 
   // Form documento
   const [docForm, setDocForm] = useState({ nombre: '', tipo: 'justificante', notas: '' });
+  const [docFile, setDocFile] = useState<File | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -205,16 +206,50 @@ export default function ClienteDetallePage() {
     if (!docProcId) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+
+    let archivoUrl: string | null = null;
+
+    // Subir archivo si existe
+    if (docFile) {
+      try {
+        const fileName = `${user.id}/${docProcId}/${Date.now()}-${docFile.name}`;
+        
+        const { data, error: uploadError } = await supabase.storage
+          .from('documentos')
+          .upload(fileName, docFile);
+
+        if (uploadError) {
+          console.error('Error al subir documento:', uploadError);
+          // Si el bucket no existe, mostrar mensaje amigable
+          if (uploadError.message?.includes('Bucket not found')) {
+            alert('El bucket de documentos no está configurado en Supabase. El documento se guardará sin archivo. Por favor, crea el bucket "documentos" en la configuración de Storage de Supabase.');
+          } else {
+            throw uploadError;
+          }
+        } else {
+          // Obtener URL pública
+          const { data: { publicUrl } } = supabase.storage
+            .from('documentos')
+            .getPublicUrl(fileName);
+          archivoUrl = publicUrl;
+        }
+      } catch (error) {
+        console.error('Error completo al subir documento:', error);
+        alert('Error al subir el archivo. El documento se guardará sin archivo.');
+      }
+    }
+
     await supabase.from('documentos').insert({
       procedimiento_id: docProcId,
       nombre: docForm.nombre,
       tipo: docForm.tipo,
-      archivo_url: null,
+      archivo_url: archivoUrl,
       notas: docForm.notas || null,
       user_id: user.id,
     });
     setShowDocModal(false);
     setDocForm({ nombre: '', tipo: 'justificante', notas: '' });
+    setDocFile(null);
     fetchData();
   };
 
@@ -511,12 +546,59 @@ export default function ClienteDetallePage() {
             </select>
           </div>
           <div>
+            <label className="form-label">Archivo</label>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors">
+              <input
+                type="file"
+                onChange={(e) => setDocFile(e.target.files?.[0] || null)}
+                className="hidden"
+                id="doc-file-input"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
+              />
+              <label htmlFor="doc-file-input" className="cursor-pointer">
+                <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                <div className="text-sm text-gray-600">
+                  {docFile ? (
+                    <div className="text-blue-600 font-medium">
+                      {docFile.name} ({(docFile.size / 1024 / 1024).toFixed(2)} MB)
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="font-medium text-gray-700">Click para subir archivo</div>
+                      <div className="text-xs text-gray-500">PDF, DOC, DOCX, JPG, PNG, TXT (máx. 10MB)</div>
+                    </div>
+                  )}
+                </div>
+              </label>
+              {docFile && (
+                <button
+                  type="button"
+                  onClick={() => setDocFile(null)}
+                  className="mt-2 text-xs text-red-600 hover:text-red-800 transition-colors"
+                >
+                  Quitar archivo
+                </button>
+              )}
+            </div>
+          </div>
+          <div>
             <label className="form-label">Notas</label>
             <textarea value={docForm.notas} onChange={e => setDocForm({ ...docForm, notas: e.target.value })} className="form-input" rows={2} />
           </div>
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setShowDocModal(false)} className="btn btn-secondary">Cancelar</button>
-            <button type="submit" className="btn btn-primary"><Upload className="w-4 h-4" /> Guardar</button>
+            <button 
+              type="button" 
+              onClick={() => {
+                setShowDocModal(false);
+                setDocFile(null);
+              }} 
+              className="btn btn-secondary"
+            >
+              Cancelar
+            </button>
+            <button type="submit" className="btn btn-primary">
+              <Upload className="w-4 h-4" /> Guardar
+            </button>
           </div>
         </form>
       </Modal>

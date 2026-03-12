@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { Cobro, Cliente, Procedimiento } from '@/lib/supabase/types';
 import { createClient } from '@/lib/supabase/client';
+import { Search, X } from 'lucide-react';
 
 interface CobroFormProps {
   cobro?: Cobro;
@@ -26,13 +27,52 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
   const [procedimientos, setProcedimientos] = useState<Procedimiento[]>([]);
   const [loading, setLoading] = useState(false);
   const [avisoSuperacion, setAvisoSuperacion] = useState<string | null>(null);
+  const [clienteSearchTerm, setClienteSearchTerm] = useState('');
+  const [showClienteDropdown, setShowClienteDropdown] = useState(false);
+  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
 
   useEffect(() => {
     if (!clienteIdFijo) {
       const supabase = createClient();
-      supabase.from('clientes').select('*').order('nombre').then(({ data }) => setClientes(data || []));
+      supabase.from('clientes').select('*').order('nombre').then(({ data }) => {
+        setClientes(data || []);
+        // Si hay un cobro existente, establecer el cliente seleccionado
+        if (cobro?.cliente_id) {
+          const cliente = data?.find(c => c.id === cobro.cliente_id);
+          if (cliente) {
+            setSelectedCliente(cliente);
+            setClienteSearchTerm(cliente.nombre);
+          }
+        }
+      });
     }
-  }, [clienteIdFijo]);
+  }, [clienteIdFijo, cobro?.cliente_id]);
+
+  // Filtrar clientes para el buscador
+  const filteredClientes = useMemo(() => {
+    if (!clienteSearchTerm) return clientes;
+    return clientes.filter(cliente => 
+      cliente.nombre.toLowerCase().includes(clienteSearchTerm.toLowerCase()) ||
+      cliente.nif?.toLowerCase().includes(clienteSearchTerm.toLowerCase()) ||
+      cliente.email?.toLowerCase().includes(clienteSearchTerm.toLowerCase())
+    );
+  }, [clientes, clienteSearchTerm]);
+
+  // Manejar selección de cliente
+  const handleClienteSelect = (cliente: Cliente) => {
+    setSelectedCliente(cliente);
+    setClienteSearchTerm(cliente.nombre);
+    setShowClienteDropdown(false);
+    setFormData(prev => ({ ...prev, cliente_id: cliente.id }));
+  };
+
+  // Limpiar selección de cliente
+  const handleClearCliente = () => {
+    setSelectedCliente(null);
+    setClienteSearchTerm('');
+    setShowClienteDropdown(false);
+    setFormData(prev => ({ ...prev, cliente_id: '' }));
+  };
 
   useEffect(() => {
     const supabase = createClient();
@@ -121,12 +161,61 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
         {!clienteIdFijo && (
           <div>
             <label className="form-label">Cliente *</label>
-            <select value={formData.cliente_id} onChange={(e) => setFormData({ ...formData, cliente_id: e.target.value })} className="form-input" required>
-              <option value="">Seleccionar cliente</option>
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>{c.nombre} {c.nif ? `(${c.nif})` : ''}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar cliente por nombre, NIF o email..."
+                  value={clienteSearchTerm}
+                  onChange={(e) => {
+                    setClienteSearchTerm(e.target.value);
+                    setShowClienteDropdown(true);
+                  }}
+                  onFocus={() => setShowClienteDropdown(true)}
+                  className="form-input pl-10 pr-10"
+                  required
+                />
+                {clienteSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={handleClearCliente}
+                    className="absolute right-3 top-3 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+              
+              {showClienteDropdown && filteredClientes.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-60 overflow-y-auto">
+                  {filteredClientes.map((cliente) => (
+                    <button
+                      key={cliente.id}
+                      type="button"
+                      onClick={() => handleClienteSelect(cliente)}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
+                    >
+                      <div className="font-medium text-gray-900">{cliente.nombre}</div>
+                      {cliente.nif && (
+                        <div className="text-sm text-gray-500">NIF: {cliente.nif}</div>
+                      )}
+                      {cliente.email && (
+                        <div className="text-sm text-gray-500">{cliente.email}</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              {showClienteDropdown && filteredClientes.length === 0 && clienteSearchTerm && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                  <div className="px-3 py-2 text-sm text-gray-500">
+                    No se encontraron clientes para "{clienteSearchTerm}"
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
         <div>
