@@ -228,12 +228,16 @@ export default function ClienteDetallePage() {
     const cobrosDelProc = cobros.filter(c => c.procedimiento_id === procId);
     const totalCobrado = cobrosDelProc.reduce((s, c) => s + c.importe, 0);
     
-    // El importe_entrada ya está incluido en los cobros si se creó automáticamente
-    // Solo sumarlo si no hay cobros asociados al procedimiento
-    const entradasYaCobradas = cobrosDelProc.some(c => 
+    // Siempre contar la entrada como pagada si el procedimiento la tiene
+    const importeEntrada = procedimiento.tiene_entrada ? procedimiento.importe_entrada : 0;
+    
+    // Verificar si la entrada ya está incluida en los cobros (creada automáticamente)
+    const entradaYaCobrada = cobrosDelProc.some(c => 
       c.notas && c.notas.includes('Entrada del procedimiento')
     );
-    const totalPagado = totalCobrado;
+    
+    // Calcular total pagado: cobros + entrada (si no está ya incluida)
+    const totalPagado = totalCobrado + (procedimiento.tiene_entrada && !entradaYaCobrada ? importeEntrada : 0);
     
     return procedimiento.presupuesto - totalPagado;
   };
