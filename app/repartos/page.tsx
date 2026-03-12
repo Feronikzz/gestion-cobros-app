@@ -76,7 +76,10 @@ export default function RepartosPage() {
   }
 
   return (
-    <LayoutShell title="Repartos">
+    <LayoutShell 
+      title="Repartos" 
+      description="Gestiona las salidas y distribuciones de fondos. Controla los repartos por categorías y mantiene el balance financiero mensual."
+    >
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900">

@@ -213,7 +213,10 @@ export default function GastosPage() {
   }
 
   return (
-    <LayoutShell title="Gastos">
+    <LayoutShell 
+      title="Gastos" 
+      description="Controla todos los gastos operativos de tu negocio. Categoriza, registra facturas y analiza los costos mensuales."
+    >
       <div className="page-toolbar">
         <h2>Gestión de Gastos</h2>
         <button onClick={handleCreate} className="btn btn-primary">

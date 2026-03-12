@@ -129,7 +129,10 @@ export default function FinanzasPage() {
   };
 
   return (
-    <LayoutShell title="Finanzas">
+    <LayoutShell 
+      title="Finanzas" 
+      description="Análisis financiero completo de tu negocio. Visualiza ingresos, gastos, balance y tendencias para tomar decisiones estratégicas."
+    >
       <div className="page-toolbar">
         <h2>Resumen Financiero</h2>
       </div>

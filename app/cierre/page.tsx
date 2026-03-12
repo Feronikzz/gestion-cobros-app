@@ -41,7 +41,10 @@ export default function CierrePage() {
   if (error) return <LayoutShell title="Cierre mensual"><div className="error-state">Error: {error}</div></LayoutShell>;
 
   return (
-    <LayoutShell title="Cierre mensual">
+    <LayoutShell 
+      title="Cierre mensual" 
+      description="Cierra el mes fiscal y genera informes. Calcula balances, arrastra saldos y prepara el siguiente período contable."
+    >
       {/* ── Métricas ── */}
       <div className="dashboard-metrics">
         <div className="metric-card metric-green">

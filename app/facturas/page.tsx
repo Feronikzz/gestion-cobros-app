@@ -259,7 +259,10 @@ export default function FacturasPage() {
   if (error) return <LayoutShell title="Facturas"><div className="error-state">Error: {error}</div></LayoutShell>;
 
   return (
-    <LayoutShell title="Facturas">
+    <LayoutShell 
+      title="Facturas" 
+      description="Genera y gestiona facturas profesionales. Configura datos del emisor, crea facturas de clientes y controla la facturación."
+    >
       <div className="page-toolbar">
         <div className="flex items-center gap-3 flex-wrap">
           <button onClick={openEmisorModal} className="btn btn-secondary">

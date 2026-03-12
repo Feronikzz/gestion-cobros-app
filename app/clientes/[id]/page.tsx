@@ -313,7 +313,10 @@ export default function ClienteDetallePage() {
   if (!cliente) return <LayoutShell title="Cliente"><div className="error-state">Cliente no encontrado</div></LayoutShell>;
 
   return (
-    <LayoutShell title={cliente.nombre}>
+    <LayoutShell 
+      title={cliente.nombre}
+      description="Gestiona toda la información del cliente. Controla expedientes, cobros, documentos y notas de seguimiento."
+    >
       {/* Navegación */}
       <button onClick={() => router.push('/clientes')} className="back-link">
         <ArrowLeft className="w-4 h-4" /> Volver a clientes

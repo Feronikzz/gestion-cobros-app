@@ -222,7 +222,10 @@ export default function CobrosPage() {
   }
 
   return (
-    <LayoutShell title="Cobros">
+    <LayoutShell 
+      title="Cobros" 
+      description="Registra y gestiona todos los cobros de tus clientes. Controla métodos de pago, fechas y seguimiento de ingresos."
+    >
       <div className="page-toolbar">
         <h2>Gestión de Cobros</h2>
         <button onClick={handleCreate} className="btn btn-primary">

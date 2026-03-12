@@ -30,7 +30,10 @@ export default function DashboardPage() {
   }, [cobros, clientes]);
 
   return (
-    <LayoutShell title="Dashboard">
+    <LayoutShell 
+      title="Dashboard" 
+      description="Vista general de tu negocio con métricas clave, actividad reciente y estado financiero actual."
+    >
       {/* ── Métricas principales ── */}
       <div className="dashboard-metrics">
         <div className="metric-card metric-green">

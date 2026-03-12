@@ -98,7 +98,10 @@ export default function ClientesPage() {
   if (error) return <LayoutShell title="Clientes"><div className="error-state">Error: {error}</div></LayoutShell>;
 
   return (
-    <LayoutShell title="Clientes">
+    <LayoutShell 
+      title="Clientes" 
+      description="Gestiona tu cartera de clientes. Crea, edita y consulta información de contacto, estado y expedientes de cada cliente."
+    >
       <div className="page-toolbar">
         <h2>Gestión de Clientes</h2>
         <button onClick={() => { setEditingCliente(null); setIsModalOpen(true); }} className="btn btn-primary">
