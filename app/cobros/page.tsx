@@ -10,7 +10,7 @@ import { useClientes } from '@/lib/hooks/use-clientes';
 import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import type { Cobro } from '@/lib/supabase/types';
 import { eur } from '@/lib/utils';
-import { Plus, FileText, DollarSign, Edit3, Trash2, Search, Filter } from 'lucide-react';
+import { Plus, FileText, DollarSign, Edit3, Trash2, Search, Filter, ChevronDown, ChevronUp, X } from 'lucide-react';
 
 export default function CobrosPage() {
   const router = useRouter();
@@ -25,6 +25,8 @@ export default function CobrosPage() {
   const [filterCliente, setFilterCliente] = useState('');
   const [filterMetodo, setFilterMetodo] = useState('');
   const [filterTipo, setFilterTipo] = useState('');
+  const [filterMes, setFilterMes] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
 
   // Filtrado de cobros
   const filteredCobros = useMemo(() => {
@@ -46,9 +48,34 @@ export default function CobrosPage() {
         (filterTipo === 'entrada' && isEntrada(cobro)) ||
         (filterTipo === 'normal' && !isEntrada(cobro));
 
-      return searchMatch && clienteMatch && metodoMatch && tipoMatch;
+      // Filtro por mes
+      const mesMatch = !filterMes || cobro.fecha_cobro.startsWith(filterMes);
+
+      return searchMatch && clienteMatch && metodoMatch && tipoMatch && mesMatch;
     });
-  }, [cobros, searchTerm, filterCliente, filterMetodo, filterTipo]);
+  }, [cobros, searchTerm, filterCliente, filterMetodo, filterTipo, filterMes]);
+
+  // Generar meses disponibles para el filtro
+  const mesesDisponibles = useMemo(() => {
+    const meses = new Set<string>();
+    cobros.forEach(cobro => {
+      const mes = cobro.fecha_cobro.slice(0, 7); // YYYY-MM
+      meses.add(mes);
+    });
+    
+    return Array.from(meses).sort((a, b) => b.localeCompare(a)).map(mes => {
+      const [year, month] = mes.split('-');
+      const monthNames = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 
+                         'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+      return {
+        value: mes,
+        label: `${monthNames[parseInt(month) - 1]} ${year}`
+      };
+    });
+  }, [cobros]);
+
+  // Contar filtros activos
+  const activeFiltersCount = [searchTerm, filterCliente, filterMetodo, filterTipo, filterMes].filter(Boolean).length;
 
   const handleCreate = () => {
     setEditingCobro(null);
@@ -64,6 +91,7 @@ export default function CobrosPage() {
     setFilterCliente('');
     setFilterMetodo('');
     setFilterTipo('');
+    setFilterMes('');
   };
 
   const handleEdit = (cobro: Cobro) => {
@@ -154,95 +182,141 @@ export default function CobrosPage() {
     <LayoutShell title="Cobros">
       <div className="page-toolbar">
         <h2>Gestión de Cobros</h2>
-        <button onClick={handleCreate} className="btn btn-primary">
-          <Plus className="w-4 h-4" /> Nuevo Cobro
-        </button>
-      </div>
-
-      {/* Filtros */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Filter className="w-4 h-4 text-gray-500" />
-          <h3 className="text-sm font-medium text-gray-700">Filtros</h3>
-          {(searchTerm || filterCliente || filterMetodo || filterTipo) && (
+        <div className="flex items-center gap-3">
+          {/* Desplegable de filtros */}
+          <div className="relative">
             <button
-              onClick={clearFilters}
-              className="text-xs text-blue-600 hover:text-blue-700 ml-2"
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                activeFiltersCount > 0 
+                  ? 'border-blue-300 bg-blue-50 text-blue-700' 
+                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+              }`}
             >
-              Limpiar filtros
+              <Filter className="w-4 h-4" />
+              <span className="text-sm font-medium">Filtros</span>
+              {activeFiltersCount > 0 && (
+                <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {activeFiltersCount}
+                </span>
+              )}
+              {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
-          )}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Búsqueda */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Buscar</label>
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Cliente, notas o procedimiento..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="form-input pl-10"
-              />
-            </div>
+
+            {/* Panel desplegable de filtros */}
+            {showFilters && (
+              <div className="absolute top-full left-0 mt-2 w-96 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                <div className="p-4">
+                  {/* Header del panel */}
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-medium text-gray-700">Filtros</h3>
+                    {activeFiltersCount > 0 && (
+                      <button
+                        onClick={clearFilters}
+                        className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                      >
+                        <X className="w-3 h-3" />
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Búsqueda */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Buscar</label>
+                      <div className="relative">
+                        <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Cliente, notas o procedimiento..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="form-input pl-10"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Filtro por cliente */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Cliente</label>
+                      <select
+                        value={filterCliente}
+                        onChange={(e) => setFilterCliente(e.target.value)}
+                        className="form-input"
+                      >
+                        <option value="">Todos los clientes</option>
+                        {clientes.map(cliente => (
+                          <option key={cliente.id} value={cliente.id}>
+                            {cliente.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Filtro por método */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Método de pago</label>
+                      <select
+                        value={filterMetodo}
+                        onChange={(e) => setFilterMetodo(e.target.value)}
+                        className="form-input"
+                      >
+                        <option value="">Todos los métodos</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="efectivo">Efectivo</option>
+                        <option value="tarjeta">Tarjeta</option>
+                        <option value="bizum">Bizum</option>
+                      </select>
+                    </div>
+
+                    {/* Filtro por tipo */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
+                      <select
+                        value={filterTipo}
+                        onChange={(e) => setFilterTipo(e.target.value)}
+                        className="form-input"
+                      >
+                        <option value="">Todos los tipos</option>
+                        <option value="normal">Normal</option>
+                        <option value="entrada">Entrada</option>
+                      </select>
+                    </div>
+
+                    {/* Filtro por mes */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Mes</label>
+                      <select
+                        value={filterMes}
+                        onChange={(e) => setFilterMes(e.target.value)}
+                        className="form-input"
+                      >
+                        <option value="">Todos los meses</option>
+                        {mesesDisponibles.map(mes => (
+                          <option key={mes.value} value={mes.value}>
+                            {mes.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Filtro por cliente */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Cliente</label>
-            <select
-              value={filterCliente}
-              onChange={(e) => setFilterCliente(e.target.value)}
-              className="form-input"
-            >
-              <option value="">Todos los clientes</option>
-              {clientes.map(cliente => (
-                <option key={cliente.id} value={cliente.id}>
-                  {cliente.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Filtro por método */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Método de pago</label>
-            <select
-              value={filterMetodo}
-              onChange={(e) => setFilterMetodo(e.target.value)}
-              className="form-input"
-            >
-              <option value="">Todos los métodos</option>
-              <option value="transferencia">Transferencia</option>
-              <option value="efectivo">Efectivo</option>
-              <option value="tarjeta">Tarjeta</option>
-              <option value="bizum">Bizum</option>
-            </select>
-          </div>
-
-          {/* Filtro por tipo */}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
-            <select
-              value={filterTipo}
-              onChange={(e) => setFilterTipo(e.target.value)}
-              className="form-input"
-            >
-              <option value="">Todos los tipos</option>
-              <option value="normal">Normal</option>
-              <option value="entrada">Entrada</option>
-            </select>
-          </div>
+          <button onClick={handleCreate} className="btn btn-primary">
+            <Plus className="w-4 h-4" /> Nuevo Cobro
+          </button>
         </div>
       </div>
 
       {/* Contador de resultados */}
-      {(searchTerm || filterCliente || filterMetodo || filterTipo) && (
-        <div className="mb-4 text-sm text-gray-600">
-          Mostrando {filteredCobros.length} de {cobros.length} cobros
+      {activeFiltersCount > 0 && (
+        <div className="mb-4 text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <span className="font-medium">Filtros activos:</span> {activeFiltersCount} | 
+          <span className="ml-2">Mostrando {filteredCobros.length} de {cobros.length} cobros</span>
         </div>
       )}
 
