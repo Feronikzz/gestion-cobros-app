@@ -9,7 +9,7 @@ import { useClientes } from '@/lib/hooks/use-clientes';
 import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import type { Cobro } from '@/lib/supabase/types';
 import { eur } from '@/lib/utils';
-import { Plus, FileText, DollarSign } from 'lucide-react';
+import { Plus, FileText, DollarSign, Edit3, Trash2 } from 'lucide-react';
 
 export default function CobrosPage() {
   const { cobros, loading, error, createCobro, updateCobro, deleteCobro } = useCobros();
@@ -109,15 +109,10 @@ export default function CobrosPage() {
 
   return (
     <LayoutShell title="Cobros">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900">
-          Gestión de Cobros
-        </h2>
-        <button
-          onClick={handleCreate}
-          className="btn btn-primary"
-        >
-          Nuevo Cobro
+      <div className="page-toolbar">
+        <h2>Gestión de Cobros</h2>
+        <button onClick={handleCreate} className="btn btn-primary">
+          <Plus className="w-4 h-4" /> Nuevo Cobro
         </button>
       </div>
 
@@ -149,19 +144,17 @@ export default function CobrosPage() {
                   <td className="font-medium">{getClienteNombre(cobro.cliente_id)}</td>
                   <td>
                     {isEntrada(cobro) ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                      <span className="badge badge-amber">
                         <DollarSign className="w-3 h-3 mr-1" />
                         Entrada
                       </span>
                     ) : (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                        Normal
-                      </span>
+                      <span className="badge badge-gray">Normal</span>
                     )}
                   </td>
                   <td>
                     {cobro.procedimiento_id ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                      <span className="badge badge-purple">
                         <FileText className="w-3 h-3 mr-1" />
                         {getProcedimientoTitulo(cobro.procedimiento_id)}
                       </span>
@@ -170,32 +163,34 @@ export default function CobrosPage() {
                     )}
                   </td>
                   <td>
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {cobro.metodo_pago}
-                    </span>
+                    <span className="badge badge-blue">{cobro.metodo_pago}</span>
                   </td>
                   <td className="font-medium text-green-600">{eur(cobro.importe)}</td>
-                  <td className="subtle-text">{cobro.notas || '-'}</td>
+                  <td className="text-sm text-gray-600 max-w-xs truncate" title={cobro.notas || ''}>
+                    {cobro.notas || '-'}
+                  </td>
                   <td>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-1">
                       <button
                         onClick={() => handleCreateFacturaFromCobro(cobro)}
-                        className="btn btn-secondary btn-sm"
+                        className="action-btn action-view"
                         title="Crear factura"
                       >
                         <FileText className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleEdit(cobro)}
-                        className="text-blue-600 hover:text-blue-800"
+                        className="action-btn action-edit"
+                        title="Editar"
                       >
-                        Editar
+                        <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(cobro)}
-                        className="text-red-600 hover:text-red-800"
+                        className="action-btn action-delete"
+                        title="Eliminar"
                       >
-                        Eliminar
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </td>

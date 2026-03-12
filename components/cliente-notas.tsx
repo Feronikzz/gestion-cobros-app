@@ -153,67 +153,78 @@ export function ClienteNotas({ clienteId }: ClienteNotasProps) {
           <p className="text-sm mt-1">Añade la primera nota para este cliente</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {displayNotas.map((nota) => (
-            <div key={nota.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:bg-gray-100 transition-colors">
-              <div className="flex justify-between items-start gap-4">
-                <div className="flex-1">
-                  {editingNota?.id === nota.id ? (
-                    <textarea
-                      value={editingNota.nota}
-                      onChange={(e) => setEditingNota({ ...editingNota, nota: e.target.value })}
-                      className="form-input"
-                      rows={3}
-                      autoFocus
-                    />
-                  ) : (
-                    <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">{nota.nota}</p>
-                  )}
-                  <div className="flex items-center justify-between mt-3">
-                    <p className="text-xs text-gray-500">{formatDate(nota.created_at)}</p>
-                    <p className="text-xs text-gray-400">{nota.nota.length} caracteres</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                  {editingNota?.id === nota.id ? (
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => handleEditNota(editingNota)}
-                        className="action-btn action-view"
-                        title="Guardar"
-                      >
-                        ✓
-                      </button>
-                      <button
-                        onClick={() => setEditingNota(null)}
-                        className="action-btn action-delete"
-                        title="Cancelar"
-                      >
-                        ✕
-                      </button>
+        <div className="table-container">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Nota</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayNotas.map((nota) => (
+                <tr key={nota.id}>
+                  <td className="text-sm text-gray-500">
+                    {formatDate(nota.created_at)}
+                  </td>
+                  <td>
+                    {editingNota?.id === nota.id ? (
+                      <textarea
+                        value={editingNota.nota}
+                        onChange={(e) => setEditingNota({ ...editingNota, nota: e.target.value })}
+                        className="form-input"
+                        rows={3}
+                        autoFocus
+                        style={{ minWidth: '300px' }}
+                      />
+                    ) : (
+                      <p className="text-gray-800 whitespace-pre-wrap">{nota.nota}</p>
+                    )}
+                  </td>
+                  <td>
+                    <div className="flex items-center gap-1">
+                      {editingNota?.id === nota.id ? (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => handleEditNota(editingNota)}
+                            className="action-btn action-view"
+                            title="Guardar"
+                          >
+                            ✓
+                          </button>
+                          <button
+                            onClick={() => setEditingNota(null)}
+                            className="action-btn action-delete"
+                            title="Cancelar"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setEditingNota(nota)}
+                            className="action-btn action-edit"
+                            title="Editar"
+                          >
+                            <Edit3 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteNota(nota.id)}
+                            className="action-btn action-delete"
+                            title="Eliminar"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
                     </div>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => setEditingNota(nota)}
-                        className="action-btn action-edit"
-                        title="Editar"
-                      >
-                        <Edit3 className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteNota(nota.id)}
-                        className="action-btn action-delete"
-                        title="Eliminar"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
