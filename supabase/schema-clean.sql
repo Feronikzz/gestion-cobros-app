@@ -245,6 +245,15 @@ DO $$ BEGIN
     END IF;
 END $$;
 
+-- ─── Cliente Notas ───────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.cliente_notas (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    cliente_id uuid NOT NULL REFERENCES public.clientes(id) ON DELETE CASCADE,
+    nota text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- Habilitar Row Level Security
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.procedimientos ENABLE ROW LEVEL SECURITY;
@@ -255,6 +264,7 @@ ALTER TABLE public.cierres_mensuales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.documentos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.datos_emisor ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.facturas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cliente_notas ENABLE ROW LEVEL SECURITY;
 
 -- Crear políticas solo si no existen (manejo seguro)
 DO $$
@@ -398,6 +408,20 @@ BEGIN
     END IF;
     IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'facturas' AND policyname = 'facturas_delete_own') THEN
         CREATE POLICY "facturas_delete_own" ON public.facturas FOR DELETE USING (auth.uid() = user_id);
+    END IF;
+
+    -- Políticas para cliente_notas
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'cliente_notas' AND policyname = 'cliente_notas_select_own') THEN
+        CREATE POLICY "cliente_notas_select_own" ON public.cliente_notas FOR SELECT USING (auth.uid() = user_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'cliente_notas' AND policyname = 'cliente_notas_insert_own') THEN
+        CREATE POLICY "cliente_notas_insert_own" ON public.cliente_notas FOR INSERT WITH CHECK (auth.uid() = user_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'cliente_notas' AND policyname = 'cliente_notas_update_own') THEN
+        CREATE POLICY "cliente_notas_update_own" ON public.cliente_notas FOR UPDATE USING (auth.uid() = user_id);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'cliente_notas' AND policyname = 'cliente_notas_delete_own') THEN
+        CREATE POLICY "cliente_notas_delete_own" ON public.cliente_notas FOR DELETE USING (auth.uid() = user_id);
     END IF;
 END $$;
 

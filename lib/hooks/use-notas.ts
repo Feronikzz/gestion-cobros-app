@@ -45,6 +45,8 @@ export function useNotas(clienteId?: string) {
         throw new Error('Usuario no autenticado');
       }
 
+      console.log('Creando nota:', { ...nota, user_id: user.id });
+
       const { data, error } = await supabase
         .from('cliente_notas')
         .insert([{ ...nota, user_id: user.id }])
@@ -52,15 +54,29 @@ export function useNotas(clienteId?: string) {
         .single();
 
       if (error) {
-        console.error('Error Supabase:', error);
-        throw error;
+        console.error('Error Supabase detallado:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw new Error(`Error de base de datos: ${error.message || 'Error desconocido'}`);
+      }
+      
+      if (!data) {
+        throw new Error('No se devolvieron datos al crear la nota');
       }
       
       setNotas(prev => [data, ...prev]);
       return data;
     } catch (error) {
-      console.error('Error completo:', error);
-      throw new Error(error instanceof Error ? error.message : 'Error al crear nota');
+      console.error('Error completo al crear nota:', error);
+      
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Error inesperado al crear nota');
+      }
     }
   };
 
