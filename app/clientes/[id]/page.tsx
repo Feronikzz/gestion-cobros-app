@@ -417,7 +417,7 @@ export default function ClienteDetallePage() {
             </div>
             <div>
               <label className="form-label">Presupuesto *</label>
-              <input type="number" step="0.01" min="0" value={procForm.presupuesto} onChange={e => setProcForm({ ...procForm, presupuesto: parseFloat(e.target.value) || 0 })} className="form-input" required />
+              <input type="number" step="0.01" min="0" value={procForm.presupuesto.toFixed(2)} onChange={e => setProcForm({ ...procForm, presupuesto: parseFloat(e.target.value) || 0 })} className="form-input" required />
             </div>
             <div>
               <label className="form-label">Estado</label>
@@ -457,7 +457,7 @@ export default function ClienteDetallePage() {
               {procForm.tiene_entrada && (
                 <div>
                   <label className="form-label">Importe de entrada</label>
-                  <input type="number" step="0.01" min="0" value={procForm.importe_entrada} onChange={e => setProcForm({ ...procForm, importe_entrada: parseFloat(e.target.value) || 0 })} className="form-input" />
+                  <input type="number" step="0.01" min="0" value={procForm.importe_entrada.toFixed(2)} onChange={e => setProcForm({ ...procForm, importe_entrada: parseFloat(e.target.value) || 0 })} className="form-input" />
                 </div>
               )}
             </div>

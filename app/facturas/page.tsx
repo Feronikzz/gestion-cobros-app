@@ -164,10 +164,10 @@ export default function FacturasPage() {
   const addLinea = () => setFacForm(prev => ({ ...prev, lineas: [...prev.lineas, { ...emptyLinea }] }));
   const removeLinea = (idx: number) => setFacForm(prev => ({ ...prev, lineas: prev.lineas.filter((_, i) => i !== idx) }));
 
-  const baseImponible = facForm.lineas.reduce((s, l) => s + l.importe, 0);
-  const ivaImporte = facForm.incluir_iva ? baseImponible * facForm.iva_porcentaje / 100 : 0;
-  const irpfImporte = facForm.incluir_irpf ? baseImponible * facForm.irpf_porcentaje / 100 : 0;
-  const total = baseImponible + ivaImporte - irpfImporte;
+  const baseImponible = Math.round(facForm.lineas.reduce((s, l) => s + l.importe, 0) * 100) / 100;
+  const ivaImporte = facForm.incluir_iva ? Math.round(baseImponible * facForm.iva_porcentaje * 100) / 10000 : 0;
+  const irpfImporte = facForm.incluir_irpf ? Math.round(baseImponible * facForm.irpf_porcentaje * 100) / 10000 : 0;
+  const total = Math.round((baseImponible + ivaImporte - irpfImporte) * 100) / 100;
 
   // Generar número factura
   const nextNumero = () => {
@@ -428,7 +428,7 @@ export default function FacturasPage() {
                 </div>
                 <div className="col-span-2">
                   {i === 0 && <label className="form-label">Precio</label>}
-                  <input type="number" step="0.01" min="0" value={l.precio_unitario} onChange={e => updateLinea(i, 'precio_unitario', parseFloat(e.target.value) || 0)} className="form-input" />
+                  <input type="number" step="0.01" min="0" value={l.precio_unitario.toFixed(2)} onChange={e => updateLinea(i, 'precio_unitario', parseFloat(e.target.value) || 0)} className="form-input" />
                 </div>
                 <div className="col-span-2">
                   {i === 0 && <label className="form-label">Importe</label>}

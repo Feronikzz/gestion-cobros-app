@@ -39,16 +39,27 @@ export function useNotas(clienteId?: string) {
   const createNota = async (nota: Omit<ClienteNota, 'id' | 'user_id' | 'created_at'>) => {
     try {
       const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('Usuario no autenticado');
+      }
+
       const { data, error } = await supabase
         .from('cliente_notas')
-        .insert([{ ...nota, user_id: (await supabase.auth.getUser()).data.user?.id }])
+        .insert([{ ...nota, user_id: user.id }])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error Supabase:', error);
+        throw error;
+      }
+      
       setNotas(prev => [data, ...prev]);
       return data;
     } catch (error) {
+      console.error('Error completo:', error);
       throw new Error(error instanceof Error ? error.message : 'Error al crear nota');
     }
   };

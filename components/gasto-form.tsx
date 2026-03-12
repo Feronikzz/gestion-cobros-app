@@ -18,8 +18,6 @@ export function GastoForm({ gasto, onSubmit, onCancel }: GastoFormProps) {
     proveedor: gasto?.proveedor || '',
     conceptos: gasto?.conceptos.join(', ') || '',
     importe_total: gasto?.importe_total || 0,
-    numero_factura: gasto?.numero_factura || '',
-    fecha_factura: gasto?.fecha_factura || '',
     notas: gasto?.notas || ''
   });
   const [loading, setLoading] = useState(false);
@@ -50,7 +48,9 @@ export function GastoForm({ gasto, onSubmit, onCancel }: GastoFormProps) {
       await onSubmit({
         ...formData,
         conceptos: conceptosArray,
-        factura_url: facturaUrl
+        factura_url: facturaUrl,
+        numero_factura: '', // Campo vacío ya que no se necesita
+        fecha_factura: '' // Campo vacío ya que no se necesita
       });
     } catch (error) {
       console.error('Error:', error);
@@ -63,7 +63,7 @@ export function GastoForm({ gasto, onSubmit, onCancel }: GastoFormProps) {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: name === 'importe_total' ? parseFloat(value) || 0 : value
     }));
   };
 
@@ -169,7 +169,7 @@ export function GastoForm({ gasto, onSubmit, onCancel }: GastoFormProps) {
           <input
             type="number"
             name="importe_total"
-            value={formData.importe_total}
+            value={formData.importe_total.toFixed(2)}
             onChange={handleInputChange}
             placeholder="0.00"
             step="0.01"
@@ -179,33 +179,7 @@ export function GastoForm({ gasto, onSubmit, onCancel }: GastoFormProps) {
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Número de factura
-          </label>
-          <input
-            type="text"
-            name="numero_factura"
-            value={formData.numero_factura}
-            onChange={handleInputChange}
-            placeholder="FAC-2024-001"
-            className="form-input"
-          />
         </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Fecha de factura
-        </label>
-        <input
-          type="date"
-          name="fecha_factura"
-          value={formData.fecha_factura}
-          onChange={handleInputChange}
-          className="form-input"
-        />
-      </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">

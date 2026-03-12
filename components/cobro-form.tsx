@@ -150,7 +150,7 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
         </div>
         <div>
           <label className="form-label">Importe *</label>
-          <input type="number" step="0.01" min="0" value={formData.importe} onChange={(e) => setFormData({ ...formData, importe: parseFloat(e.target.value) || 0 })} className="form-input" required />
+          <input type="number" step="0.01" min="0" value={formData.importe.toFixed(2)} onChange={(e) => setFormData({ ...formData, importe: parseFloat(e.target.value) || 0 })} className="form-input" required />
           {avisoSuperacion && (
             <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
               <p className="text-sm text-amber-800 font-medium">{avisoSuperacion}</p>

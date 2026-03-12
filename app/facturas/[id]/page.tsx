@@ -38,8 +38,266 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
     window.print();
   };
 
-  const handleDownload = () => {
-    window.print();
+  const handleDownload = async () => {
+    if (!factura) return;
+    
+    try {
+      // Crear una nueva ventana con el contenido de la factura
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert('No se pudo abrir la ventana de impresión. Por favor, permite las ventanas emergentes.');
+        return;
+      }
+
+      // Generar el HTML completo para la factura
+      const facturaHTML = generateFacturaHTML(factura);
+      
+      // Escribir el contenido en la nueva ventana
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Factura ${factura.numero}</title>
+          <style>
+            ${getFacturaStyles()}
+          </style>
+        </head>
+        <body>
+          ${facturaHTML}
+        </body>
+        </html>
+      `);
+      
+      printWindow.document.close();
+      
+      // Esperar a que se cargue todo y luego imprimir
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+        }, 500);
+      };
+    } catch (error) {
+      console.error('Error al descargar factura:', error);
+      alert('Error al generar la factura para descargar');
+    }
+  };
+
+  const generateFacturaHTML = (factura: Factura) => {
+    return `
+      <div class="factura-container">
+        <div class="factura-header">
+          <div class="factura-numero">
+            <h1>FACTURA</h1>
+            <p>Número: ${factura.numero}</p>
+            <p>Fecha: ${factura.fecha}</p>
+          </div>
+        </div>
+
+        <div class="factura-partes">
+          <div class="factura-emisor">
+            <h3>EMISOR</h3>
+            <p><strong>${factura.emisor_nombre}</strong></p>
+            <p>NIF/CIF: ${factura.emisor_nif}</p>
+            ${factura.emisor_direccion ? `<p>${factura.emisor_direccion}</p>` : ''}
+          </div>
+          
+          <div class="factura-receptor">
+            <h3>CLIENTE</h3>
+            <p><strong>${factura.receptor_nombre}</strong></p>
+            ${factura.receptor_nif ? `<p>NIF/CIF: ${factura.receptor_nif}</p>` : ''}
+            ${factura.receptor_direccion ? `<p>${factura.receptor_direccion}</p>` : ''}
+          </div>
+        </div>
+
+        <div class="factura-lineas">
+          <table>
+            <thead>
+              <tr>
+                <th>Descripción</th>
+                <th>Cantidad</th>
+                <th>Precio Unitario</th>
+                <th>Importe</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${factura.lineas.map(linea => `
+                <tr>
+                  <td>${linea.descripcion}</td>
+                  <td>${linea.cantidad}</td>
+                  <td>${eur(linea.precio_unitario)}</td>
+                  <td>${eur(linea.importe)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="factura-totales">
+          <div class="totales-row">
+            <span>Base Imponible:</span>
+            <span>${eur(factura.base_imponible)}</span>
+          </div>
+          ${factura.incluir_iva ? `
+            <div class="totales-row">
+              <span>IVA (${factura.iva_porcentaje}%):</span>
+              <span>${eur(factura.iva_importe)}</span>
+            </div>
+          ` : ''}
+          ${factura.incluir_irpf ? `
+            <div class="totales-row">
+              <span>IRPF (${factura.irpf_porcentaje}%):</span>
+              <span>-${eur(factura.irpf_importe)}</span>
+            </div>
+          ` : ''}
+          <div class="totales-row total">
+            <span><strong>TOTAL:</strong></span>
+            <span><strong>${eur(factura.total)}</strong></span>
+          </div>
+        </div>
+
+        ${factura.notas ? `
+          <div class="factura-notas">
+            <h4>Notas:</h4>
+            <p>${factura.notas}</p>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  };
+
+  const getFacturaStyles = () => {
+    return `
+      @page {
+        size: A4;
+        margin: 2cm;
+      }
+      
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 12px;
+        line-height: 1.4;
+        color: #333;
+        margin: 0;
+        padding: 0;
+      }
+      
+      .factura-container {
+        max-width: 100%;
+        margin: 0 auto;
+      }
+      
+      .factura-header {
+        text-align: center;
+        margin-bottom: 30px;
+        border-bottom: 2px solid #333;
+        padding-bottom: 20px;
+      }
+      
+      .factura-numero h1 {
+        font-size: 24px;
+        margin: 0;
+        color: #333;
+      }
+      
+      .factura-numero p {
+        margin: 5px 0;
+        font-size: 14px;
+      }
+      
+      .factura-partes {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 30px;
+        gap: 40px;
+      }
+      
+      .factura-emisor, .factura-receptor {
+        flex: 1;
+      }
+      
+      .factura-emisor h3, .factura-receptor h3 {
+        font-size: 14px;
+        margin: 0 0 10px 0;
+        color: #666;
+        text-transform: uppercase;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 5px;
+      }
+      
+      .factura-emisor p, .factura-receptor p {
+        margin: 5px 0;
+        font-size: 12px;
+      }
+      
+      .factura-lineas table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+      }
+      
+      .factura-lineas th, .factura-lineas td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: left;
+      }
+      
+      .factura-lineas th {
+        background-color: #f5f5f5;
+        font-weight: bold;
+        font-size: 12px;
+      }
+      
+      .factura-lineas td {
+        font-size: 11px;
+      }
+      
+      .factura-lineas td:last-child {
+        text-align: right;
+      }
+      
+      .factura-totales {
+        margin-top: 20px;
+        text-align: right;
+      }
+      
+      .totales-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+        font-size: 12px;
+      }
+      
+      .totales-row.total {
+        border-top: 2px solid #333;
+        padding-top: 10px;
+        font-weight: bold;
+        font-size: 14px;
+      }
+      
+      .factura-notas {
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #ccc;
+      }
+      
+      .factura-notas h4 {
+        font-size: 14px;
+        margin: 0 0 10px 0;
+        color: #666;
+      }
+      
+      .factura-notas p {
+        font-size: 11px;
+        margin: 0;
+        line-height: 1.4;
+      }
+      
+      @media print {
+        body { margin: 0; }
+        .factura-container { margin: 0; }
+      }
+    `;
   };
 
   if (loading) {
