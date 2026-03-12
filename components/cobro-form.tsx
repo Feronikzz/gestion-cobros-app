@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { Cobro, Cliente } from '@/lib/supabase/types';
+import type { Cobro, Cliente, Procedimiento } from '@/lib/supabase/types';
 import { createClient } from '@/lib/supabase/client';
 
 interface CobroFormProps {
@@ -19,10 +19,11 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
     importe: cobro?.importe || 0,
     metodo_pago: cobro?.metodo_pago || 'transferencia',
     notas: cobro?.notas || '',
-    iva_incluido: cobro?.iva_incluido || false,
+    iva_tipo: cobro?.iva_tipo || 'sin_iva' as 'sin_iva' | 'iva_incluido' | 'iva_sobre_precio',
     iva_porcentaje: cobro?.iva_porcentaje || 21,
   });
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [procedimientos, setProcedimientos] = useState<Procedimiento[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -31,6 +32,21 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
       supabase.from('clientes').select('*').order('nombre').then(({ data }) => setClientes(data || []));
     }
   }, [clienteIdFijo]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    // Cargar procedimientos del cliente seleccionado
+    if (formData.cliente_id) {
+      supabase
+        .from('procedimientos')
+        .select('*')
+        .eq('cliente_id', formData.cliente_id)
+        .order('created_at', { ascending: false })
+        .then(({ data }) => setProcedimientos(data || []));
+    } else {
+      setProcedimientos([]);
+    }
+  }, [formData.cliente_id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +79,21 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
           <input type="date" value={formData.fecha_cobro} onChange={(e) => setFormData({ ...formData, fecha_cobro: e.target.value })} className="form-input" required />
         </div>
         <div>
+          <label className="form-label">Expediente/Procedimiento</label>
+          <select 
+            value={formData.procedimiento_id || ''} 
+            onChange={(e) => setFormData({ ...formData, procedimiento_id: e.target.value || null })} 
+            className="form-input"
+          >
+            <option value="">Sin expediente asignado</option>
+            {procedimientos.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.titulo} - {p.estado} ({p.presupuesto}€)
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
           <label className="form-label">Importe *</label>
           <input type="number" step="0.01" min="0" value={formData.importe} onChange={(e) => setFormData({ ...formData, importe: parseFloat(e.target.value) || 0 })} className="form-input" required />
         </div>
@@ -79,18 +110,17 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
         </div>
         <div>
           <label className="form-label">IVA</label>
-          <div className="flex items-center gap-3">
-            <input 
-              type="checkbox" 
-              checked={formData.iva_incluido} 
-              onChange={(e) => setFormData({ ...formData, iva_incluido: e.target.checked })} 
-              className="form-checkbox" 
-              id="iva_incluido" 
-            />
-            <label htmlFor="iva_incluido" className="form-label" style={{ marginBottom: 0 }}>
-              El importe ya incluye IVA
-            </label>
-            {formData.iva_incluido && (
+          <select 
+            value={formData.iva_tipo} 
+            onChange={(e) => setFormData({ ...formData, iva_tipo: e.target.value as 'sin_iva' | 'iva_incluido' | 'iva_sobre_precio' })} 
+            className="form-input"
+          >
+            <option value="sin_iva">Sin IVA</option>
+            <option value="iva_incluido">IVA incluido en el precio</option>
+            <option value="iva_sobre_precio">IVA sobre el precio</option>
+          </select>
+          {(formData.iva_tipo === 'iva_incluido' || formData.iva_tipo === 'iva_sobre_precio') && (
+            <div className="mt-2">
               <input 
                 type="number" 
                 min="0" 
@@ -98,11 +128,10 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
                 value={formData.iva_porcentaje} 
                 onChange={(e) => setFormData({ ...formData, iva_porcentaje: parseFloat(e.target.value) || 0 })} 
                 className="form-input" 
-                style={{ width: '80px' }} 
-                placeholder="%" 
+                placeholder="Porcentaje de IVA" 
               />
-            )}
-          </div>
+            </div>
+          )}
         </div>
         <div className="md:col-span-2">
           <label className="form-label">Notas</label>

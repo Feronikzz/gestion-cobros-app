@@ -20,8 +20,8 @@ END $$;
 
 -- Migración: añadir campos IVA a cobros si no existen
 DO $$ BEGIN
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cobros' AND column_name='iva_incluido') THEN
-        ALTER TABLE public.cobros ADD COLUMN iva_incluido boolean NOT NULL DEFAULT false;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cobros' AND column_name='iva_tipo') THEN
+        ALTER TABLE public.cobros ADD COLUMN iva_tipo text NOT NULL DEFAULT 'sin_iva' CHECK (iva_tipo IN ('sin_iva', 'iva_incluido', 'iva_sobre_precio'));
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cobros' AND column_name='iva_porcentaje') THEN
         ALTER TABLE public.cobros ADD COLUMN iva_porcentaje numeric(5,2) NOT NULL DEFAULT 21;
@@ -39,5 +39,5 @@ ORDER BY column_name;
 SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns 
 WHERE table_name = 'cobros' 
-    AND column_name IN ('iva_incluido', 'iva_porcentaje')
+    AND column_name IN ('iva_tipo', 'iva_porcentaje')
 ORDER BY column_name;

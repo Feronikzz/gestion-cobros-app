@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { eur } from '@/lib/utils';
 import type { Cliente, Procedimiento, Cobro } from '@/lib/supabase/types';
 import type { Documento, EstadoProcedimiento } from '@/lib/supabase/types';
-import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt } from 'lucide-react';
 
 export default function ClienteDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -175,6 +175,21 @@ export default function ClienteDetallePage() {
     fetchData();
   };
 
+  const handleCreateFacturaFromCobro = (cobro: Cobro) => {
+    // Redirigir a página de facturas con parámetros prellenados
+    const params = new URLSearchParams({
+      cliente_id: cobro.cliente_id,
+      cliente_nombre: cliente?.nombre || '',
+      cliente_nif: cliente?.nif || '',
+      cliente_direccion: cliente?.direccion || '',
+      importe: cobro.importe.toString(),
+      concepto: cobro.notas || 'Cobro sin concepto específico',
+      fecha: cobro.fecha_cobro,
+    });
+    
+    window.open(`/facturas?${params.toString()}`, '_blank');
+  };
+
   // Documentos
   const handleSaveDoc = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -315,7 +330,7 @@ export default function ClienteDetallePage() {
         ) : (
           <div className="table-container">
             <table className="table">
-              <thead><tr><th>Fecha</th><th>Importe</th><th>Método</th><th>Notas</th><th></th></tr></thead>
+              <thead><tr><th>Fecha</th><th>Importe</th><th>Método</th><th>Notas</th><th>Acciones</th></tr></thead>
               <tbody>
                 {cobros.map(c => (
                   <tr key={c.id}>
@@ -323,7 +338,24 @@ export default function ClienteDetallePage() {
                     <td className="font-medium text-green-700">{eur(c.importe)}</td>
                     <td>{c.metodo_pago}</td>
                     <td className="subtle-text">{c.notas || '—'}</td>
-                    <td><button onClick={() => handleDeleteCobro(c.id)} className="action-btn action-delete"><Trash2 className="w-3.5 h-3.5" /></button></td>
+                    <td>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => handleCreateFacturaFromCobro(c)} 
+                          className="action-btn action-view" 
+                          title="Crear factura"
+                        >
+                          <Receipt className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteCobro(c.id)} 
+                          className="action-btn action-delete" 
+                          title="Eliminar cobro"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

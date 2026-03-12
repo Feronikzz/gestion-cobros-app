@@ -70,7 +70,7 @@ export interface Cobro {
   importe: number;
   metodo_pago: string;
   notas: string | null;
-  iva_incluido: boolean;
+  iva_tipo: 'sin_iva' | 'iva_incluido' | 'iva_sobre_precio';
   iva_porcentaje: number;
   created_at: string;
 }

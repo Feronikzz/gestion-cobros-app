@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS public.cobros (
     importe numeric(12,2) NOT NULL,
     metodo_pago text CHECK (metodo_pago IN ('transferencia', 'efectivo', 'tarjeta', 'bizum', 'cheque', 'otro')),
     notas text,
-    iva_incluido boolean NOT NULL DEFAULT false,
+    iva_tipo text NOT NULL DEFAULT 'sin_iva' CHECK (iva_tipo IN ('sin_iva', 'iva_incluido', 'iva_sobre_precio')),
     iva_porcentaje numeric(5,2) NOT NULL DEFAULT 21,
     created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -123,8 +123,8 @@ DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cobros' AND column_name='procedimiento_id') THEN
         ALTER TABLE public.cobros ADD COLUMN procedimiento_id uuid REFERENCES public.procedimientos(id) ON DELETE SET NULL;
     END IF;
-    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cobros' AND column_name='iva_incluido') THEN
-        ALTER TABLE public.cobros ADD COLUMN iva_incluido boolean NOT NULL DEFAULT false;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cobros' AND column_name='iva_tipo') THEN
+        ALTER TABLE public.cobros ADD COLUMN iva_tipo text NOT NULL DEFAULT 'sin_iva' CHECK (iva_tipo IN ('sin_iva', 'iva_incluido', 'iva_sobre_precio'));
     END IF;
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='cobros' AND column_name='iva_porcentaje') THEN
         ALTER TABLE public.cobros ADD COLUMN iva_porcentaje numeric(5,2) NOT NULL DEFAULT 21;
