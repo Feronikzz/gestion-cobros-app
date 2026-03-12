@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { Cliente, ClienteInsert } from '@/lib/supabase/types';
+import { formatField } from '@/lib/utils/text';
 
 interface ClienteFormProps {
   cliente?: Cliente;
@@ -31,14 +32,15 @@ export function ClienteForm({ cliente, onSubmit, onCancel }: ClienteFormProps) {
     try {
       await onSubmit({
         ...formData,
-        nif: formData.nif || null,
-        telefono: formData.telefono || null,
-        email: formData.email || null,
-        direccion: formData.direccion || null,
+        nombre: formatField(formData.nombre, 'name'),
+        nif: formData.nif ? formatField(formData.nif, 'nif') : null,
+        telefono: formData.telefono ? formatField(formData.telefono, 'phone') : null,
+        email: formData.email ? formatField(formData.email, 'email') : null,
+        direccion: formData.direccion ? formatField(formData.direccion, 'address') : null,
         anio_nacimiento: formData.anio_nacimiento ? parseInt(formData.anio_nacimiento) : null,
         documento_tipo: formData.documento_tipo || null,
         documento_caducidad: formData.documento_caducidad || null,
-        notas: formData.notas || null,
+        notas: formData.notas ? formatField(formData.notas, 'general') : null,
       });
     } catch (error) {
       console.error('Error:', error);

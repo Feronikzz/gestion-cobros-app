@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { Gasto } from '@/lib/supabase/types';
 import { eur } from '@/lib/utils';
+import { formatField } from '@/lib/utils/text';
 
 interface GastoFormProps {
   gasto?: Gasto;
@@ -45,7 +46,7 @@ export function GastoForm({ gasto, onSubmit, onCancel, onUploadFactura }: GastoF
       
       const conceptosArray = formData.conceptos
         .split(',')
-        .map(c => c.trim())
+        .map(c => formatField(c.trim(), 'general'))
         .filter(c => c.length > 0);
 
       console.log('Conceptos procesados:', conceptosArray);
@@ -78,10 +79,13 @@ export function GastoForm({ gasto, onSubmit, onCancel, onUploadFactura }: GastoF
 
       const gastoData = {
         ...formData,
+        categoria: formatField(formData.categoria, 'general'),
+        proveedor: formatField(formData.proveedor, 'name'),
         conceptos: conceptosArray,
         factura_url: finalFacturaUrl,
         numero_factura: null, // Campo null en vez de string vacío
-        fecha_factura: null // Campo null en vez de string vacío
+        fecha_factura: null, // Campo null en vez de string vacío
+        notas: formData.notas ? formatField(formData.notas, 'general') : ''
       };
 
       console.log('Datos finales del gasto:', gastoData);

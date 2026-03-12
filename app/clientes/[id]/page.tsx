@@ -12,6 +12,7 @@ import { eur } from '@/lib/utils';
 import type { Cliente, Procedimiento, Cobro } from '@/lib/supabase/types';
 import type { Documento, EstadoProcedimiento } from '@/lib/supabase/types';
 import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download } from 'lucide-react';
+import { formatField } from '@/lib/utils/text';
 
 export default function ClienteDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -96,12 +97,14 @@ export default function ClienteDetallePage() {
 
     const payload = {
       ...procForm,
-      nie_interesado: procForm.nie_interesado || null,
-      nombre_interesado: procForm.nombre_interesado || null,
+      titulo: formatField(procForm.titulo, 'general'),
+      concepto: formatField(procForm.concepto, 'general'),
+      nie_interesado: procForm.nie_interesado ? formatField(procForm.nie_interesado, 'nif') : null,
+      nombre_interesado: procForm.nombre_interesado ? formatField(procForm.nombre_interesado, 'name') : null,
       expediente_referencia: procForm.expediente_referencia || null,
       fecha_presentacion: procForm.fecha_presentacion || null,
       fecha_resolucion: procForm.fecha_resolucion || null,
-      notas: procForm.notas || null,
+      notas: procForm.notas ? formatField(procForm.notas, 'general') : null,
       cliente_id: id,
       user_id: user.id,
     };
@@ -241,10 +244,10 @@ export default function ClienteDetallePage() {
 
     await supabase.from('documentos').insert({
       procedimiento_id: docProcId,
-      nombre: docForm.nombre,
+      nombre: formatField(docForm.nombre, 'general'),
       tipo: docForm.tipo,
       archivo_url: archivoUrl,
-      notas: docForm.notas || null,
+      notas: docForm.notas ? formatField(docForm.notas, 'general') : null,
       user_id: user.id,
     });
     setShowDocModal(false);
