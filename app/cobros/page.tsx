@@ -150,13 +150,30 @@ export default function CobrosPage() {
   };
 
   const calcularPendiente = () => {
-    // Calcular total de procedimientos menos total cobrado
-    const totalProcedimientos = cobros.reduce((total, cobro) => total + cobro.importe, 0);
-    const totalCobrado = cobros.reduce((total, cobro) => total + cobro.importe, 0);
+    // Calcular pendiente basado en procedimientos activos
+    let totalPendiente = 0;
     
-    // Por ahora, asumimos que todo está pendiente hasta que tengamos un estado de cobro
-    // Podemos ajustar esta lógica cuando tengamos más datos
-    return 0; // Temporalmente 0 hasta que definamos qué es "pendiente"
+    procedimientos.forEach(procedimiento => {
+      // Solo considerar procedimientos que no estén cerrados/archivados
+      if (!['cerrado', 'archivado'].includes(procedimiento.estado)) {
+        // Calcular lo que se espera cobrar de este procedimiento
+        const presupuestoTotal = procedimiento.presupuesto || 0;
+        
+        // Buscar cobros asociados a este procedimiento
+        const cobrosDelProcedimiento = cobros.filter(cobro => cobro.procedimiento_id === procedimiento.id);
+        const totalCobradoDelProcedimiento = cobrosDelProcedimiento.reduce((total, cobro) => total + cobro.importe, 0);
+        
+        // Calcular pendiente para este procedimiento
+        const pendienteProcedimiento = presupuestoTotal - totalCobradoDelProcedimiento;
+        
+        // Añadir al total pendiente si es positivo
+        if (pendienteProcedimiento > 0) {
+          totalPendiente += pendienteProcedimiento;
+        }
+      }
+    });
+    
+    return totalPendiente;
   };
 
   const isEntrada = (cobro: Cobro) => {
@@ -435,7 +452,6 @@ export default function CobrosPage() {
             <tr>
               <th>Fecha</th>
               <th>Cliente</th>
-              <th>Tipo</th>
               <th>Procedimiento</th>
               <th>Método</th>
               <th>Importe</th>
@@ -446,7 +462,7 @@ export default function CobrosPage() {
           <tbody>
             {filteredCobros.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-8 text-gray-500">
+                <td colSpan={7} className="text-center py-8 text-gray-500">
                   {cobros.length === 0 ? 'No hay cobros registrados' : 'No hay cobros que coincidan con los filtros'}
                 </td>
               </tr>
@@ -462,16 +478,6 @@ export default function CobrosPage() {
                     >
                       {getClienteNombre(cobro.cliente_id)}
                     </button>
-                  </td>
-                  <td>
-                    {isEntrada(cobro) ? (
-                      <span className="badge badge-amber">
-                        <DollarSign className="w-3 h-3 mr-1" />
-                        Entrada
-                      </span>
-                    ) : (
-                      <span className="badge badge-gray">Normal</span>
-                    )}
                   </td>
                   <td>
                     {cobro.procedimiento_id ? (
