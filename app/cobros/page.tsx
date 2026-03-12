@@ -10,7 +10,7 @@ import { useClientes } from '@/lib/hooks/use-clientes';
 import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import type { Cobro } from '@/lib/supabase/types';
 import { eur } from '@/lib/utils';
-import { Plus, FileText, DollarSign, Edit3, Trash2, Search, Filter, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Plus, FileText, DollarSign, Edit3, Trash2, Search, Filter, ChevronDown, ChevronUp, X, Users, CreditCard, Calendar } from 'lucide-react';
 
 export default function CobrosPage() {
   const router = useRouter();
@@ -27,6 +27,7 @@ export default function CobrosPage() {
   const [filterTipo, setFilterTipo] = useState('');
   const [filterMes, setFilterMes] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [showMonthFilter, setShowMonthFilter] = useState(false);
 
   // Filtrado de cobros
   const filteredCobros = useMemo(() => {
@@ -182,129 +183,189 @@ export default function CobrosPage() {
     <LayoutShell title="Cobros">
       <div className="page-toolbar">
         <h2>Gestión de Cobros</h2>
-        <div className="flex items-center gap-3">
-          {/* Desplegable de filtros */}
+        <button onClick={handleCreate} className="btn btn-primary">
+          <Plus className="w-4 h-4" /> Nuevo Cobro
+        </button>
+      </div>
+
+      {/* Búsqueda Principal */}
+      <div className="mb-6">
+        <div className="max-w-2xl mx-auto">
+          <div className="relative">
+            <Search className="w-5 h-5 absolute left-4 top-3.5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="🔍 Buscar cobros por cliente, notas o procedimiento..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 text-lg border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-3.5 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Filtros Visuales */}
+      <div className="mb-6">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+            <Filter className="w-4 h-4" />
+            Filtros rápidos:
+          </div>
+          
+          {/* Filtro de Cliente */}
           <div className="relative">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-                activeFiltersCount > 0 
-                  ? 'border-blue-300 bg-blue-50 text-blue-700' 
-                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+              className={`px-4 py-2 rounded-full border-2 transition-all duration-200 ${
+                filterCliente 
+                  ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium' 
+                  : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
               }`}
             >
-              <Filter className="w-4 h-4" />
-              <span className="text-sm font-medium">Filtros</span>
-              {activeFiltersCount > 0 && (
-                <span className="bg-blue-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {activeFiltersCount}
-                </span>
-              )}
-              {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                <span>{filterCliente ? getClienteNombre(filterCliente) : 'Cliente'}</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+              </div>
             </button>
 
-            {/* Panel desplegable de filtros */}
             {showFilters && (
-              <div className="absolute top-full left-0 mt-2 w-96 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-medium text-gray-700">Filtros</h3>
-                    {activeFiltersCount > 0 && (
-                      <button
-                        onClick={clearFilters}
-                        className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                      >
-                        <X className="w-3 h-3" />
-                        Limpiar
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Buscar</label>
-                      <div className="relative">
-                        <Search className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" />
-                        <input
-                          type="text"
-                          placeholder="Cliente, notas o procedimiento..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="form-input pl-10"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Cliente</label>
-                        <select
-                          value={filterCliente}
-                          onChange={(e) => setFilterCliente(e.target.value)}
-                          className="form-input"
-                        >
-                          <option value="">Todos los clientes</option>
-                          {clientes.map(cliente => (
-                            <option key={cliente.id} value={cliente.id}>
-                              {cliente.nombre}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Método</label>
-                        <select
-                          value={filterMetodo}
-                          onChange={(e) => setFilterMetodo(e.target.value)}
-                          className="form-input"
-                        >
-                          <option value="">Todos los métodos</option>
-                          <option value="transferencia">Transferencia</option>
-                          <option value="efectivo">Efectivo</option>
-                          <option value="tarjeta">Tarjeta</option>
-                          <option value="bizum">Bizum</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Tipo</label>
-                        <select
-                          value={filterTipo}
-                          onChange={(e) => setFilterTipo(e.target.value)}
-                          className="form-input"
-                        >
-                          <option value="">Todos los tipos</option>
-                          <option value="normal">Normal</option>
-                          <option value="entrada">Entrada</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-medium text-gray-700 mb-1">Mes</label>
-                        <select
-                          value={filterMes}
-                          onChange={(e) => setFilterMes(e.target.value)}
-                          className="form-input"
-                        >
-                          <option value="">Todos los meses</option>
-                          {mesesDisponibles.map(mes => (
-                            <option key={mes.value} value={mes.value}>
-                              {mes.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
+              <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                <div className="p-3 max-h-64 overflow-y-auto">
+                  <div className="text-xs font-medium text-gray-500 mb-2">Seleccionar cliente</div>
+                  {clientes.map(cliente => (
+                    <button
+                      key={cliente.id}
+                      onClick={() => {
+                        setFilterCliente(filterCliente === cliente.id ? '' : cliente.id);
+                        setShowFilters(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                        filterCliente === cliente.id 
+                          ? 'bg-blue-50 text-blue-700 font-medium' 
+                          : 'hover:bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      {cliente.nombre}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
           </div>
 
-          <button onClick={handleCreate} className="btn btn-primary">
-            <Plus className="w-4 h-4" /> Nuevo Cobro
-          </button>
+          {/* Filtro de Método */}
+          <div className="flex flex-wrap gap-2">
+            {['transferencia', 'efectivo', 'tarjeta', 'bizum'].map(metodo => (
+              <button
+                key={metodo}
+                onClick={() => setFilterMetodo(filterMetodo === metodo ? '' : metodo)}
+                className={`px-4 py-2 rounded-full border-2 transition-all duration-200 ${
+                  filterMetodo === metodo 
+                    ? 'border-green-500 bg-green-50 text-green-700 font-medium' 
+                    : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4" />
+                  <span className="capitalize">{metodo}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Filtro de Tipo */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setFilterTipo(filterTipo === 'entrada' ? '' : 'entrada')}
+              className={`px-4 py-2 rounded-full border-2 transition-all duration-200 ${
+                filterTipo === 'entrada' 
+                  ? 'border-amber-500 bg-amber-50 text-amber-700 font-medium' 
+                  : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                <span>Entrada</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setFilterTipo(filterTipo === 'normal' ? '' : 'normal')}
+              className={`px-4 py-2 rounded-full border-2 transition-all duration-200 ${
+                filterTipo === 'normal' 
+                  ? 'border-purple-500 bg-purple-50 text-purple-700 font-medium' 
+                  : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                <span>Normal</span>
+              </div>
+            </button>
+          </div>
+
+          {/* Filtro de Mes */}
+          <div className="relative">
+            <button
+              onClick={() => setShowMonthFilter(!showMonthFilter)}
+              className={`px-4 py-2 rounded-full border-2 transition-all duration-200 ${
+                filterMes 
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-medium' 
+                  : 'border-gray-300 bg-white text-gray-600 hover:border-gray-400'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                <span>{filterMes ? mesesDisponibles.find(m => m.value === filterMes)?.label || 'Mes' : 'Mes'}</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${showMonthFilter ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {showMonthFilter && (
+              <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                <div className="p-3 max-h-64 overflow-y-auto">
+                  <div className="text-xs font-medium text-gray-500 mb-2">Seleccionar mes</div>
+                  {mesesDisponibles.map(mes => (
+                    <button
+                      key={mes.value}
+                      onClick={() => {
+                        setFilterMes(filterMes === mes.value ? '' : mes.value);
+                        setShowMonthFilter(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                        filterMes === mes.value 
+                          ? 'bg-indigo-50 text-indigo-700 font-medium' 
+                          : 'hover:bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      {mes.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Botón Limpiar */}
+          {activeFiltersCount > 0 && (
+            <button
+              onClick={clearFilters}
+              className="px-4 py-2 rounded-full border-2 border-red-300 bg-red-50 text-red-700 font-medium hover:bg-red-100 transition-all duration-200"
+            >
+              <div className="flex items-center gap-2">
+                <X className="w-4 h-4" />
+                <span>Limpiar ({activeFiltersCount})</span>
+              </div>
+            </button>
+          )}
         </div>
       </div>
 
