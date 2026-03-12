@@ -153,116 +153,62 @@ export function ClienteNotas({ clienteId }: ClienteNotasProps) {
           <p className="text-sm mt-1">Añade la primera nota para este cliente</p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {displayNotas.map((nota, index) => (
-            <div key={nota.id} className="group relative">
-              {/* Tarjeta de nota con diseño moderno */}
-              <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden">
-                {/* Header de la nota */}
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-4 py-3 border-b border-gray-100">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                      <span className="text-xs font-medium text-blue-700 uppercase tracking-wide">
-                        Nota #{displayNotas.length - index}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500">
-                        {formatDate(nota.created_at)}
-                      </span>
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <div className="flex items-center gap-1">
-                          {editingNota?.id === nota.id ? (
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => handleEditNota(editingNota)}
-                                className="p-1.5 bg-green-100 text-green-600 rounded-md hover:bg-green-200 transition-colors"
-                                title="Guardar"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => setEditingNota(null)}
-                                className="p-1.5 bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200 transition-colors"
-                                title="Cancelar"
-                              >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            </div>
-                          ) : (
-                            <>
-                              <button
-                                onClick={() => setEditingNota(nota)}
-                                className="p-1.5 bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200 transition-colors"
-                                title="Editar"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteNota(nota.id)}
-                                className="p-1.5 bg-red-100 text-red-600 rounded-md hover:bg-red-200 transition-colors"
-                                title="Eliminar"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+        <div className="space-y-3">
+          {displayNotas.map((nota) => (
+            <div key={nota.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+              <div className="flex justify-between items-start gap-4">
+                <div className="flex-1">
+                  {editingNota?.id === nota.id ? (
+                    <textarea
+                      value={editingNota.nota}
+                      onChange={(e) => setEditingNota({ ...editingNota, nota: e.target.value })}
+                      className="form-input"
+                      rows={3}
+                      autoFocus
+                    />
+                  ) : (
+                    <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">{nota.nota}</p>
+                  )}
+                  <div className="flex items-center justify-between mt-3">
+                    <p className="text-xs text-gray-500">{formatDate(nota.created_at)}</p>
+                    <p className="text-xs text-gray-400">{nota.nota.length} caracteres</p>
                   </div>
                 </div>
-                
-                {/* Contenido de la nota */}
-                <div className="p-4">
+                <div className="flex items-center gap-1 flex-shrink-0">
                   {editingNota?.id === nota.id ? (
-                    <div className="space-y-3">
-                      <textarea
-                        value={editingNota.nota}
-                        onChange={(e) => setEditingNota({ ...editingNota, nota: e.target.value })}
-                        className="w-full p-3 border border-blue-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        rows={4}
-                        placeholder="Edita tu nota..."
-                        autoFocus
-                        style={{
-                          fontSize: '14px',
-                          lineHeight: '1.5'
-                        }}
-                      />
-                      <div className="flex justify-end gap-2 text-xs">
-                        <span className="text-gray-500">
-                          {editingNota.nota.length} caracteres
-                        </span>
-                      </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleEditNota(editingNota)}
+                        className="action-btn action-view"
+                        title="Guardar"
+                      >
+                        ✓
+                      </button>
+                      <button
+                        onClick={() => setEditingNota(null)}
+                        className="action-btn action-delete"
+                        title="Cancelar"
+                      >
+                        ✕
+                      </button>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      <p className="text-gray-700 leading-relaxed whitespace-pre-wrap" style={{
-                        fontSize: '14px',
-                        lineHeight: '1.6'
-                      }}>
-                        {nota.nota}
-                      </p>
-                      <div className="flex items-center gap-4 pt-2 border-t border-gray-100">
-                        <div className="flex items-center gap-1 text-xs text-gray-500">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <span>Hace {getRelativeTime(nota.created_at)}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-gray-500">
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                          </svg>
-                          <span>{nota.nota.length} caracteres</span>
-                        </div>
-                      </div>
-                    </div>
+                    <>
+                      <button
+                        onClick={() => setEditingNota(nota)}
+                        className="action-btn action-edit"
+                        title="Editar"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteNota(nota.id)}
+                        className="action-btn action-delete"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
