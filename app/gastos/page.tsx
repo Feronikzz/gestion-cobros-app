@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { LayoutShell } from '@/components/layout-shell';
 import { GastoForm } from '@/components/gasto-form';
 import { Modal } from '@/components/modal';
-import { SearchFilters } from '@/components/search-filters';
 import { useGastos } from '@/lib/hooks/use-gastos';
 import type { Gasto } from '@/lib/supabase/types';
 import { eur, monthLabel } from '@/lib/utils';
-import { FileText, Download, Eye, Edit, Trash2, Receipt } from 'lucide-react';
+import { FileText, Download, Eye, Edit, Trash2, Receipt, TrendingUp, TrendingDown, Calendar, DollarSign, ShoppingCart, Building, Zap, Car, Phone, Mail, CreditCard, Search, Filter, ChevronDown, X } from 'lucide-react';
 
 export default function GastosPage() {
   const { gastos, loading, error, createGasto, updateGasto, deleteGasto } = useGastos();
@@ -17,6 +16,9 @@ export default function GastosPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('');
   const [mesFilter, setMesFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [showCategoriaFilter, setShowCategoriaFilter] = useState(false);
+  const [showMesFilter, setShowMesFilter] = useState(false);
 
   // Filtrar gastos
   const filteredGastos = useMemo(() => {
@@ -33,6 +35,93 @@ export default function GastosPage() {
       return matchesSearch && matchesCategoria && matchesMes;
     });
   }, [gastos, searchQuery, categoriaFilter, mesFilter]);
+
+  // Funciones de estadísticas
+  const calcularGastoMesActual = () => {
+    const fechaActual = new Date();
+    const mesActual = fechaActual.getMonth();
+    const añoActual = fechaActual.getFullYear();
+    const mesActualStr = `${añoActual}-${String(mesActual + 1).padStart(2, '0')}`;
+    
+    return gastos
+      .filter(gasto => gasto.mes === mesActualStr)
+      .reduce((total, gasto) => total + gasto.importe_total, 0);
+  };
+
+  const calcularGastoMensualMedio = () => {
+    const gastosPorMes = new Map<string, number>();
+    
+    gastos.forEach(gasto => {
+      const current = gastosPorMes.get(gasto.mes) || 0;
+      gastosPorMes.set(gasto.mes, current + gasto.importe_total);
+    });
+    
+    if (gastosPorMes.size === 0) return 0;
+    
+    const total = Array.from(gastosPorMes.values()).reduce((sum, amount) => sum + amount, 0);
+    return total / gastosPorMes.size;
+  };
+
+  const calcularGastoMesAnterior = () => {
+    const fechaActual = new Date();
+    const mesAnterior = new Date(fechaActual.getFullYear(), fechaActual.getMonth() - 1, 1);
+    const mesAnteriorStr = `${mesAnterior.getFullYear()}-${String(mesAnterior.getMonth() + 1).padStart(2, '0')}`;
+    
+    return gastos
+      .filter(gasto => gasto.mes === mesAnteriorStr)
+      .reduce((total, gasto) => total + gasto.importe_total, 0);
+  };
+
+  const getCategoriaMasGastada = () => {
+    const gastosPorCategoria = new Map<string, number>();
+    
+    gastos.forEach(gasto => {
+      const current = gastosPorCategoria.get(gasto.categoria) || 0;
+      gastosPorCategoria.set(gasto.categoria, current + gasto.importe_total);
+    });
+    
+    let maxCategoria = '';
+    let maxImporte = 0;
+    
+    gastosPorCategoria.forEach((importe, categoria) => {
+      if (importe > maxImporte) {
+        maxImporte = importe;
+        maxCategoria = categoria;
+      }
+    });
+    
+    return { categoria: maxCategoria, importe: maxImporte };
+  };
+
+  const getVariacionMesAnterior = () => {
+    const gastoActual = calcularGastoMesActual();
+    const gastoAnterior = calcularGastoMesAnterior();
+    
+    if (gastoAnterior === 0) return 0;
+    return ((gastoActual - gastoAnterior) / gastoAnterior) * 100;
+  };
+
+  const getCategoriaIcon = (categoria: string) => {
+    const icons: Record<string, any> = {
+      'Suministros': Zap,
+      'Alquiler': Building,
+      'Material': ShoppingCart,
+      'Servicios': CreditCard,
+      'Impuestos': FileText,
+      'Marketing': Mail,
+      'Transporte': Car,
+      'Otros': DollarSign
+    };
+    return icons[categoria] || DollarSign;
+  };
+
+  const activeFiltersCount = [searchQuery, categoriaFilter, mesFilter].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setCategoriaFilter('');
+    setMesFilter('');
+  };
 
   // Obtener meses únicos para filtros
   const mesesUnicos = useMemo(() => {
@@ -112,43 +201,220 @@ export default function GastosPage() {
 
   return (
     <LayoutShell title="Gastos">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold text-gray-900">
-          Gestión de Gastos
-        </h2>
-        <button
-          onClick={handleCreate}
-          className="btn btn-primary"
-        >
-          Nuevo Gasto
+      <div className="page-toolbar">
+        <h2>Gestión de Gastos</h2>
+        <button onClick={handleCreate} className="btn btn-primary">
+          <FileText className="w-4 h-4" /> Nuevo Gasto
         </button>
       </div>
 
-      <SearchFilters
-        onSearch={setSearchQuery}
-        onFilterChange={(filters) => {
-          setCategoriaFilter(filters.categoria || '');
-          setMesFilter(filters.mes || '');
-        }}
-        filters={[
-          {
-            key: 'categoria',
-            label: 'Categoría',
-            options: categoriaOptions
-          },
-          {
-            key: 'mes',
-            label: 'Mes',
-            options: mesesUnicos
-          }
-        ]}
-        placeholder="Buscar por proveedor, conceptos o factura..."
-      />
-
-      <div className="mb-4 text-sm text-gray-600">
-        Mostrando {filteredGastos.length} de {gastos.length} gastos
+      {/* Estadísticas de Gastos */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-gradient-to-r from-red-500 to-pink-600 rounded-xl p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-red-100 text-sm font-medium mb-1">Gasto este mes</div>
+              <div className="text-2xl font-bold">{eur(calcularGastoMesActual())}</div>
+              <div className="text-red-100 text-xs mt-1">
+                {getVariacionMesAnterior() > 0 ? (
+                  <span className="flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3" />
+                    +{getVariacionMesAnterior().toFixed(1)}% vs mes anterior
+                  </span>
+                ) : getVariacionMesAnterior() < 0 ? (
+                  <span className="flex items-center gap-1">
+                    <TrendingDown className="w-3 h-3" />
+                    {getVariacionMesAnterior().toFixed(1)}% vs mes anterior
+                  </span>
+                ) : (
+                  <span>Sin variación</span>
+                )}
+              </div>
+            </div>
+            <div className="p-3 bg-white/20 rounded-lg">
+              <Calendar className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-blue-100 text-sm font-medium mb-1">Gasto mensual medio</div>
+              <div className="text-2xl font-bold">{eur(calcularGastoMensualMedio())}</div>
+              <div className="text-blue-100 text-xs mt-1">Promedio histórico</div>
+            </div>
+            <div className="p-3 bg-white/20 rounded-lg">
+              <TrendingUp className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-purple-100 text-sm font-medium mb-1">Categoría top</div>
+              <div className="text-xl font-bold">{getCategoriaMasGastada().categoria || 'N/A'}</div>
+              <div className="text-purple-100 text-xs mt-1">{eur(getCategoriaMasGastada().importe)}</div>
+            </div>
+            <div className="p-3 bg-white/20 rounded-lg">
+              {getCategoriaIcon(getCategoriaMasGastada().categoria) && 
+                React.createElement(getCategoriaIcon(getCategoriaMasGastada().categoria), { className: "w-6 h-6 text-white" })
+              }
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-green-100 text-sm font-medium mb-1">Total gastos</div>
+              <div className="text-2xl font-bold">{gastos.length}</div>
+              <div className="text-green-100 text-xs mt-1">Registrados</div>
+            </div>
+            <div className="p-3 bg-white/20 rounded-lg">
+              <ShoppingCart className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
       </div>
 
+      {/* Búsqueda y Filtros */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
+        {/* Búsqueda Principal */}
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="w-5 h-5 absolute left-4 top-4 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Buscar gastos por proveedor, conceptos o factura..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-12 py-4 text-lg border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-4 top-4 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Filtros */}
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Filtro de Categoría */}
+          <div className="relative">
+            <button
+              onClick={() => setShowCategoriaFilter(!showCategoriaFilter)}
+              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 ${
+                categoriaFilter 
+                  ? 'border-purple-500 bg-purple-50 text-purple-700' 
+                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <ShoppingCart className="w-4 h-4" />
+                <span>{categoriaFilter || 'Categoría'}</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${showCategoriaFilter ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {showCategoriaFilter && (
+              <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                <div className="p-3 max-h-64 overflow-y-auto">
+                  <div className="text-xs font-medium text-gray-500 mb-2">Seleccionar categoría</div>
+                  {categorias.map(categoria => (
+                    <button
+                      key={categoria}
+                      onClick={() => {
+                        setCategoriaFilter(categoriaFilter === categoria ? '' : categoria);
+                        setShowCategoriaFilter(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                        categoriaFilter === categoria 
+                          ? 'bg-purple-50 text-purple-700 font-medium' 
+                          : 'hover:bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        {React.createElement(getCategoriaIcon(categoria), { className: "w-4 h-4" })}
+                        <span>{categoria}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Filtro de Mes */}
+          <div className="relative">
+            <button
+              onClick={() => setShowMesFilter(!showMesFilter)}
+              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 ${
+                mesFilter 
+                  ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                <span>{mesFilter ? monthLabel(mesFilter) : 'Mes'}</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${showMesFilter ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {showMesFilter && (
+              <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                <div className="p-3 max-h-64 overflow-y-auto">
+                  <div className="text-xs font-medium text-gray-500 mb-2">Seleccionar mes</div>
+                  {mesesUnicos.map(mes => (
+                    <button
+                      key={mes.value}
+                      onClick={() => {
+                        setMesFilter(mesFilter === mes.value ? '' : mes.value);
+                        setShowMesFilter(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                        mesFilter === mes.value 
+                          ? 'bg-blue-50 text-blue-700 font-medium' 
+                          : 'hover:bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      {mes.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Botón Limpiar */}
+          {activeFiltersCount > 0 && (
+            <button
+              onClick={clearFilters}
+              className="px-4 py-2 rounded-lg border-2 border-red-300 bg-red-50 text-red-700 font-medium hover:bg-red-100 transition-all duration-200"
+            >
+              <div className="flex items-center gap-2">
+                <X className="w-4 h-4" />
+                <span>Limpiar ({activeFiltersCount})</span>
+              </div>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {activeFiltersCount > 0 && (
+        <div className="mb-4 text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <span className="font-medium">Filtros activos:</span> {activeFiltersCount} | 
+          <span className="ml-2">Mostrando {filteredGastos.length} de {gastos.length} gastos</span>
+        </div>
+      )}
+
+      {/* Tabla de Gastos */}
       <div className="table-container">
         <table className="table">
           <thead>
@@ -197,7 +463,10 @@ export default function GastosPage() {
                       gasto.categoria === 'Transporte' ? 'bg-indigo-100 text-indigo-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {gasto.categoria}
+                      <div className="flex items-center gap-1">
+                        {React.createElement(getCategoriaIcon(gasto.categoria), { className: "w-3 h-3 mr-1" })}
+                        {gasto.categoria}
+                      </div>
                     </span>
                   </td>
                   <td className="font-medium text-red-600">{eur(gasto.importe_total)}</td>
