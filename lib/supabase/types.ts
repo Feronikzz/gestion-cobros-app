@@ -1,6 +1,7 @@
 // ─── Estados globales ─────────────────────────────────────
 export type EstadoCliente = 'activo' | 'pendiente' | 'pagado' | 'archivado';
 export type EstadoProcedimiento =
+  | 'pendiente'
   | 'pendiente_presentar'
   | 'presentado'
   | 'pendiente_resolucion'

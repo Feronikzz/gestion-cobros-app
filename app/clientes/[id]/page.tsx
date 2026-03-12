@@ -71,6 +71,7 @@ export default function ClienteDetallePage() {
   const totalPendiente = totalPresupuesto - totalCobrado;
 
   const estadoProcLabel: Record<EstadoProcedimiento, string> = {
+    pendiente: 'Pendiente',
     pendiente_presentar: 'Pte. presentar',
     presentado: 'Presentado',
     pendiente_resolucion: 'Pte. resolución',
@@ -80,6 +81,7 @@ export default function ClienteDetallePage() {
     archivado: 'Archivado',
   };
   const estadoProcBadge: Record<EstadoProcedimiento, string> = {
+    pendiente: 'badge-orange',
     pendiente_presentar: 'badge-yellow',
     presentado: 'badge-blue',
     pendiente_resolucion: 'badge-yellow',

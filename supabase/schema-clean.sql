@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS public.procedimientos (
     fecha_presentacion date,
     fecha_resolucion date,
     estado text DEFAULT 'pendiente_presentar' CHECK (estado IN (
-        'pendiente_presentar', 'presentado', 'pendiente_resolucion',
+        'pendiente', 'pendiente_presentar', 'presentado', 'pendiente_resolucion',
         'pendiente_recurso', 'resuelto', 'cerrado', 'archivado'
     )),
     notas text,

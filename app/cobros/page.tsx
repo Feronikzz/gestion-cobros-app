@@ -10,7 +10,7 @@ import { useClientes } from '@/lib/hooks/use-clientes';
 import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import type { Cobro } from '@/lib/supabase/types';
 import { eur } from '@/lib/utils';
-import { Plus, FileText, DollarSign, Edit3, Trash2, Search, Filter, ChevronDown, ChevronUp, X, Users, CreditCard, Calendar } from 'lucide-react';
+import { CheckCircle, AlertCircle, Plus, FileText, DollarSign, Edit3, Trash2, Search, Filter, ChevronDown, ChevronUp, X, Users, CreditCard, Calendar, TrendingUp, Eye } from 'lucide-react';
 
 export default function CobrosPage() {
   const router = useRouter();
@@ -178,6 +178,16 @@ export default function CobrosPage() {
 
   const isEntrada = (cobro: Cobro) => {
     return cobro.notas?.includes('Entrada del procedimiento:') || cobro.procedimiento_id !== null;
+  };
+
+  const isProcedimientoPagadoCompletamente = (procedimientoId: string) => {
+    const procedimiento = procedimientos.find(p => p.id === procedimientoId);
+    if (!procedimiento) return false;
+    
+    const cobrosDelProcedimiento = cobros.filter(cobro => cobro.procedimiento_id === procedimientoId);
+    const totalCobrado = cobrosDelProcedimiento.reduce((total, cobro) => total + cobro.importe, 0);
+    
+    return totalCobrado >= procedimiento.presupuesto;
   };
 
   const handleCreateFacturaFromCobro = (cobro: Cobro) => {
@@ -459,13 +469,14 @@ export default function CobrosPage() {
               <th>Método</th>
               <th>Importe</th>
               <th>Notas</th>
+              <th>Pago completo</th>
               <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {filteredCobros.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-gray-500">
+                <td colSpan={8} className="text-center py-8 text-gray-500">
                   {cobros.length === 0 ? 'No hay cobros registrados' : 'No hay cobros que coincidan con los filtros'}
                 </td>
               </tr>
@@ -499,8 +510,34 @@ export default function CobrosPage() {
                   <td className="text-sm text-gray-600 max-w-xs truncate" title={cobro.notas || ''}>
                     {cobro.notas || '-'}
                   </td>
+                  <td className="text-center">
+                    {cobro.procedimiento_id ? (
+                      isProcedimientoPagadoCompletamente(cobro.procedimiento_id) ? (
+                        <div className="flex items-center justify-center gap-1 text-green-600">
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="text-sm">Sí</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1 text-red-600">
+                          <AlertCircle className="w-4 h-4" />
+                          <span className="text-sm">No</span>
+                        </div>
+                      )
+                    ) : (
+                      <span className="text-gray-400 text-sm">—</span>
+                    )}
+                  </td>
                   <td>
                     <div className="flex items-center gap-1">
+                      {cobro.procedimiento_id && (
+                        <button
+                          onClick={() => router.push(`/expedientes`)}
+                          className="action-btn action-view"
+                          title="Ver expedientes"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleCreateFacturaFromCobro(cobro)}
                         className="action-btn action-view"

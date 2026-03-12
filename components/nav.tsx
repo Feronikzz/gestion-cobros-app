@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, X, Home, Users, CreditCard, PieChart, FileText, Calendar, Receipt, TrendingUp } from 'lucide-react';
+import { Menu, X, Home, Users, CreditCard, PieChart, FileText, Calendar, Receipt, TrendingUp, FolderOpen } from 'lucide-react';
 import { LogoutButton } from '@/components/logout-button';
 
 export function Nav() {
@@ -13,6 +13,7 @@ export function Nav() {
   const items = [
     { href: '/dashboard', label: 'Inicio', icon: Home },
     { href: '/clientes', label: 'Clientes', icon: Users },
+    { href: '/expedientes', label: 'Expedientes', icon: FolderOpen },
     { href: '/cobros', label: 'Cobros', icon: CreditCard },
     { href: '/gastos', label: 'Gastos', icon: FileText },
     { href: '/finanzas', label: 'Finanzas', icon: TrendingUp },
