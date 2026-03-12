@@ -124,21 +124,34 @@ export function useGastos() {
 
       const fileName = `${user.id}/${Date.now()}-${file.name}`;
       
+      // Intentar subir la factura
       const { data, error: uploadError } = await supabase.storage
         .from('facturas')
         .upload(fileName, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Error al subir factura a Supabase Storage:', uploadError);
+        
+        // Si el bucket no existe, mostrar mensaje amigable
+        if (uploadError.message?.includes('Bucket not found')) {
+          throw new Error('El bucket de facturas no está configurado en Supabase. Por favor, crea el bucket "facturas" en la configuración de Storage de Supabase.');
+        }
+        
+        throw uploadError;
+      }
 
       // Obtener URL pública
       const { data: { publicUrl } } = supabase.storage
         .from('facturas')
         .getPublicUrl(fileName);
 
+      console.log('Factura subida exitosamente:', publicUrl);
       return publicUrl;
     } catch (err: any) {
-      setError(err.message);
-      console.error('Error uploading factura:', err);
+      console.error('Error completo al subir factura:', err);
+      
+      // No establecer error global para no bloquear la creación del gasto
+      // setError(err.message);
       throw err;
     }
   };

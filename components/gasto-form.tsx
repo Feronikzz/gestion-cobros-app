@@ -62,7 +62,17 @@ export function GastoForm({ gasto, onSubmit, onCancel, onUploadFactura }: GastoF
           console.log('Factura subida exitosamente:', finalFacturaUrl);
         } catch (uploadError) {
           console.error('Error al subir factura:', uploadError);
-          throw new Error(`Error al subir la factura: ${uploadError instanceof Error ? uploadError.message : 'Error desconocido'}`);
+          
+          // Si el error es de bucket no encontrado, permitir continuar sin factura
+          if (uploadError instanceof Error && uploadError.message?.includes('bucket de facturas')) {
+            const continuar = confirm(`No se pudo subir la factura porque el bucket no está configurado.\n\n${uploadError.message}\n\n¿Deseas continuar creando el gasto sin factura?`);
+            if (!continuar) {
+              throw new Error('Creación de gasto cancelada por el usuario.');
+            }
+            console.log('Usuario decidió continuar sin factura');
+          } else {
+            throw new Error(`Error al subir la factura: ${uploadError instanceof Error ? uploadError.message : 'Error desconocido'}`);
+          }
         }
       }
 
@@ -70,8 +80,8 @@ export function GastoForm({ gasto, onSubmit, onCancel, onUploadFactura }: GastoF
         ...formData,
         conceptos: conceptosArray,
         factura_url: finalFacturaUrl,
-        numero_factura: '', // Campo vacío ya que no se necesita
-        fecha_factura: '' // Campo vacío ya que no se necesita
+        numero_factura: null, // Campo null en vez de string vacío
+        fecha_factura: null // Campo null en vez de string vacío
       };
 
       console.log('Datos finales del gasto:', gastoData);
