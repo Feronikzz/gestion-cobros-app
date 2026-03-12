@@ -208,14 +208,34 @@ CREATE TABLE IF NOT EXISTS public.facturas (
     receptor_direccion text,
     lineas jsonb NOT NULL DEFAULT '[]',
     base_imponible numeric(12,2) NOT NULL DEFAULT 0,
+    incluir_iva boolean NOT NULL DEFAULT true,
     iva_porcentaje numeric(5,2) NOT NULL DEFAULT 21,
     iva_importe numeric(12,2) NOT NULL DEFAULT 0,
+    incluir_irpf boolean NOT NULL DEFAULT false,
+    irpf_porcentaje numeric(5,2) NOT NULL DEFAULT 15,
+    irpf_importe numeric(12,2) NOT NULL DEFAULT 0,
     total numeric(12,2) NOT NULL DEFAULT 0,
     factura_rectificada_id uuid REFERENCES public.facturas(id) ON DELETE SET NULL,
     motivo_rectificacion text,
     notas text,
     created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- Migración: añadir campos IRPF a facturas si no existen
+DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='facturas' AND column_name='incluir_iva') THEN
+        ALTER TABLE public.facturas ADD COLUMN incluir_iva boolean NOT NULL DEFAULT true;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='facturas' AND column_name='incluir_irpf') THEN
+        ALTER TABLE public.facturas ADD COLUMN incluir_irpf boolean NOT NULL DEFAULT false;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='facturas' AND column_name='irpf_porcentaje') THEN
+        ALTER TABLE public.facturas ADD COLUMN irpf_porcentaje numeric(5,2) NOT NULL DEFAULT 15;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='facturas' AND column_name='irpf_importe') THEN
+        ALTER TABLE public.facturas ADD COLUMN irpf_importe numeric(12,2) NOT NULL DEFAULT 0;
+    END IF;
+END $$;
 
 -- Habilitar Row Level Security
 ALTER TABLE public.clientes ENABLE ROW LEVEL SECURITY;

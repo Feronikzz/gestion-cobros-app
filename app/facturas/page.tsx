@@ -8,7 +8,7 @@ import { useClientes } from '@/lib/hooks/use-clientes';
 import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import { eur } from '@/lib/utils';
 import type { TipoFactura, FacturaLinea, Factura } from '@/lib/supabase/types';
-import { Plus, Trash2, Settings, FileText, Copy } from 'lucide-react';
+import { Plus, Trash2, Settings, FileText, Copy, Eye, Download } from 'lucide-react';
 
 export default function FacturasPage() {
   const { facturas, emisor, loading, error, saveEmisor, createFactura, deleteFactura } = useFacturas();
@@ -38,7 +38,10 @@ export default function FacturasPage() {
     receptor_nombre: '',
     receptor_nif: '',
     receptor_direccion: '',
+    incluir_iva: true,
     iva_porcentaje: 21,
+    incluir_irpf: false,
+    irpf_porcentaje: 15,
     lineas: [{ ...emptyLinea }] as FacturaLinea[],
     factura_rectificada_id: '',
     motivo_rectificacion: '',
@@ -75,8 +78,9 @@ export default function FacturasPage() {
   const removeLinea = (idx: number) => setFacForm(prev => ({ ...prev, lineas: prev.lineas.filter((_, i) => i !== idx) }));
 
   const baseImponible = facForm.lineas.reduce((s, l) => s + l.importe, 0);
-  const ivaImporte = baseImponible * facForm.iva_porcentaje / 100;
-  const total = baseImponible + ivaImporte;
+  const ivaImporte = facForm.incluir_iva ? baseImponible * facForm.iva_porcentaje / 100 : 0;
+  const irpfImporte = facForm.incluir_irpf ? baseImponible * facForm.irpf_porcentaje / 100 : 0;
+  const total = baseImponible + ivaImporte - irpfImporte;
 
   // Generar número factura
   const nextNumero = () => {
@@ -115,8 +119,12 @@ export default function FacturasPage() {
       receptor_direccion: facForm.receptor_direccion || null,
       lineas: facForm.lineas,
       base_imponible: baseImponible,
+      incluir_iva: facForm.incluir_iva,
       iva_porcentaje: facForm.iva_porcentaje,
       iva_importe: ivaImporte,
+      incluir_irpf: facForm.incluir_irpf,
+      irpf_porcentaje: facForm.irpf_porcentaje,
+      irpf_importe: irpfImporte,
       total,
       factura_rectificada_id: facForm.factura_rectificada_id || null,
       motivo_rectificacion: facForm.motivo_rectificacion || null,
@@ -126,7 +134,8 @@ export default function FacturasPage() {
     setFacForm({
       cliente_id: '', procedimiento_id: '', tipo: 'normal', fecha: new Date().toISOString().slice(0, 10),
       receptor_nombre: '', receptor_nif: '', receptor_direccion: '',
-      iva_porcentaje: 21, lineas: [{ ...emptyLinea }],
+      incluir_iva: true, iva_porcentaje: 21, incluir_irpf: false, irpf_porcentaje: 15,
+      lineas: [{ ...emptyLinea }],
       factura_rectificada_id: '', motivo_rectificacion: '', notas: '',
     });
   };
@@ -198,7 +207,6 @@ export default function FacturasPage() {
               <th>Cliente</th>
               <th>Tipo</th>
               <th>Base</th>
-              <th>IVA</th>
               <th>Total</th>
               <th></th>
             </tr>
@@ -214,10 +222,10 @@ export default function FacturasPage() {
                   <td>{f.receptor_nombre}</td>
                   <td><span className={`badge ${tipoBadge[f.tipo]}`}>{tipoLabel[f.tipo]}</span></td>
                   <td>{eur(f.base_imponible)}</td>
-                  <td className="subtle-text">{eur(f.iva_importe)}</td>
                   <td className="font-medium">{eur(f.total)}</td>
                   <td>
                     <div className="action-buttons">
+                      <button onClick={() => window.open(`/facturas/${f.id}`, '_blank')} className="action-btn action-view" title="Ver factura"><Eye className="w-3.5 h-3.5" /></button>
                       <button onClick={() => handleDelete(f)} className="action-btn action-delete"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </td>
@@ -351,20 +359,47 @@ export default function FacturasPage() {
             </button>
           </fieldset>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="form-label">IVA %</label>
-              <input type="number" min="0" max="100" value={facForm.iva_porcentaje} onChange={e => setFacForm({ ...facForm, iva_porcentaje: parseFloat(e.target.value) || 0 })} className="form-input" />
+          <fieldset className="form-fieldset">
+            <legend className="form-legend">Impuestos y totales</legend>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="flex items-center gap-3">
+                <input type="checkbox" checked={facForm.incluir_iva} onChange={e => setFacForm({ ...facForm, incluir_iva: e.target.checked })} className="form-checkbox" id="incluir_iva" />
+                <label htmlFor="incluir_iva" className="form-label" style={{ marginBottom: 0 }}>Incluir IVA</label>
+                {facForm.incluir_iva && (
+                  <input type="number" min="0" max="100" value={facForm.iva_porcentaje} onChange={e => setFacForm({ ...facForm, iva_porcentaje: parseFloat(e.target.value) || 0 })} className="form-input" style={{ width: '80px' }} placeholder="%" />
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <input type="checkbox" checked={facForm.incluir_irpf} onChange={e => setFacForm({ ...facForm, incluir_irpf: e.target.checked })} className="form-checkbox" id="incluir_irpf" />
+                <label htmlFor="incluir_irpf" className="form-label" style={{ marginBottom: 0 }}>Incluir IRPF</label>
+                {facForm.incluir_irpf && (
+                  <input type="number" min="0" max="100" value={facForm.irpf_porcentaje} onChange={e => setFacForm({ ...facForm, irpf_porcentaje: parseFloat(e.target.value) || 0 })} className="form-input" style={{ width: '80px' }} placeholder="%" />
+                )}
+              </div>
             </div>
-            <div>
-              <label className="form-label">Base imponible</label>
-              <input type="text" value={eur(baseImponible)} className="form-input" readOnly />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="form-label">Base imponible</label>
+                <input type="text" value={eur(baseImponible)} className="form-input" readOnly />
+              </div>
+              {facForm.incluir_iva && (
+                <div>
+                  <label className="form-label">IVA ({facForm.iva_porcentaje}%)</label>
+                  <input type="text" value={eur(ivaImporte)} className="form-input" readOnly />
+                </div>
+              )}
+              {facForm.incluir_irpf && (
+                <div>
+                  <label className="form-label">IRPF (-{facForm.irpf_porcentaje}%)</label>
+                  <input type="text" value={eur(irpfImporte)} className="form-input" readOnly />
+                </div>
+              )}
+              <div>
+                <label className="form-label">Total</label>
+                <input type="text" value={eur(total)} className="form-input font-bold" readOnly />
+              </div>
             </div>
-            <div>
-              <label className="form-label">Total</label>
-              <input type="text" value={eur(total)} className="form-input font-bold" readOnly />
-            </div>
-          </div>
+          </fieldset>
 
           <div>
             <label className="form-label">Notas</label>

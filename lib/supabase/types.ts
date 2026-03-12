@@ -151,8 +151,12 @@ export interface Factura {
   // Líneas y totales
   lineas: FacturaLinea[];
   base_imponible: number;
+  incluir_iva: boolean;
   iva_porcentaje: number;
   iva_importe: number;
+  incluir_irpf: boolean;
+  irpf_porcentaje: number;
+  irpf_importe: number;
   total: number;
   // Rectificativa
   factura_rectificada_id: string | null;

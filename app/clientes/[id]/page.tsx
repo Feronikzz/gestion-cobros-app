@@ -106,8 +106,34 @@ export default function ClienteDetallePage() {
     if (editingProc) {
       const { cliente_id, user_id, ...updates } = payload;
       await supabase.from('procedimientos').update(updates).eq('id', editingProc.id);
+      
+      // Si se añade entrada en edición y no existía antes, crear cobro
+      if (procForm.tiene_entrada && procForm.importe_entrada > 0 && !editingProc.tiene_entrada) {
+        await supabase.from('cobros').insert({
+          user_id: user.id,
+          cliente_id: id,
+          procedimiento_id: editingProc.id,
+          fecha_cobro: new Date().toISOString().slice(0, 10),
+          importe: procForm.importe_entrada,
+          metodo_pago: 'efectivo',
+          notas: `Entrada del procedimiento: ${procForm.titulo}`,
+        });
+      }
     } else {
-      await supabase.from('procedimientos').insert(payload);
+      const { data: newProc } = await supabase.from('procedimientos').insert(payload).select().single();
+      
+      // Si tiene entrada, crear cobro automáticamente
+      if (newProc && procForm.tiene_entrada && procForm.importe_entrada > 0) {
+        await supabase.from('cobros').insert({
+          user_id: user.id,
+          cliente_id: id,
+          procedimiento_id: newProc.id,
+          fecha_cobro: new Date().toISOString().slice(0, 10),
+          importe: procForm.importe_entrada,
+          metodo_pago: 'efectivo',
+          notas: `Entrada del procedimiento: ${procForm.titulo}`,
+        });
+      }
     }
     setShowProcModal(false);
     setEditingProc(null);

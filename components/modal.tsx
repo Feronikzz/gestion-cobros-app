@@ -20,14 +20,10 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      // Prevenir scroll del body cuando el modal está abierto
-      document.body.style.overflow = 'hidden';
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      // Restaurar scroll cuando el modal se cierra
-      document.body.style.overflow = '';
     };
   }, [isOpen, onClose]);
 

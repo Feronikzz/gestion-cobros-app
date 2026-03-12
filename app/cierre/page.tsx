@@ -8,25 +8,23 @@ import { Lock, Unlock, TrendingUp, TrendingDown, DollarSign, Calendar } from 'lu
 
 export default function CierrePage() {
   const { cierres, summary, loading, error, createCierre } = useCierreMensual();
-  const [filterEstado, setFilterEstado] = useState<'todos' | 'abierto' | 'cerrado'>('todos');
-  const [filterAnio, setFilterAnio] = useState<string>('');
-
-  const aniosDisponibles = useMemo(() => {
-    const set = new Set(summary.map(s => s.mes.slice(0, 4)));
-    return Array.from(set).sort().reverse();
-  }, [summary]);
 
   const isMesCerrado = (mes: string) => cierres.some(c => c.mes === mes);
 
+  // Mostrar solo el mes actual (el que no está cerrado)
+  const mesActual = useMemo(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  }, []);
+
   const filteredSummary = useMemo(() => {
-    return summary.filter(row => {
-      const cerrado = isMesCerrado(row.mes);
-      if (filterEstado === 'abierto' && cerrado) return false;
-      if (filterEstado === 'cerrado' && !cerrado) return false;
-      if (filterAnio && !row.mes.startsWith(filterAnio)) return false;
-      return true;
-    });
-  }, [summary, filterEstado, filterAnio, cierres]);
+    // Solo mostrar el mes actual si no está cerrado
+    const mesActualData = summary.find(s => s.mes === mesActual);
+    if (mesActualData && !isMesCerrado(mesActual)) {
+      return [mesActualData];
+    }
+    return [];
+  }, [summary, mesActual, cierres]);
 
   // Totales filtrados
   const totalCobrado = useMemo(() => filteredSummary.reduce((s, r) => s + r.cobradoMes, 0), [filteredSummary]);
@@ -76,19 +74,13 @@ export default function CierrePage() {
         </div>
       </div>
 
-      {/* ── Filtros ── */}
-      <div className="search-bar">
-        <select value={filterEstado} onChange={e => setFilterEstado(e.target.value as 'todos' | 'abierto' | 'cerrado')} className="form-input search-select">
-          <option value="todos">Todos los estados</option>
-          <option value="abierto">Solo abiertos</option>
-          <option value="cerrado">Solo cerrados</option>
-        </select>
-        <select value={filterAnio} onChange={e => setFilterAnio(e.target.value)} className="form-input search-select">
-          <option value="">Todos los años</option>
-          {aniosDisponibles.map(a => <option key={a} value={a}>{a}</option>)}
-        </select>
-        <p className="result-count" style={{ margin: 0, alignSelf: 'center' }}>{filteredSummary.length} meses</p>
-      </div>
+      {/* ── Info mes actual ── */}
+      {filteredSummary.length === 0 && (
+        <div className="section-block" style={{ textAlign: 'center', padding: '2rem' }}>
+          <p className="text-lg font-semibold text-gray-700">El mes actual ya está cerrado</p>
+          <p className="text-sm text-gray-500 mt-2">No hay meses pendientes de cierre</p>
+        </div>
+      )}
 
       {/* ── Tabla ── */}
       <div className="table-container">
