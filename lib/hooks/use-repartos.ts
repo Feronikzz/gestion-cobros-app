@@ -8,9 +8,13 @@ export function useRepartos() {
   const [repartos, setRepartos] = useState<Reparto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createClient();
+  
+  // Solo crear el cliente de Supabase en el cliente
+  const supabase = typeof window !== 'undefined' ? createClient() : null;
 
   const fetchRepartos = async () => {
+    if (!supabase) return;
+    
     try {
       setLoading(true);
       setError(null);
@@ -30,6 +34,8 @@ export function useRepartos() {
   };
 
   const createReparto = async (reparto: Omit<Reparto, 'id' | 'user_id' | 'created_at'>) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
@@ -50,6 +56,8 @@ export function useRepartos() {
   };
 
   const updateReparto = async (id: string, updates: Partial<Reparto>) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
       const { data, error } = await supabase
         .from('repartos')
@@ -68,6 +76,8 @@ export function useRepartos() {
   };
 
   const deleteReparto = async (id: string) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
       const { error } = await supabase
         .from('repartos')
@@ -83,8 +93,11 @@ export function useRepartos() {
   };
 
   useEffect(() => {
-    fetchRepartos();
-  }, []);
+    // Solo ejecutar en el cliente cuando supabase esté disponible
+    if (typeof window !== 'undefined' && supabase) {
+      fetchRepartos();
+    }
+  }, [supabase]);
 
   return {
     repartos,
