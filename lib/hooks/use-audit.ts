@@ -102,12 +102,90 @@ export function useAudit() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || user.email !== 'feronikz@gmail.com') return;
 
+      // Intentar usar la función RPC primero
       const { data, error } = await supabase.rpc('get_audit_stats');
 
-      if (error) throw error;
+      if (error) {
+        console.warn('RPC function not available, calculating stats manually:', error.message);
+        // Calcular estadísticas manualmente si la RPC no está disponible
+        await fetchStatsManually();
+        return;
+      }
+
       setStats(data);
     } catch (err: any) {
       console.error('Error fetching audit stats:', err);
+      // Intentar cálculo manual como fallback
+      await fetchStatsManually();
+    }
+  };
+
+  // Cálculo manual de estadísticas como fallback
+  const fetchStatsManually = async () => {
+    if (!supabase) return;
+
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || user.email !== 'feronikz@gmail.com') return;
+
+      // Obtener estadísticas básicas
+      const { data: allLogs, error } = await supabase
+        .from('audit_log')
+        .select('*')
+        .limit(10000);
+
+      if (error) throw error;
+
+      const logs = allLogs || [];
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      // Calcular estadísticas
+      const stats = {
+        total_events: logs.length,
+        events_today: logs.filter(log => new Date(log.created_at) >= today).length,
+        events_this_week: logs.filter(log => new Date(log.created_at) >= weekAgo).length,
+        events_this_month: logs.filter(log => new Date(log.created_at) >= monthStart).length,
+        top_users: Object.entries(
+          logs.reduce((acc, log) => {
+            if (log.user_email) {
+              acc[log.user_email] = (acc[log.user_email] || 0) + 1;
+            }
+            return acc;
+          }, {} as Record<string, number>)
+        )
+          .sort(([,a], [,b]) => (b as number) - (a as number))
+          .slice(0, 5)
+          .map(([email, count]) => ({ email, count: count as number })),
+        top_entities: Object.entries(
+          logs.reduce((acc, log) => {
+            if (log.entity_type) {
+              acc[log.entity_type] = (acc[log.entity_type] || 0) + 1;
+            }
+            return acc;
+          }, {} as Record<string, number>)
+        )
+          .sort(([,a], [,b]) => (b as number) - (a as number))
+          .slice(0, 5)
+          .map(([type, count]) => ({ type, count: count as number })),
+        recent_restores: logs.filter(log => log.restored_at).length,
+      };
+
+      setStats(stats);
+    } catch (err: any) {
+      console.error('Error fetching audit stats manually:', err);
+      // Establecer valores por defecto para evitar errores
+      setStats({
+        total_events: 0,
+        events_today: 0,
+        events_this_week: 0,
+        events_this_month: 0,
+        top_users: [],
+        top_entities: [],
+        recent_restores: 0,
+      });
     }
   };
 

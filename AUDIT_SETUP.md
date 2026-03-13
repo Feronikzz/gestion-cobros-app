@@ -8,11 +8,17 @@ Se ha implementado un sistema completo de auditoría que registra todos los even
 
 ### 1. Ejecutar el Schema SQL
 
-Ejecuta el siguiente SQL en tu proyecto Supabase:
+Ejecuta los siguientes SQL en tu proyecto Supabase:
 
 ```sql
--- Copiar y ejecutar el contenido de: lib/supabase/schema.sql
+-- 1. Tabla de auditoría (lib/supabase/schema.sql)
+-- Copiar y ejecutar el contenido completo del archivo
+
+-- 2. Funciones de estadísticas (lib/supabase/functions.sql)
+-- Copiar y ejecutar el contenido para obtener estadísticas optimizadas
 ```
+
+**Importante:** La función `get_audit_stats()` es opcional. El sistema tiene un fallback automático que calcula las estadísticas manualmente si la función no está disponible.
 
 ### 2. Tabla Creada
 
