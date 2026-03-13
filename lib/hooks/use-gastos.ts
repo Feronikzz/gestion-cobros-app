@@ -9,10 +9,13 @@ export function useGastos() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = createClient();
+  // Solo crear el cliente de Supabase en el cliente
+  const supabase = typeof window !== 'undefined' ? createClient() : null;
 
   // Cargar gastos
   const fetchGastos = async () => {
+    if (!supabase) return;
+    
     try {
       setLoading(true);
       setError(null);
@@ -35,6 +38,8 @@ export function useGastos() {
 
   // Crear gasto
   const createGasto = async (gasto: Omit<Gasto, 'id' | 'user_id' | 'created_at'>) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
@@ -79,6 +84,8 @@ export function useGastos() {
 
   // Actualizar gasto
   const updateGasto = async (id: string, updates: Partial<Omit<Gasto, 'id' | 'user_id' | 'created_at'>>) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
       const { data, error: updateError } = await supabase
         .from('gastos')
@@ -100,6 +107,8 @@ export function useGastos() {
 
   // Eliminar gasto
   const deleteGasto = async (id: string) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
       const { error: deleteError } = await supabase
         .from('gastos')
@@ -118,6 +127,8 @@ export function useGastos() {
 
   // Subir factura
   const uploadFactura = async (file: File) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
@@ -157,8 +168,11 @@ export function useGastos() {
   };
 
   useEffect(() => {
-    fetchGastos();
-  }, []);
+    // Solo ejecutar en el cliente cuando supabase esté disponible
+    if (typeof window !== 'undefined' && supabase) {
+      fetchGastos();
+    }
+  }, [supabase]);
 
   return {
     gastos,

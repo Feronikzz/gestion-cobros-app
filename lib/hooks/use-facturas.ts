@@ -5,13 +5,16 @@ import { createClient } from '@/lib/supabase/client';
 import type { Factura, DatosEmisor } from '@/lib/supabase/types';
 
 export function useFacturas() {
-  const supabase = createClient();
+  // Solo crear el cliente de Supabase en el cliente
+  const supabase = typeof window !== 'undefined' ? createClient() : null;
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [emisor, setEmisor] = useState<DatosEmisor | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchFacturas = useCallback(async () => {
+    if (!supabase) return;
+    
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -34,9 +37,16 @@ export function useFacturas() {
     }
   }, []);
 
-  useEffect(() => { fetchFacturas(); }, [fetchFacturas]);
+  useEffect(() => {
+    // Solo ejecutar en el cliente cuando supabase esté disponible
+    if (typeof window !== 'undefined' && supabase) {
+      fetchFacturas();
+    }
+  }, [fetchFacturas, supabase]);
 
   const saveEmisor = async (data: Omit<DatosEmisor, 'id' | 'user_id' | 'created_at'>) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -49,6 +59,8 @@ export function useFacturas() {
   };
 
   const createFactura = async (data: Omit<Factura, 'id' | 'user_id' | 'created_at'>) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     const { error: err } = await supabase.from('facturas').insert({ ...data, user_id: user.id });
@@ -57,6 +69,8 @@ export function useFacturas() {
   };
 
   const deleteFactura = async (id: string) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     await supabase.from('facturas').delete().eq('id', id);
     await fetchFacturas();
   };

@@ -19,8 +19,13 @@ export function useNotas(clienteId?: string) {
   }, [clienteId]);
 
   const fetchNotas = async () => {
+    if (!clienteId) return;
+    
+    // Solo crear el cliente de Supabase en el cliente
+    const supabase = typeof window !== 'undefined' ? createClient() : null;
+    if (!supabase) return;
+    
     try {
-      const supabase = createClient();
       const { data, error } = await supabase
         .from('cliente_notas')
         .select('*')
@@ -37,8 +42,11 @@ export function useNotas(clienteId?: string) {
   };
 
   const createNota = async (nota: Omit<ClienteNota, 'id' | 'user_id' | 'created_at'>) => {
+    // Solo crear el cliente de Supabase en el cliente
+    const supabase = typeof window !== 'undefined' ? createClient() : null;
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
-      const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
@@ -81,8 +89,11 @@ export function useNotas(clienteId?: string) {
   };
 
   const updateNota = async (id: string, updates: Partial<ClienteNota>) => {
+    // Solo crear el cliente de Supabase en el cliente
+    const supabase = typeof window !== 'undefined' ? createClient() : null;
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
-      const supabase = createClient();
       const { data, error } = await supabase
         .from('cliente_notas')
         .update(updates)
@@ -99,8 +110,11 @@ export function useNotas(clienteId?: string) {
   };
 
   const deleteNota = async (id: string) => {
+    // Solo crear el cliente de Supabase en el cliente
+    const supabase = typeof window !== 'undefined' ? createClient() : null;
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
-      const supabase = createClient();
       const { error } = await supabase
         .from('cliente_notas')
         .delete()
