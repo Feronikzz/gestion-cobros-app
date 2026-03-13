@@ -6,9 +6,19 @@ export async function middleware(request: NextRequest) {
     request,
   });
 
+  // Check if Supabase environment variables are available
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('Missing Supabase environment variables in middleware');
+    // Continue without authentication if env vars are missing
+    return response;
+  }
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -28,14 +38,19 @@ export async function middleware(request: NextRequest) {
   );
 
   // Refresh session if expired - important for auth to work properly
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  let session;
+  try {
+    const { data } = await supabase.auth.getSession();
+    session = data.session;
+  } catch (error) {
+    console.error('Error getting session in middleware:', error);
+    session = null;
+  }
 
   const isAuthPage = request.nextUrl.pathname.startsWith('/login');
 
-  // Redirect unauthenticated users to login
-  if (!session && !isAuthPage) {
+  // Redirect unauthenticated users to login (only if we have proper auth setup)
+  if (!session && !isAuthPage && supabaseUrl && supabaseAnonKey) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     return NextResponse.redirect(url);
