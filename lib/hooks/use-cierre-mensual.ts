@@ -19,7 +19,9 @@ export function useCierreMensual() {
   const [summary, setSummary] = useState<MonthlySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createClient();
+  
+  // Solo crear el cliente de Supabase en el cliente
+  const supabase = typeof window !== 'undefined' ? createClient() : null;
 
   const calculateMonthlySummary = async (months: string[], cobros: Cobro[], repartos: Reparto[]) => {
     const summary: MonthlySummary[] = [];
@@ -80,6 +82,8 @@ export function useCierreMensual() {
   };
 
   const fetchCierres = async () => {
+    if (!supabase) return;
+    
     try {
       setLoading(true);
       setError(null);
@@ -118,6 +122,8 @@ export function useCierreMensual() {
   };
 
   const createCierre = async (mes: string) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
@@ -150,6 +156,8 @@ export function useCierreMensual() {
   };
 
   const updateCierre = async (id: string, updates: Partial<CierreMensual>) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
       const { data, error } = await supabase
         .from('cierres_mensuales')
@@ -168,6 +176,8 @@ export function useCierreMensual() {
   };
 
   const deleteCierre = async (id: string) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
       const { error } = await supabase
         .from('cierres_mensuales')
@@ -183,8 +193,11 @@ export function useCierreMensual() {
   };
 
   useEffect(() => {
-    fetchCierres();
-  }, []);
+    // Solo ejecutar en el cliente cuando supabase esté disponible
+    if (typeof window !== 'undefined' && supabase) {
+      fetchCierres();
+    }
+  }, [supabase]);
 
   return {
     cierres,
