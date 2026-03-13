@@ -16,7 +16,9 @@ import { formatField } from '@/lib/utils/text';
 export default function ClienteDetallePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const supabase = createClient();
+  
+  // Solo crear el cliente de Supabase en el cliente
+  const supabase = typeof window !== 'undefined' ? createClient() : null;
 
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [procedimientos, setProcedimientos] = useState<Procedimiento[]>([]);
@@ -46,6 +48,11 @@ export default function ClienteDetallePage() {
   const [docFile, setDocFile] = useState<File | null>(null);
 
   const fetchData = async () => {
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     const [{ data: cli }, { data: procs }, { data: cobs }, { data: docs }] = await Promise.all([
       supabase.from('clientes').select('*').eq('id', id).single(),
@@ -60,7 +67,12 @@ export default function ClienteDetallePage() {
     setLoading(false);
   };
 
-  useEffect(() => { if (id) fetchData(); }, [id]);
+  useEffect(() => {
+    // Solo ejecutar en el cliente cuando supabase esté disponible
+    if (typeof window !== 'undefined' && supabase && id) {
+      fetchData();
+    }
+  }, [supabase, id]);
 
   // Totales
   const procsAbiertas = useMemo(() => procedimientos.filter(p => p.estado !== 'cerrado' && p.estado !== 'archivado'), [procedimientos]);

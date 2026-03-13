@@ -16,7 +16,13 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
 
   useEffect(() => {
     const fetchFactura = async () => {
-      const supabase = createClient();
+      // Solo crear el cliente de Supabase en el cliente
+      const supabase = typeof window !== 'undefined' ? createClient() : null;
+      if (!supabase) {
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('facturas')
         .select('*')
@@ -31,7 +37,10 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
       setLoading(false);
     };
 
-    fetchFactura();
+    // Solo ejecutar en el cliente
+    if (typeof window !== 'undefined') {
+      fetchFactura();
+    }
   }, [id]);
 
   const handlePrint = () => {

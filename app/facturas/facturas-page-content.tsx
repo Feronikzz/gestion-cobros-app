@@ -77,7 +77,10 @@ export function FacturasPageContent() {
         // Verificar si ya existe una factura para este cobro
         if (cobroId) {
           const { createClient } = await import('@/lib/supabase/client');
-          const supabase = createClient();
+          // Solo crear el cliente de Supabase en el cliente
+          const supabase = typeof window !== 'undefined' ? createClient() : null;
+          if (!supabase) return;
+          
           const { data: facturaExistente } = await supabase
             .from('facturas')
             .select('*')

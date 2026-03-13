@@ -9,12 +9,20 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
-  const supabase = createClient();
+  
+  // Solo crear el cliente de Supabase en el cliente
+  const supabase = typeof window !== 'undefined' ? createClient() : null;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    if (!supabase) {
+      setError('Error: Supabase client no disponible');
+      setLoading(false);
+      return;
+    }
 
     try {
       const { error } = await supabase.auth.signInWithPassword({
