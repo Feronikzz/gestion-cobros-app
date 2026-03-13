@@ -17,7 +17,8 @@ import {
   Archive,
   DollarSign,
   Users,
-  Eye
+  Eye,
+  X
 } from 'lucide-react';
 
 export default function ExpedientesPage() {
@@ -30,21 +31,25 @@ export default function ExpedientesPage() {
 
   // Aplicar filtros
   const filteredExpedientes = useMemo(() => {
-    let filtered = expedientes;
-    
-    // Filtro de búsqueda
-    if (searchTerm.trim()) {
-      filtered = filtrarPorCliente(searchTerm);
-    }
-    
-    // Filtro de estado
-    filtered = filtrarPorEstado(estadoFilter);
-    
-    // Filtro de pagado
-    filtered = filtrarPorPagado(pagadoFilter);
-    
-    return filtered;
-  }, [expedientes, searchTerm, estadoFilter, pagadoFilter, filtrarPorEstado, filtrarPorCliente, filtrarPorPagado]);
+    return expedientes.filter(expediente => {
+      // Búsqueda por texto (cliente, título, concepto, referencia)
+      const searchMatch = !searchTerm || 
+        expediente.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        expediente.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        expediente.concepto.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (expediente.expediente_referencia && expediente.expediente_referencia.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      // Filtro de estado
+      const estadoMatch = estadoFilter === 'todos' || expediente.estado === estadoFilter;
+      
+      // Filtro de pagado
+      const pagadoMatch = pagadoFilter === 'todos' || 
+        (pagadoFilter === 'pagados' && expediente.esta_pagado_totalmente) ||
+        (pagadoFilter === 'pendientes' && !expediente.esta_pagado_totalmente);
+
+      return searchMatch && estadoMatch && pagadoMatch;
+    });
+  }, [expedientes, searchTerm, estadoFilter, pagadoFilter]);
 
   // Estado labels y badges
   const estadoLabels: Record<EstadoProcedimiento, string> = {
@@ -123,25 +128,42 @@ export default function ExpedientesPage() {
         </div>
       </div>
 
-      {/* ─── Filtros ── */}
-      <div className="page-toolbar">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="search-box">
-            <Search className="search-icon" />
+      {/* ─── Búsqueda y Filtros ── */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
+        {/* Búsqueda Principal */}
+        <div className="mb-4">
+          <div className="relative">
+            <Search className="w-5 h-5 absolute left-4 top-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Buscar por cliente..."
+              placeholder="Buscar expedientes por cliente, título, concepto o referencia..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
+              className="w-full pl-12 pr-12 py-4 text-lg border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-4 top-4 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-500" />
+        </div>
+
+        {/* Filtros */}
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Filtro de Estado */}
+          <div className="relative">
             <select
               value={estadoFilter}
               onChange={(e) => setEstadoFilter(e.target.value)}
-              className="form-input search-select"
+              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 appearance-none bg-white pr-10 ${
+                estadoFilter !== 'todos'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                  : 'border-gray-300 text-gray-700 hover:border-gray-400'
+              }`}
             >
               <option value="todos">Todos los estados</option>
               <option value="pendiente">Pendiente</option>
@@ -153,25 +175,59 @@ export default function ExpedientesPage() {
               <option value="cerrado">Cerrado</option>
               <option value="archivado">Archivado</option>
             </select>
+            <Filter className="w-4 h-4 absolute right-3 top-3 text-gray-400 pointer-events-none" />
           </div>
-          <div className="flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-gray-500" />
+
+          {/* Filtro de Pago */}
+          <div className="relative">
             <select
               value={pagadoFilter}
               onChange={(e) => setPagadoFilter(e.target.value)}
-              className="form-input search-select"
+              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 appearance-none bg-white pr-10 ${
+                pagadoFilter !== 'todos'
+                  ? 'border-green-500 bg-green-50 text-green-700' 
+                  : 'border-gray-300 text-gray-700 hover:border-gray-400'
+              }`}
             >
               <option value="todos">Todos los pagos</option>
               <option value="pagados">Pagados totalmente</option>
               <option value="pendientes">Con pago pendiente</option>
             </select>
+            <DollarSign className="w-4 h-4 absolute right-3 top-3 text-gray-400 pointer-events-none" />
           </div>
+
+          {/* Contador de filtros activos */}
+          {(estadoFilter !== 'todos' || pagadoFilter !== 'todos' || searchTerm) && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span>
+                {[
+                  estadoFilter !== 'todos' && `Estado: ${estadoLabels[estadoFilter as EstadoProcedimiento]}`,
+                  pagadoFilter !== 'todos' && (pagadoFilter === 'pagados' ? 'Pagados' : 'Pendientes de pago'),
+                  searchTerm && 'Búsqueda activa'
+                ].filter(Boolean).join(' • ')}
+              </span>
+            </div>
+          )}
+
+          {/* Botón limpiar filtros */}
+          {(estadoFilter !== 'todos' || pagadoFilter !== 'todos' || searchTerm) && (
+            <button
+              onClick={() => {
+                setSearchTerm('');
+                setEstadoFilter('todos');
+                setPagadoFilter('todos');
+              }}
+              className="px-3 py-1 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              Limpiar filtros
+            </button>
+          )}
         </div>
       </div>
 
       {/* ─── Tabla de Expedientes ── */}
-      <div className="data-table-container">
-        <table className="data-table">
+      <div className="table-container">
+        <table className="table">
           <thead>
             <tr>
               <th>Cliente</th>
@@ -272,12 +328,12 @@ export default function ExpedientesPage() {
         </table>
       </div>
 
-      {/* ─── Resumen de filtros ── */}
+      {/* ─── Resumen de resultados ── */}
       {filteredExpedientes.length !== expedientes.length && (
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
           <div className="flex items-center gap-2 text-blue-800">
             <Filter className="w-4 h-4" />
-            <span className="text-sm">
+            <span className="text-sm font-medium">
               Mostrando {filteredExpedientes.length} de {expedientes.length} expedientes
             </span>
           </div>
