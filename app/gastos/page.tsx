@@ -156,7 +156,7 @@ export default function GastosPage() {
     try {
       console.log('Enviando datos del gasto:', data);
       
-      if (editingGasto) {
+      if (editingGasto && editingGasto.id && editingGasto.id !== '') {
         console.log('Actualizando gasto existente:', editingGasto.id);
         await updateGasto(editingGasto.id, data);
       } else {
