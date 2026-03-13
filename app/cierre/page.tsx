@@ -11,25 +11,27 @@ export default function CierrePage() {
 
   const isMesCerrado = (mes: string) => cierres.some(c => c.mes === mes);
 
-  // Mostrar solo el mes actual (el que no está cerrado)
+  // Mostrar todos los meses con actividad (cobros o repartos)
+  const activeMonthsSummary = useMemo(() => {
+    return summary.filter(row => 
+      row.cobradoMes > 0 || row.repartidoMes > 0 || row.arrastreAnterior > 0 || row.saldoFinal !== 0
+    ).sort((a, b) => b.mes.localeCompare(a.mes)); // Ordenar del más reciente al más antiguo
+  }, [summary]);
+
+  // Mes actual para referencia
   const mesActual = useMemo(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   }, []);
 
-  const filteredSummary = useMemo(() => {
-    // Solo mostrar el mes actual si no está cerrado
-    const mesActualData = summary.find(s => s.mes === mesActual);
-    if (mesActualData && !isMesCerrado(mesActual)) {
-      return [mesActualData];
-    }
-    return [];
-  }, [summary, mesActual, cierres]);
-
-  // Totales filtrados
-  const totalCobrado = useMemo(() => filteredSummary.reduce((s, r) => s + r.cobradoMes, 0), [filteredSummary]);
-  const totalRepartido = useMemo(() => filteredSummary.reduce((s, r) => s + r.repartidoMes, 0), [filteredSummary]);
+  // Totales de todos los meses con actividad
+  const totalCobrado = useMemo(() => activeMonthsSummary.reduce((s, r) => s + r.cobradoMes, 0), [activeMonthsSummary]);
+  const totalRepartido = useMemo(() => activeMonthsSummary.reduce((s, r) => s + r.repartidoMes, 0), [activeMonthsSummary]);
   const saldoActual = summary.length > 0 ? summary[summary.length - 1].saldoFinal : 0;
+  
+  // Estadísticas adicionales
+  const mesesCerrados = useMemo(() => activeMonthsSummary.filter(row => isMesCerrado(row.mes)).length, [activeMonthsSummary, cierres]);
+  const mesesAbiertos = useMemo(() => activeMonthsSummary.filter(row => !isMesCerrado(row.mes)).length, [activeMonthsSummary, cierres]);
 
   const handleCerrarMes = async (mes: string, label: string) => {
     if (window.confirm(`¿Cerrar el mes de ${label}? Esta acción no se puede deshacer fácilmente.`)) {
@@ -72,16 +74,23 @@ export default function CierrePage() {
           <Calendar className="metric-icon" />
           <div>
             <p className="metric-label">Meses cerrados</p>
-            <p className="metric-value">{cierres.length} / {summary.length}</p>
+            <p className="metric-value">{mesesCerrados} / {activeMonthsSummary.length}</p>
+          </div>
+        </div>
+        <div className="metric-card metric-blue">
+          <Unlock className="metric-icon" />
+          <div>
+            <p className="metric-label">Meses abiertos</p>
+            <p className="metric-value">{mesesAbiertos}</p>
           </div>
         </div>
       </div>
 
-      {/* ── Info mes actual ── */}
-      {filteredSummary.length === 0 && (
+      {/* ── Info sin actividad ── */}
+      {activeMonthsSummary.length === 0 && (
         <div className="section-block" style={{ textAlign: 'center', padding: '2rem' }}>
-          <p className="text-lg font-semibold text-gray-700">El mes actual ya está cerrado</p>
-          <p className="text-sm text-gray-500 mt-2">No hay meses pendientes de cierre</p>
+          <p className="text-lg font-semibold text-gray-700">No hay actividad registrada</p>
+          <p className="text-sm text-gray-500 mt-2">No se encontraron cobros o repartos en ningún mes</p>
         </div>
       )}
 
@@ -101,14 +110,21 @@ export default function CierrePage() {
             </tr>
           </thead>
           <tbody>
-            {filteredSummary.length === 0 ? (
+            {activeMonthsSummary.length === 0 ? (
               <tr><td colSpan={8} className="empty-state">No hay datos para los filtros seleccionados</td></tr>
             ) : (
-              filteredSummary.map((row) => {
+              activeMonthsSummary.map((row) => {
                 const cerrado = isMesCerrado(row.mes);
                 return (
-                  <tr key={row.mes}>
-                    <td className="font-medium">{row.label}</td>
+                  <tr key={row.mes} className={row.mes === mesActual ? 'bg-blue-50' : ''}>
+                    <td className="font-medium">
+                      {row.label}
+                      {row.mes === mesActual && (
+                        <span className="ml-2 text-xs bg-blue-500 text-white px-2 py-1 rounded-full">
+                          Actual
+                        </span>
+                      )}
+                    </td>
                     <td>
                       <span className={`badge ${cerrado ? 'badge-red' : 'badge-green'}`}>
                         {cerrado ? 'Cerrado' : 'Abierto'}
