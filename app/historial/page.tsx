@@ -129,7 +129,7 @@ export default function HistorialPage() {
 
   if (loading) {
     return (
-      <LayoutShell>
+      <LayoutShell title="Cargando...">
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
@@ -139,7 +139,7 @@ export default function HistorialPage() {
 
   if (error) {
     return (
-      <LayoutShell>
+      <LayoutShell title="Error">
         <div className="flex items-center justify-center h-64">
           <div className="text-red-600 flex items-center gap-2">
             <AlertCircle className="w-5 h-5" />
@@ -151,7 +151,7 @@ export default function HistorialPage() {
   }
 
   return (
-    <LayoutShell>
+    <LayoutShell title="Historial de Auditoría">
       <div className="historial-page">
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
@@ -196,7 +196,7 @@ export default function HistorialPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Total Eventos</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.total_events.toLocaleString()}</p>
+                  <p className="text-2xl font-bold text-gray-900">{(stats.total_events || 0).toLocaleString()}</p>
                 </div>
                 <Activity className="w-8 h-8 text-blue-600" />
               </div>
@@ -205,7 +205,7 @@ export default function HistorialPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Hoy</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.events_today}</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.events_today || 0}</p>
                 </div>
                 <Calendar className="w-8 h-8 text-green-600" />
               </div>
@@ -214,7 +214,7 @@ export default function HistorialPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Esta Semana</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.events_this_week}</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.events_this_week || 0}</p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-purple-600" />
               </div>
@@ -223,7 +223,7 @@ export default function HistorialPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Restauraciones</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.recent_restores}</p>
+                  <p className="text-2xl font-bold text-gray-900">{stats.recent_restores || 0}</p>
                 </div>
                 <RotateCcw className="w-8 h-8 text-orange-600" />
               </div>

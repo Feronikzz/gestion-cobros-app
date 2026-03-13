@@ -9,7 +9,15 @@ export function useAudit() {
   const supabase = typeof window !== 'undefined' ? createClient() : null;
   
   const [logs, setLogs] = useState<AuditLog[]>([]);
-  const [stats, setStats] = useState<AuditStats | null>(null);
+  const [stats, setStats] = useState<AuditStats>({
+    total_events: 0,
+    events_today: 0,
+    events_this_week: 0,
+    events_this_month: 0,
+    top_users: [],
+    top_entities: [],
+    recent_restores: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
