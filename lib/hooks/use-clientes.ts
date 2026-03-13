@@ -8,9 +8,13 @@ export function useClientes() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createClient();
+  
+  // Solo crear el cliente de Supabase en el cliente
+  const supabase = typeof window !== 'undefined' ? createClient() : null;
 
   const fetchClientes = async () => {
+    if (!supabase) return;
+    
     try {
       setLoading(true);
       setError(null);
@@ -28,6 +32,8 @@ export function useClientes() {
   };
 
   const createCliente = async (input: Omit<ClienteInsert, 'user_id'>) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Usuario no autenticado');
     const { data, error } = await supabase
@@ -41,6 +47,8 @@ export function useClientes() {
   };
 
   const updateCliente = async (id: string, updates: ClienteUpdate) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     const { data, error } = await supabase
       .from('clientes')
       .update(updates)
@@ -53,12 +61,19 @@ export function useClientes() {
   };
 
   const deleteCliente = async (id: string) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     const { error } = await supabase.from('clientes').delete().eq('id', id);
     if (error) throw error;
     setClientes(prev => prev.filter(c => c.id !== id));
   };
 
-  useEffect(() => { fetchClientes(); }, []);
+  useEffect(() => {
+    // Solo ejecutar en el cliente cuando supabase esté disponible
+    if (typeof window !== 'undefined' && supabase) {
+      fetchClientes();
+    }
+  }, [supabase]);
 
   return { clientes, loading, error, fetchClientes, createCliente, updateCliente, deleteCliente };
 }
