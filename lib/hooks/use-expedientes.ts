@@ -13,9 +13,13 @@ export function useExpedientes() {
   const [expedientes, setExpedientes] = useState<ExpedienteConCliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createClient();
+  
+  // Solo crear el cliente de Supabase en el cliente
+  const supabase = typeof window !== 'undefined' ? createClient() : null;
 
   const fetchExpedientes = async () => {
+    if (!supabase) return;
+    
     try {
       setLoading(true);
       setError(null);
@@ -75,8 +79,11 @@ export function useExpedientes() {
   };
 
   useEffect(() => {
-    fetchExpedientes();
-  }, []);
+    // Solo ejecutar en el cliente cuando supabase esté disponible
+    if (typeof window !== 'undefined' && supabase) {
+      fetchExpedientes();
+    }
+  }, [supabase]);
 
   // Funciones de filtrado
   const filtrarPorEstado = (estado: string) => {
