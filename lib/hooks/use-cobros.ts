@@ -8,9 +8,13 @@ export function useCobros() {
   const [cobros, setCobros] = useState<Cobro[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createClient();
+  
+  // Solo crear el cliente de Supabase en el cliente
+  const supabase = typeof window !== 'undefined' ? createClient() : null;
 
   const fetchCobros = async () => {
+    if (!supabase) return;
+    
     try {
       setLoading(true);
       setError(null);
@@ -30,6 +34,8 @@ export function useCobros() {
   };
 
   const createCobro = async (cobro: Omit<Cobro, 'id' | 'user_id' | 'created_at'>) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuario no autenticado');
@@ -50,6 +56,8 @@ export function useCobros() {
   };
 
   const updateCobro = async (id: string, updates: Partial<Cobro>) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
       const { data, error } = await supabase
         .from('cobros')
@@ -68,6 +76,8 @@ export function useCobros() {
   };
 
   const deleteCobro = async (id: string) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     try {
       const { error } = await supabase
         .from('cobros')
@@ -83,8 +93,11 @@ export function useCobros() {
   };
 
   useEffect(() => {
-    fetchCobros();
-  }, []);
+    // Solo ejecutar en el cliente cuando supabase esté disponible
+    if (typeof window !== 'undefined' && supabase) {
+      fetchCobros();
+    }
+  }, [supabase]);
 
   return {
     cobros,

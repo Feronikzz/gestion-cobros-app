@@ -8,9 +8,13 @@ export function useProcedimientos(clienteId?: string) {
   const [procedimientos, setProcedimientos] = useState<Procedimiento[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const supabase = createClient();
+  
+  // Solo crear el cliente de Supabase en el cliente
+  const supabase = typeof window !== 'undefined' ? createClient() : null;
 
   const fetchProcedimientos = async () => {
+    if (!supabase) return;
+    
     try {
       setLoading(true);
       setError(null);
@@ -27,6 +31,8 @@ export function useProcedimientos(clienteId?: string) {
   };
 
   const createProcedimiento = async (input: Omit<ProcedimientoInsert, 'user_id'>) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('No autenticado');
     const { data, error } = await supabase
@@ -40,6 +46,8 @@ export function useProcedimientos(clienteId?: string) {
   };
 
   const updateProcedimiento = async (id: string, updates: ProcedimientoUpdate) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     const { data, error } = await supabase
       .from('procedimientos')
       .update(updates)
@@ -52,12 +60,19 @@ export function useProcedimientos(clienteId?: string) {
   };
 
   const deleteProcedimiento = async (id: string) => {
+    if (!supabase) throw new Error('Supabase client no disponible');
+    
     const { error } = await supabase.from('procedimientos').delete().eq('id', id);
     if (error) throw error;
     setProcedimientos(prev => prev.filter(p => p.id !== id));
   };
 
-  useEffect(() => { fetchProcedimientos(); }, [clienteId]);
+  useEffect(() => {
+    // Solo ejecutar en el cliente cuando supabase esté disponible
+    if (typeof window !== 'undefined' && supabase) {
+      fetchProcedimientos();
+    }
+  }, [supabase, clienteId]);
 
   return { procedimientos, loading, error, fetchProcedimientos, createProcedimiento, updateProcedimiento, deleteProcedimiento };
 }
