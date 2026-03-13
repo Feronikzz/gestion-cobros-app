@@ -193,9 +193,13 @@ export default function GastosPage() {
   };
 
   const handleDuplicate = (gasto: Gasto) => {
-    // Crear una copia del gasto sin ID, created_at y con fecha actual
-    const duplicatedGasto: Omit<Gasto, 'id' | 'user_id' | 'created_at'> = {
-      ...gasto,
+    // Crear una copia del gasto sin ID, user_id, created_at y con fecha actual
+    const duplicatedGasto = {
+      categoria: gasto.categoria,
+      proveedor: gasto.proveedor,
+      conceptos: gasto.conceptos,
+      importe_total: gasto.importe_total,
+      notas: gasto.notas,
       fecha: new Date().toISOString().split('T')[0], // Fecha actual
       mes: new Date().toISOString().slice(0, 7), // Mes actual (YYYY-MM)
       numero_factura: null, // Limpiar número de factura
@@ -203,7 +207,15 @@ export default function GastosPage() {
       factura_url: null, // Limpiar URL de factura
     };
     
-    setEditingGasto(duplicatedGasto as Gasto); // Convertir a Gasto para el formulario
+    // Crear un objeto Gasto sin ID para el formulario
+    const gastoForForm = {
+      ...duplicatedGasto,
+      id: '', // ID vacío para indicar que es nuevo
+      user_id: '', // Se asignará automáticamente
+      created_at: '', // Se asignará automáticamente
+    } as Gasto;
+    
+    setEditingGasto(gastoForForm);
     setIsModalOpen(true);
   };
 
@@ -559,14 +571,14 @@ export default function GastosPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingGasto?.id ? 'Editar Gasto' : editingGasto ? 'Duplicar Gasto' : 'Nuevo Gasto'}
+        title={editingGasto?.id && editingGasto.id !== '' ? 'Editar Gasto' : editingGasto ? 'Duplicar Gasto' : 'Nuevo Gasto'}
       >
         <GastoForm
           gasto={editingGasto || undefined}
           onSubmit={handleSubmit}
           onCancel={() => setIsModalOpen(false)}
           onUploadFactura={uploadFactura}
-          isDuplicating={!!(editingGasto && !editingGasto.id)}
+          isDuplicating={!!(editingGasto && editingGasto.id === '')}
         />
       </Modal>
     </LayoutShell>
