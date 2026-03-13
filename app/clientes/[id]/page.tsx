@@ -105,6 +105,8 @@ export default function ClienteDetallePage() {
   // Guardar procedimiento
   const handleSaveProc = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabase) return;
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -179,12 +181,16 @@ export default function ClienteDetallePage() {
 
   const handleDeleteProc = async (procId: string) => {
     if (!window.confirm('¿Eliminar este procedimiento?')) return;
+    if (!supabase) return;
+    
     await supabase.from('procedimientos').delete().eq('id', procId);
     fetchData();
   };
 
   // Guardar cobro
   const handleSaveCobro = async (data: Omit<Cobro, 'id' | 'user_id' | 'created_at'>) => {
+    if (!supabase) return;
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
     await supabase.from('cobros').insert({ ...data, user_id: user.id });
@@ -194,6 +200,8 @@ export default function ClienteDetallePage() {
 
   const handleDeleteCobro = async (cobroId: string) => {
     if (!window.confirm('¿Eliminar este cobro?')) return;
+    if (!supabase) return;
+    
     await supabase.from('cobros').delete().eq('id', cobroId);
     fetchData();
   };
@@ -219,7 +227,8 @@ export default function ClienteDetallePage() {
   // Documentos
   const handleSaveDoc = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!docProcId) return;
+    if (!docProcId || !supabase) return;
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -271,6 +280,8 @@ export default function ClienteDetallePage() {
 
   const handleDeleteDoc = async (docId: string) => {
     if (!window.confirm('¿Eliminar este documento?')) return;
+    if (!supabase) return;
+    
     await supabase.from('documentos').delete().eq('id', docId);
     fetchData();
   };
