@@ -7,7 +7,7 @@ import { Modal } from '@/components/modal';
 import { useGastos } from '@/lib/hooks/use-gastos';
 import type { Gasto } from '@/lib/supabase/types';
 import { eur, monthLabel } from '@/lib/utils';
-import { FileText, Download, Eye, Edit, Trash2, Receipt, TrendingUp, TrendingDown, Calendar, DollarSign, ShoppingCart, Building, Zap, Car, Phone, Mail, CreditCard, Search, Filter, ChevronDown, X } from 'lucide-react';
+import { FileText, Download, Eye, Edit, Trash2, Receipt, TrendingUp, TrendingDown, Calendar, DollarSign, ShoppingCart, Building, Zap, Car, Phone, Mail, CreditCard, Search, Filter, ChevronDown, X, Copy } from 'lucide-react';
 
 export default function GastosPage() {
   const { gastos, loading, error, createGasto, updateGasto, deleteGasto, uploadFactura } = useGastos();
@@ -190,6 +190,21 @@ export default function GastosPage() {
 
   const handleViewFactura = (facturaUrl: string) => {
     window.open(facturaUrl, '_blank');
+  };
+
+  const handleDuplicate = (gasto: Gasto) => {
+    // Crear una copia del gasto sin ID, created_at y con fecha actual
+    const duplicatedGasto: Omit<Gasto, 'id' | 'user_id' | 'created_at'> = {
+      ...gasto,
+      fecha: new Date().toISOString().split('T')[0], // Fecha actual
+      mes: new Date().toISOString().slice(0, 7), // Mes actual (YYYY-MM)
+      numero_factura: null, // Limpiar número de factura
+      fecha_factura: null, // Limpiar fecha de factura
+      factura_url: null, // Limpiar URL de factura
+    };
+    
+    setEditingGasto(duplicatedGasto as Gasto); // Convertir a Gasto para el formulario
+    setIsModalOpen(true);
   };
 
   if (loading) {
@@ -514,6 +529,13 @@ export default function GastosPage() {
                   <td>
                     <div className="flex gap-2">
                       <button
+                        onClick={() => handleDuplicate(gasto)}
+                        className="text-purple-600 hover:text-purple-800"
+                        title="Duplicar gasto"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                      <button
                         onClick={() => handleEdit(gasto)}
                         className="text-blue-600 hover:text-blue-800"
                       >
@@ -537,13 +559,14 @@ export default function GastosPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editingGasto ? 'Editar Gasto' : 'Nuevo Gasto'}
+        title={editingGasto?.id ? 'Editar Gasto' : editingGasto ? 'Duplicar Gasto' : 'Nuevo Gasto'}
       >
         <GastoForm
           gasto={editingGasto || undefined}
           onSubmit={handleSubmit}
           onCancel={() => setIsModalOpen(false)}
           onUploadFactura={uploadFactura}
+          isDuplicating={!!(editingGasto && !editingGasto.id)}
         />
       </Modal>
     </LayoutShell>
