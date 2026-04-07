@@ -57,7 +57,9 @@ export default function ClientesPageEnhanced() {
     return clientes.filter(cliente => {
       const matchesSearch = searchQuery === '' || 
         cliente.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        cliente.apellidos?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         cliente.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        cliente.nif?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         cliente.telefono?.includes(searchQuery);
       
       const matchesEstado = estadoFilter === '' || cliente.estado === estadoFilter;
@@ -68,7 +70,7 @@ export default function ClientesPageEnhanced() {
 
   const activeFiltersCount = useMemo(() => [searchQuery, estadoFilter].filter(Boolean).length, [searchQuery, estadoFilter]);
 
-  const handleSubmit = async (data: ClienteInsert) => {
+  const handleSubmit = async (data: Omit<ClienteInsert, 'user_id'>) => {
     try {
       if (editingCliente) {
         await updateCliente(editingCliente.id, data);
@@ -278,7 +280,7 @@ export default function ClientesPageEnhanced() {
                     <tr key={cliente.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{cliente.nombre}</div>
+                          <div className="text-sm font-medium text-gray-900">{[cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}</div>
                           <div className="text-sm text-gray-500">{cliente.nif || '—'}</div>
                         </div>
                       </td>
@@ -352,7 +354,7 @@ export default function ClientesPageEnhanced() {
             {filteredClientes.map((cliente) => (
               <MobileCard
                 key={cliente.id}
-                title={cliente.nombre}
+                title={[cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}
                 subtitle={cliente.nif || '—'}
                 actions={
                   <div className="flex items-center gap-2">
