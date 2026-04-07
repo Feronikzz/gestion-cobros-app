@@ -2,12 +2,13 @@
 
 import React, { useState, useMemo } from 'react';
 import { LayoutShell } from '@/components/layout-shell';
-import { ClienteForm } from '@/components/cliente-form';
+import { ClienteFormV2 } from '@/components/cliente-form-v2';
 import { Modal } from '@/components/modal';
 import { useClientes } from '@/lib/hooks/use-clientes';
 import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import { useCobros } from '@/lib/hooks/use-cobros';
-import type { Cliente, ClienteInsert } from '@/lib/supabase/types';
+import type { Cliente, ClienteInsert, EstadoProcedimiento } from '@/lib/supabase/types';
+import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
 import { Eye, Edit, Trash2, UserPlus, Users, TrendingUp, Calendar, DollarSign, Search, ChevronDown, X } from 'lucide-react';
 
@@ -57,20 +58,77 @@ export default function ClientesPage() {
       const q = searchQuery.toLowerCase();
       const matchesSearch = !q ||
         c.nombre.toLowerCase().includes(q) ||
+        c.apellidos?.toLowerCase().includes(q) ||
         c.nif?.toLowerCase().includes(q) ||
         c.email?.toLowerCase().includes(q) ||
+        c.telefono?.toLowerCase().includes(q) ||
         c.notas?.toLowerCase().includes(q);
       const matchesEstado = !estadoFilter || c.estado === estadoFilter;
       return matchesSearch && matchesEstado;
     });
   }, [clientes, searchQuery, estadoFilter]);
 
-  const handleSubmit = async (data: Omit<ClienteInsert, 'user_id'>) => {
+  const handleSubmit = async (
+    data: Omit<ClienteInsert, 'user_id'>,
+    docs: { tipo: string; numero: string; fecha_expedicion: string; fecha_caducidad: string; es_principal: boolean }[],
+    proc: { titulo: string; concepto: string; presupuesto: number; tiene_entrada: boolean; importe_entrada: number; estado: EstadoProcedimiento } | null
+  ) => {
     try {
       if (editingCliente) {
         await updateCliente(editingCliente.id, data);
       } else {
-        await createCliente(data);
+        const newCliente = await createCliente(data);
+        // Si se creó un procedimiento junto al cliente
+        if (proc && newCliente) {
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data: newProc } = await supabase.from('procedimientos').insert({
+              ...proc,
+              cliente_id: newCliente.id,
+              user_id: user.id,
+              nie_interesado: null,
+              nombre_interesado: null,
+              expediente_referencia: null,
+              fecha_presentacion: null,
+              fecha_resolucion: null,
+              notas: null,
+            }).select().single();
+            // Si tiene entrada, crear cobro automático
+            if (newProc && proc.tiene_entrada && proc.importe_entrada > 0) {
+              await supabase.from('cobros').insert({
+                user_id: user.id,
+                cliente_id: newCliente.id,
+                procedimiento_id: newProc.id,
+                fecha_cobro: new Date().toISOString().slice(0, 10),
+                importe: proc.importe_entrada,
+                metodo_pago: 'efectivo',
+                notas: `Entrada del procedimiento: ${proc.titulo}`,
+                iva_tipo: 'iva_incluido',
+                iva_porcentaje: 21,
+              });
+            }
+          }
+        }
+        // Guardar documentos de identidad
+        if (docs.length > 0 && newCliente) {
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase.from('documentos_identidad').insert(
+              docs.filter(d => d.numero).map(d => ({
+                user_id: user.id,
+                cliente_id: newCliente.id,
+                tipo: d.tipo,
+                numero: d.numero,
+                fecha_expedicion: d.fecha_expedicion || null,
+                fecha_caducidad: d.fecha_caducidad || null,
+                es_principal: d.es_principal,
+                notas: null,
+              }))
+            );
+          }
+        }
       }
       setIsModalOpen(false);
     } catch (err) {
@@ -278,7 +336,7 @@ export default function ClientesPage() {
             ) : (
               filteredClientes.map((c) => (
                 <tr key={c.id}>
-                  <td className="font-medium">{c.nombre}</td>
+                  <td className="font-medium">{[c.nombre, c.apellidos].filter(Boolean).join(' ')}</td>
                   <td className="subtle-text">{c.nif || '—'}</td>
                   <td className="subtle-text">{c.telefono || c.email || '—'}</td>
                   <td>{c.fecha_entrada}</td>
@@ -298,7 +356,12 @@ export default function ClientesPage() {
       </div>
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingCliente ? 'Editar Cliente' : 'Nuevo Cliente'}>
-        <ClienteForm cliente={editingCliente || undefined} onSubmit={handleSubmit} onCancel={() => setIsModalOpen(false)} />
+        <ClienteFormV2
+          cliente={editingCliente || undefined}
+          onSubmit={handleSubmit}
+          onCancel={() => setIsModalOpen(false)}
+          allowProcedimiento={!editingCliente}
+        />
       </Modal>
     </LayoutShell>
   );

@@ -10,8 +10,18 @@ import { createClient } from '@/lib/supabase/client';
 import { eur } from '@/lib/utils';
 import type { Cliente, Procedimiento, Cobro } from '@/lib/supabase/types';
 import type { Documento, EstadoProcedimiento } from '@/lib/supabase/types';
-import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download, Activity, FileSignature, Printer } from 'lucide-react';
 import { formatField } from '@/lib/utils/text';
+import { ProcedimientoForm } from '@/components/procedimiento-form';
+import { ActividadForm } from '@/components/actividad-form';
+import { ActividadTimeline } from '@/components/actividad-timeline';
+import { DesignacionRepresentante } from '@/components/designacion-representante';
+import { RecibiGenerator } from '@/components/recibi-generator';
+import { RecibiFormInline } from '@/components/recibi-form';
+import { ClienteFormV2 } from '@/components/cliente-form-v2';
+import { useActividades } from '@/lib/hooks/use-actividades';
+import { useRecibis } from '@/lib/hooks/use-recibis';
+import type { Actividad, Recibi, RecibiInsert, ClienteInsert, ClienteUpdate } from '@/lib/supabase/types';
 
 export default function ClienteDetallePage() {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +43,16 @@ export default function ClienteDetallePage() {
   const [showDocModal, setShowDocModal] = useState(false);
   const [docProcId, setDocProcId] = useState<string | null>(null);
   const [editingProc, setEditingProc] = useState<Procedimiento | null>(null);
+  const [showActividadModal, setShowActividadModal] = useState(false);
+  const [showRecibiModal, setShowRecibiModal] = useState(false);
+  const [showDesignacionModal, setShowDesignacionModal] = useState(false);
+  const [editingActividad, setEditingActividad] = useState<Actividad | null>(null);
+  const [viewRecibi, setViewRecibi] = useState<Recibi | null>(null);
+  const [showEditClienteModal, setShowEditClienteModal] = useState(false);
+
+  // Hooks CRM
+  const { actividades, createActividad, updateActividad, deleteActividad, completeActividad, stats: actStats } = useActividades(id);
+  const { recibis, createRecibi, deleteRecibi, getNextNumero } = useRecibis(id);
 
   // Form procedimiento
   const defaultProcForm = {
@@ -102,24 +122,15 @@ export default function ClienteDetallePage() {
     archivado: 'badge-gray',
   };
 
-  // Guardar procedimiento
-  const handleSaveProc = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Guardar procedimiento (recibe data directamente del ProcedimientoForm)
+  const handleSaveProcData = async (formData: any) => {
     if (!supabase) return;
     
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const payload = {
-      ...procForm,
-      titulo: formatField(procForm.titulo, 'general'),
-      concepto: formatField(procForm.concepto, 'general'),
-      nie_interesado: procForm.nie_interesado ? formatField(procForm.nie_interesado, 'nif') : null,
-      nombre_interesado: procForm.nombre_interesado ? formatField(procForm.nombre_interesado, 'name') : null,
-      expediente_referencia: procForm.expediente_referencia || null,
-      fecha_presentacion: procForm.fecha_presentacion || null,
-      fecha_resolucion: procForm.fecha_resolucion || null,
-      notas: procForm.notas ? formatField(procForm.notas, 'general') : null,
+      ...formData,
       cliente_id: id,
       user_id: user.id,
     };
@@ -129,15 +140,15 @@ export default function ClienteDetallePage() {
       await supabase.from('procedimientos').update(updates).eq('id', editingProc.id);
       
       // Si se añade entrada en edición y no existía antes, crear cobro
-      if (procForm.tiene_entrada && procForm.importe_entrada > 0 && !editingProc.tiene_entrada) {
+      if (formData.tiene_entrada && formData.importe_entrada > 0 && !editingProc.tiene_entrada) {
         await supabase.from('cobros').insert({
           user_id: user.id,
           cliente_id: id,
           procedimiento_id: editingProc.id,
           fecha_cobro: new Date().toISOString().slice(0, 10),
-          importe: procForm.importe_entrada,
+          importe: formData.importe_entrada,
           metodo_pago: 'efectivo',
-          notas: `Entrada del procedimiento: ${procForm.titulo}`,
+          notas: `Entrada del procedimiento: ${formData.titulo}`,
           iva_tipo: 'iva_incluido',
           iva_porcentaje: 21,
         });
@@ -146,15 +157,15 @@ export default function ClienteDetallePage() {
       const { data: newProc } = await supabase.from('procedimientos').insert(payload).select().single();
       
       // Si tiene entrada, crear cobro automáticamente
-      if (newProc && procForm.tiene_entrada && procForm.importe_entrada > 0) {
+      if (newProc && formData.tiene_entrada && formData.importe_entrada > 0) {
         await supabase.from('cobros').insert({
           user_id: user.id,
           cliente_id: id,
           procedimiento_id: newProc.id,
           fecha_cobro: new Date().toISOString().slice(0, 10),
-          importe: procForm.importe_entrada,
+          importe: formData.importe_entrada,
           metodo_pago: 'efectivo',
-          notas: `Entrada del procedimiento: ${procForm.titulo}`,
+          notas: `Entrada del procedimiento: ${formData.titulo}`,
           iva_tipo: 'iva_incluido',
           iva_porcentaje: 21,
         });
@@ -163,6 +174,42 @@ export default function ClienteDetallePage() {
     setShowProcModal(false);
     setEditingProc(null);
     setProcForm(defaultProcForm);
+    fetchData();
+  };
+
+  // Actualizar datos del cliente
+  const handleUpdateCliente = async (
+    data: Omit<ClienteInsert, 'user_id'>,
+    docs: { tipo: string; numero: string; fecha_expedicion: string; fecha_caducidad: string; es_principal: boolean }[],
+    _proc: any
+  ) => {
+    if (!supabase || !id) return;
+    
+    const { user_id, ...updateData } = data as any;
+    await supabase.from('clientes').update(updateData).eq('id', id);
+    
+    // Actualizar documentos de identidad si hay nuevos
+    if (docs && docs.length > 0) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Eliminar docs existentes y reinsertar
+        await supabase.from('documentos_identidad').delete().eq('cliente_id', id);
+        const docsToInsert = docs.filter(d => d.numero).map(d => ({
+          user_id: user.id,
+          cliente_id: id,
+          tipo: d.tipo,
+          numero: d.numero,
+          fecha_expedicion: d.fecha_expedicion || null,
+          fecha_caducidad: d.fecha_caducidad || null,
+          es_principal: d.es_principal,
+        }));
+        if (docsToInsert.length > 0) {
+          await supabase.from('documentos_identidad').insert(docsToInsert);
+        }
+      }
+    }
+    
+    setShowEditClienteModal(false);
     fetchData();
   };
 
@@ -341,7 +388,7 @@ export default function ClienteDetallePage() {
 
   return (
     <LayoutShell 
-      title={cliente.nombre}
+      title={[cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}
       description="Gestiona toda la información del cliente. Controla expedientes, cobros, documentos y notas de seguimiento."
     >
       {/* Navegación */}
@@ -351,18 +398,24 @@ export default function ClienteDetallePage() {
 
       {/* ── Ficha del cliente ── */}
       <div className="detail-card">
-        <div className="detail-card-header">
-          <User className="w-5 h-5" />
-          <h2>Datos del cliente</h2>
+        <div className="detail-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <User className="w-5 h-5" />
+            <h2>Datos del cliente</h2>
+          </div>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowEditClienteModal(true)}>
+            <Edit className="w-4 h-4" /> Editar datos
+          </button>
         </div>
         <div className="detail-grid">
-          <div><span className="detail-label">Nombre</span><span className="detail-value">{cliente.nombre}</span></div>
-          <div><span className="detail-label">Año de nacimiento</span><span className="detail-value">{cliente.anio_nacimiento || '—'}</span></div>
-          <div><span className="detail-label">NIF</span><span className="detail-value">{cliente.nif || '—'}</span></div>
+          <div><span className="detail-label">Nombre</span><span className="detail-value">{[cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}</span></div>
+          <div><span className="detail-label">Año nacimiento</span><span className="detail-value">{cliente.anio_nacimiento || '—'}</span></div>
+          {cliente.nacionalidad && <div><span className="detail-label">Nacionalidad</span><span className="detail-value">{cliente.nacionalidad}</span></div>}
+          <div><span className="detail-label">Documento</span><span className="detail-value">{cliente.documento_tipo || '—'} {cliente.documento_numero || cliente.nif || ''} {cliente.documento_caducidad ? `(cad. ${cliente.documento_caducidad})` : ''}</span></div>
           <div><span className="detail-label">Teléfono</span><span className="detail-value">{cliente.telefono || '—'}</span></div>
+          {cliente.telefono2 && <div><span className="detail-label">2º teléfono</span><span className="detail-value">{cliente.telefono2}</span></div>}
           <div><span className="detail-label">Email</span><span className="detail-value">{cliente.email || '—'}</span></div>
-          <div><span className="detail-label">Dirección</span><span className="detail-value">{cliente.direccion || '—'}</span></div>
-          <div><span className="detail-label">Documento</span><span className="detail-value">{cliente.documento_tipo || '—'} {cliente.documento_caducidad ? `(cad. ${cliente.documento_caducidad})` : ''}</span></div>
+          <div><span className="detail-label">Dirección</span><span className="detail-value">{[cliente.direccion, cliente.codigo_postal, cliente.localidad, cliente.provincia].filter(Boolean).join(', ') || '—'}</span></div>
           <div><span className="detail-label">Fecha entrada</span><span className="detail-value">{cliente.fecha_entrada}</span></div>
           <div><span className="detail-label">Estado</span><span className={`badge badge-${cliente.estado === 'activo' ? 'green' : cliente.estado === 'pendiente' ? 'yellow' : cliente.estado === 'pagado' ? 'blue' : 'gray'}`}>{cliente.estado}</span></div>
           {cliente.notas && <div className="col-span-full"><span className="detail-label">Notas</span><span className="detail-value">{cliente.notas}</span></div>}
@@ -506,94 +559,14 @@ export default function ClienteDetallePage() {
         <CobroForm clienteIdFijo={id} onSubmit={handleSaveCobro} onCancel={() => setShowCobroModal(false)} />
       </Modal>
 
-      {/* ── Modal: Procedimiento ── */}
+      {/* ── Modal: Procedimiento (mejorado con campos condicionales) ── */}
       <Modal isOpen={showProcModal} onClose={() => setShowProcModal(false)} title={editingProc ? 'Editar procedimiento' : 'Nuevo procedimiento'}>
-        <form onSubmit={handleSaveProc} className="form-grid">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="form-label">Título *</label>
-              <input type="text" value={procForm.titulo} onChange={e => setProcForm({ ...procForm, titulo: e.target.value })} className="form-input" required />
-            </div>
-            <div>
-              <label className="form-label">Concepto *</label>
-              <input type="text" value={procForm.concepto} onChange={e => setProcForm({ ...procForm, concepto: e.target.value })} className="form-input" required />
-            </div>
-            <div>
-              <label className="form-label">Presupuesto *</label>
-              <input type="number" step="0.01" min="0" value={procForm.presupuesto.toFixed(2)} onChange={e => setProcForm({ ...procForm, presupuesto: parseFloat(e.target.value) || 0 })} className="form-input" required />
-            </div>
-            <div>
-              <label className="form-label">Estado</label>
-              <select value={procForm.estado} onChange={e => setProcForm({ ...procForm, estado: e.target.value as EstadoProcedimiento })} className="form-input">
-                <option value="pendiente_presentar">Pte. presentar</option>
-                <option value="presentado">Presentado</option>
-                <option value="pendiente_resolucion">Pte. resolución</option>
-                <option value="pendiente_recurso">Pte. recurso</option>
-                <option value="resuelto">Resuelto</option>
-                <option value="cerrado">Cerrado</option>
-                <option value="archivado">Archivado</option>
-              </select>
-            </div>
-          </div>
-
-          <fieldset className="form-fieldset">
-            <legend className="form-legend">Interesado</legend>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="form-label">NIE interesado</label>
-                <input type="text" value={procForm.nie_interesado} onChange={e => setProcForm({ ...procForm, nie_interesado: e.target.value })} className="form-input" placeholder="Y1234567X" />
-              </div>
-              <div>
-                <label className="form-label">Nombre interesado</label>
-                <input type="text" value={procForm.nombre_interesado} onChange={e => setProcForm({ ...procForm, nombre_interesado: e.target.value })} className="form-input" />
-              </div>
-            </div>
-          </fieldset>
-
-          <fieldset className="form-fieldset">
-            <legend className="form-legend">Entrada</legend>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3">
-                <input type="checkbox" id="tiene_entrada" checked={procForm.tiene_entrada} onChange={e => setProcForm({ ...procForm, tiene_entrada: e.target.checked })} className="form-checkbox" />
-                <label htmlFor="tiene_entrada" className="form-label" style={{ marginBottom: 0 }}>¿Paga entrada?</label>
-              </div>
-              {procForm.tiene_entrada && (
-                <div>
-                  <label className="form-label">Importe de entrada</label>
-                  <input type="number" step="0.01" min="0" value={procForm.importe_entrada.toFixed(2)} onChange={e => setProcForm({ ...procForm, importe_entrada: parseFloat(e.target.value) || 0 })} className="form-input" />
-                </div>
-              )}
-            </div>
-          </fieldset>
-
-          <fieldset className="form-fieldset">
-            <legend className="form-legend">Expediente</legend>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="form-label">Referencia expediente</label>
-                <input type="text" value={procForm.expediente_referencia} onChange={e => setProcForm({ ...procForm, expediente_referencia: e.target.value })} className="form-input" placeholder="EXP-2024/001" />
-              </div>
-              <div>
-                <label className="form-label">Fecha presentación</label>
-                <input type="date" value={procForm.fecha_presentacion} onChange={e => setProcForm({ ...procForm, fecha_presentacion: e.target.value })} className="form-input" />
-              </div>
-              <div>
-                <label className="form-label">Fecha resolución</label>
-                <input type="date" value={procForm.fecha_resolucion} onChange={e => setProcForm({ ...procForm, fecha_resolucion: e.target.value })} className="form-input" />
-              </div>
-            </div>
-          </fieldset>
-
-          <div>
-            <label className="form-label">Notas</label>
-            <textarea value={procForm.notas} onChange={e => setProcForm({ ...procForm, notas: e.target.value })} className="form-input" rows={2} />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setShowProcModal(false)} className="btn btn-secondary">Cancelar</button>
-            <button type="submit" className="btn btn-primary">{editingProc ? 'Actualizar' : 'Crear'}</button>
-          </div>
-        </form>
+        <ProcedimientoForm
+          procedimiento={editingProc || undefined}
+          clienteId={id}
+          onSubmit={handleSaveProcData}
+          onCancel={() => setShowProcModal(false)}
+        />
       </Modal>
 
       {/* ── Modal: Documento ── */}
@@ -669,6 +642,134 @@ export default function ClienteDetallePage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* ── Actividades / CRM ── */}
+      <div className="section-block">
+        <div className="section-header">
+          <h3><Activity className="w-4 h-4 inline mr-1" /> Actividades
+            {actStats.pendientes > 0 && <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">{actStats.pendientes} pendientes</span>}
+            {actStats.vencidas > 0 && <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">{actStats.vencidas} vencidas</span>}
+          </h3>
+          <button className="btn btn-primary btn-sm" onClick={() => { setEditingActividad(null); setShowActividadModal(true); }}>
+            <Plus className="w-4 h-4" /> Nueva actividad
+          </button>
+        </div>
+        {actividades.length === 0 ? (
+          <p className="empty-state-inline">No hay actividades registradas. Registra llamadas, visitas, tareas y más.</p>
+        ) : (
+          <ActividadTimeline
+            actividades={actividades}
+            onComplete={(actId) => { if (window.confirm('¿Marcar como completada?')) completeActividad(actId); }}
+            onEdit={(act) => { setEditingActividad(act); setShowActividadModal(true); }}
+            onDelete={(actId) => { if (window.confirm('¿Eliminar esta actividad?')) deleteActividad(actId); }}
+          />
+        )}
+      </div>
+
+      {/* ── Modal: Actividad ── */}
+      <Modal isOpen={showActividadModal} onClose={() => { setShowActividadModal(false); setEditingActividad(null); }} title={editingActividad ? 'Editar actividad' : 'Nueva actividad'}>
+        <ActividadForm
+          actividad={editingActividad || undefined}
+          clienteId={id}
+          onSubmit={async (data) => {
+            if (editingActividad) {
+              await updateActividad(editingActividad.id, data);
+            } else {
+              await createActividad(data);
+            }
+            setShowActividadModal(false);
+            setEditingActividad(null);
+          }}
+          onCancel={() => { setShowActividadModal(false); setEditingActividad(null); }}
+        />
+      </Modal>
+
+      {/* ── Recibís ── */}
+      <div className="section-block">
+        <div className="section-header">
+          <h3><Receipt className="w-4 h-4 inline mr-1" /> Recibís</h3>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowRecibiModal(true)}>
+            <Plus className="w-4 h-4" /> Nuevo recibí
+          </button>
+        </div>
+        {recibis.length === 0 ? (
+          <p className="empty-state-inline">No hay recibís generados para este cliente.</p>
+        ) : (
+          <div className="table-container">
+            <table className="table">
+              <thead><tr><th>Nº</th><th>Fecha</th><th>Importe</th><th>Concepto</th><th>Pago</th><th>Acciones</th></tr></thead>
+              <tbody>
+                {recibis.map(r => (
+                  <tr key={r.id}>
+                    <td className="font-medium">{r.numero}</td>
+                    <td>{r.fecha}</td>
+                    <td className="font-medium">{eur(r.importe)}</td>
+                    <td className="subtle-text truncate max-w-[200px]">{r.concepto}</td>
+                    <td>{r.forma_pago}</td>
+                    <td>
+                      <div className="flex gap-2">
+                        <button onClick={() => setViewRecibi(r)} className="action-btn action-view" title="Ver / Imprimir">
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => { if (window.confirm('¿Eliminar este recibí?')) deleteRecibi(r.id); }} className="action-btn action-delete" title="Eliminar">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Modal: Nuevo Recibí ── */}
+      <Modal isOpen={showRecibiModal} onClose={() => setShowRecibiModal(false)} title="Nuevo recibí">
+        <RecibiFormInline
+          clienteId={id}
+          procedimientos={procedimientos}
+          onSubmit={async (data: Omit<RecibiInsert, 'user_id'>) => {
+            await createRecibi(data);
+            setShowRecibiModal(false);
+          }}
+          onCancel={() => setShowRecibiModal(false)}
+          getNextNumero={getNextNumero}
+        />
+      </Modal>
+
+      {/* ── Modal: Ver Recibí (imprimir) ── */}
+      <Modal isOpen={!!viewRecibi} onClose={() => setViewRecibi(null)} title={`Recibí ${viewRecibi?.numero || ''}`} size="wide">
+        {viewRecibi && cliente && (
+          <RecibiGenerator cliente={cliente} recibi={viewRecibi} />
+        )}
+      </Modal>
+
+      {/* ── Designación de representante ── */}
+      <div className="section-block">
+        <div className="section-header">
+          <h3><FileSignature className="w-4 h-4 inline mr-1" /> Documentos legales</h3>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowDesignacionModal(true)}>
+            <FileSignature className="w-4 h-4" /> Designación de representante
+          </button>
+        </div>
+        <p className="text-sm text-gray-500">Genera documentos legales utilizando los datos del cliente.</p>
+      </div>
+
+      {/* ── Modal: Designación de Representante ── */}
+      <Modal isOpen={showDesignacionModal} onClose={() => setShowDesignacionModal(false)} title="Designación de Representante" size="wide">
+        <DesignacionRepresentante cliente={cliente || undefined} onClose={() => setShowDesignacionModal(false)} />
+      </Modal>
+
+      {/* ── Modal: Editar datos del cliente ── */}
+      <Modal isOpen={showEditClienteModal} onClose={() => setShowEditClienteModal(false)} title="Editar datos del cliente" size="wide">
+        <ClienteFormV2
+          cliente={cliente || undefined}
+          onSubmit={handleUpdateCliente}
+          onCancel={() => setShowEditClienteModal(false)}
+          allowProcedimiento={false}
+        />
       </Modal>
 
       {/* Sección de Notas */}

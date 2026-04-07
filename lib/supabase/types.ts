@@ -15,15 +15,75 @@ export interface Cliente {
   id: string;
   user_id: string;
   nombre: string;
+  apellidos: string | null;
   nif: string | null;
   telefono: string | null;
+  telefono2: string | null;
   email: string | null;
   direccion: string | null;
+  codigo_postal: string | null;
+  localidad: string | null;
+  provincia: string | null;
   anio_nacimiento: number | null;
+  nacionalidad: string | null;
   fecha_entrada: string;
   documento_tipo: string | null;
+  documento_numero: string | null;
   documento_caducidad: string | null;
   estado: EstadoCliente;
+  notas: string | null;
+  created_at: string;
+}
+
+// ─── Documento identidad (soporte para múltiples) ─────────
+export type TipoDocIdentidad = 'DNI' | 'NIE' | 'NIF' | 'Pasaporte' | 'CIF' | 'Otro';
+
+export interface DocumentoIdentidad {
+  id: string;
+  user_id: string;
+  cliente_id: string;
+  tipo: TipoDocIdentidad;
+  numero: string;
+  fecha_expedicion: string | null;
+  fecha_caducidad: string | null;
+  es_principal: boolean;
+  notas: string | null;
+  created_at: string;
+}
+
+// ─── Actividad / CRM ─────────────────────────────────────
+export type TipoActividad = 'llamada_entrante' | 'llamada_saliente' | 'email_enviado' | 'email_recibido' | 'visita' | 'reunion' | 'tarea' | 'nota' | 'whatsapp' | 'sms' | 'otro';
+export type EstadoActividad = 'pendiente' | 'en_progreso' | 'completada' | 'cancelada';
+export type PrioridadActividad = 'baja' | 'media' | 'alta' | 'urgente';
+
+export interface Actividad {
+  id: string;
+  user_id: string;
+  cliente_id: string | null;
+  procedimiento_id: string | null;
+  tipo: TipoActividad;
+  titulo: string;
+  descripcion: string | null;
+  estado: EstadoActividad;
+  prioridad: PrioridadActividad;
+  fecha_programada: string | null;
+  fecha_completada: string | null;
+  duracion_minutos: number | null;
+  resultado: string | null;
+  created_at: string;
+}
+
+// ─── Recibí ──────────────────────────────────────────────
+export interface Recibi {
+  id: string;
+  user_id: string;
+  cliente_id: string;
+  procedimiento_id: string | null;
+  numero: string;
+  fecha: string;
+  importe: number;
+  concepto: string;
+  forma_pago: string;
   notas: string | null;
   created_at: string;
 }
@@ -185,6 +245,10 @@ export type CobroInsert = Omit<Cobro, 'id' | 'created_at'>;
 export type DocumentoInsert = Omit<Documento, 'id' | 'created_at'>;
 export type FacturaInsert = Omit<Factura, 'id' | 'created_at'>;
 export type DatosEmisorInsert = Omit<DatosEmisor, 'id' | 'created_at'>;
+export type DocumentoIdentidadInsert = Omit<DocumentoIdentidad, 'id' | 'created_at'>;
+export type ActividadInsert = Omit<Actividad, 'id' | 'created_at'>;
+export type ActividadUpdate = Partial<Omit<Actividad, 'id' | 'user_id' | 'created_at'>>;
+export type RecibiInsert = Omit<Recibi, 'id' | 'created_at'>;
 
 // ─── Cliente Nota ───────────────────────────────────────────
 export interface ClienteNota {
@@ -202,6 +266,9 @@ export interface Database {
       procedimientos: { Row: Procedimiento; Insert: ProcedimientoInsert; Update: ProcedimientoUpdate };
       cobros: { Row: Cobro; Insert: CobroInsert; Update: Partial<Omit<Cobro, 'id' | 'user_id' | 'created_at'>> };
       documentos: { Row: Documento; Insert: DocumentoInsert; Update: Partial<Omit<Documento, 'id' | 'user_id' | 'created_at'>> };
+      documentos_identidad: { Row: DocumentoIdentidad; Insert: DocumentoIdentidadInsert; Update: Partial<Omit<DocumentoIdentidad, 'id' | 'user_id' | 'created_at'>> };
+      actividades: { Row: Actividad; Insert: ActividadInsert; Update: ActividadUpdate };
+      recibis: { Row: Recibi; Insert: RecibiInsert; Update: Partial<Omit<Recibi, 'id' | 'user_id' | 'created_at'>> };
       repartos: { Row: Reparto; Insert: Omit<Reparto, 'id' | 'created_at'>; Update: Partial<Omit<Reparto, 'id' | 'user_id' | 'created_at'>> };
       gastos: { Row: Gasto; Insert: Omit<Gasto, 'id' | 'created_at'>; Update: Partial<Omit<Gasto, 'id' | 'user_id' | 'created_at'>> };
       facturas: { Row: Factura; Insert: FacturaInsert; Update: Partial<Omit<Factura, 'id' | 'user_id' | 'created_at'>> };

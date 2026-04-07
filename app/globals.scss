@@ -247,6 +247,7 @@ body {
 .section-block {
   background: var(--color-surface); border: 1px solid var(--color-border);
   border-radius: var(--radius-xl); padding: var(--space-lg); box-shadow: var(--shadow-sm);
+  margin-top: var(--space-xl);
 }
 
 // =============================================================================
@@ -470,6 +471,14 @@ body {
   max-height: 90vh;
   overflow-y: auto;
   border: 1px solid var(--color-border);
+}
+
+.modal-content.modal-wide {
+  max-width: 860px;
+}
+
+.modal-content.modal-full {
+  max-width: 95vw;
 }
 
 .modal-header {
