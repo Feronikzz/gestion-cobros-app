@@ -167,6 +167,24 @@ export function FacturasPageContent() {
   const addLinea = () => setFacForm(prev => ({ ...prev, lineas: [...prev.lineas, { ...emptyLinea }] }));
   const removeLinea = (idx: number) => setFacForm(prev => ({ ...prev, lineas: prev.lineas.filter((_, i) => i !== idx) }));
 
+  const [entradaPrecioTotal, setEntradaPrecioTotal] = useState(false);
+
+  const handlePrecioChange = (idx: number, valor: number) => {
+    if (entradaPrecioTotal && facForm.incluir_iva) {
+      const base = Math.round((valor / (1 + facForm.iva_porcentaje / 100)) * 100) / 100;
+      updateLinea(idx, 'precio_unitario', base);
+    } else {
+      updateLinea(idx, 'precio_unitario', valor);
+    }
+  };
+
+  const getPrecioDisplay = (l: FacturaLinea) => {
+    if (entradaPrecioTotal && facForm.incluir_iva) {
+      return Math.round(l.precio_unitario * (1 + facForm.iva_porcentaje / 100) * 100) / 100;
+    }
+    return l.precio_unitario;
+  };
+
   const baseImponible = Math.round(facForm.lineas.reduce((s, l) => s + l.importe, 0) * 100) / 100;
   const ivaImporte = facForm.incluir_iva ? Math.round(baseImponible * facForm.iva_porcentaje * 100) / 10000 : 0;
   const irpfImporte = facForm.incluir_irpf ? Math.round(baseImponible * facForm.irpf_porcentaje * 100) / 10000 : 0;
@@ -433,8 +451,14 @@ export function FacturasPageContent() {
                   <input type="number" min="1" value={l.cantidad} onChange={e => updateLinea(i, 'cantidad', parseInt(e.target.value) || 1)} className="form-input" />
                 </div>
                 <div className="col-span-2">
-                  {i === 0 && <label className="form-label">Precio</label>}
-                  <input type="number" step="0.01" min="0" value={l.precio_unitario.toFixed(2)} onChange={e => updateLinea(i, 'precio_unitario', parseFloat(e.target.value) || 0)} className="form-input" />
+                  {i === 0 && (
+                    <div className="flex items-center gap-1 mb-1">
+                      <label className="form-label" style={{ marginBottom: 0 }}>
+                        {entradaPrecioTotal && facForm.incluir_iva ? 'P. total (c/IVA)' : 'Precio (sin IVA)'}
+                      </label>
+                    </div>
+                  )}
+                  <input type="number" step="0.01" min="0" value={getPrecioDisplay(l).toFixed(2)} onChange={e => handlePrecioChange(i, parseFloat(e.target.value) || 0)} className="form-input" />
                 </div>
                 <div className="col-span-2">
                   {i === 0 && <label className="form-label">Importe</label>}
@@ -454,6 +478,12 @@ export function FacturasPageContent() {
 
           <fieldset className="form-fieldset">
             <legend className="form-legend">Impuestos y totales</legend>
+            <div className="flex items-center gap-2 mb-3 p-2 bg-blue-50 rounded border border-blue-100">
+              <input type="checkbox" id="entrada_precio_total" className="form-checkbox" checked={entradaPrecioTotal} onChange={e => setEntradaPrecioTotal(e.target.checked)} />
+              <label htmlFor="entrada_precio_total" className="text-sm text-blue-800 cursor-pointer">
+                Introducir precio con IVA incluido (el sistema calculará la base imponible automáticamente)
+              </label>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div className="flex items-center gap-3">
                 <input type="checkbox" checked={facForm.incluir_iva} onChange={e => setFacForm({ ...facForm, incluir_iva: e.target.checked })} className="form-checkbox" id="incluir_iva" />
