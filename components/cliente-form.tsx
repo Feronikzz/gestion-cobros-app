@@ -41,6 +41,14 @@ export function ClienteForm({ cliente, onSubmit, onCancel }: ClienteFormProps) {
         documento_tipo: formData.documento_tipo || null,
         documento_caducidad: formData.documento_caducidad || null,
         notas: formData.notas ? formatField(formData.notas, 'general') : null,
+        // Nuevos campos — null por defecto en este formulario básico
+        apellidos: null,
+        telefono2: null,
+        codigo_postal: null,
+        localidad: null,
+        provincia: null,
+        nacionalidad: null,
+        documento_numero: null,
       });
     } catch (error) {
       console.error('Error:', error);
