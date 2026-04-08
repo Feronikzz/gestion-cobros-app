@@ -2,9 +2,29 @@
 
 import React, { useState } from 'react';
 import type { Cliente } from '@/lib/supabase/types';
-import { Download, Save, User, FileText, RefreshCw } from 'lucide-react';
+import { Download, Save, User, FileText, RefreshCw, Upload, CheckCircle, X, Plus } from 'lucide-react';
 
 const STORAGE_KEY_REP = 'designacion_representante_perfil';
+const STORAGE_KEY_EMAILS = 'designacion_emails_sugeridos';
+
+const EMAILS_DEFAULT = [
+  'extranjeria@sepe.es',
+  'oficina.extranjeria@madrid.org',
+  'notificaciones@administracion.gob.es',
+];
+
+function loadEmails(): string[] {
+  if (typeof window === 'undefined') return EMAILS_DEFAULT;
+  try {
+    const r = localStorage.getItem(STORAGE_KEY_EMAILS);
+    return r ? JSON.parse(r) : EMAILS_DEFAULT;
+  } catch { return EMAILS_DEFAULT; }
+}
+
+function saveEmails(emails: string[]) {
+  localStorage.setItem(STORAGE_KEY_EMAILS, JSON.stringify(emails));
+}
+
 const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
 interface RepresentanteProfile {
@@ -60,6 +80,29 @@ export function DesignacionRepresentante({ cliente, onClose }: DesignacionRepres
   const [loading, setLoading] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Email suggestions ──
+  const [emailSuggestions, setEmailSuggestions] = useState<string[]>(loadEmails);
+  const [showEmailDD, setShowEmailDD] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+
+  const addEmailSuggestion = (email: string) => {
+    if (!email || emailSuggestions.includes(email)) return;
+    const updated = [...emailSuggestions, email];
+    setEmailSuggestions(updated);
+    saveEmails(updated);
+    setNewEmail('');
+  };
+
+  const removeEmailSuggestion = (email: string) => {
+    const updated = emailSuggestions.filter(e => e !== email);
+    setEmailSuggestions(updated);
+    saveEmails(updated);
+  };
+
+  // ── Signed file upload ──
+  const [signedFile, setSignedFile] = useState<File | null>(null);
+  const [signedUploadMsg, setSignedUploadMsg] = useState<string | null>(null);
 
   const setR = (k: string, v: string) => setRepdo(p => ({ ...p, [k]: v }));
   const setT = (k: string, v: string) => setRepte(p => ({ ...p, [k]: v }));
@@ -156,7 +199,42 @@ export function DesignacionRepresentante({ cliente, onClose }: DesignacionRepres
           <div><label className={lbl}>C.P.</label><input className={inp} value={repdo.cp} onChange={e => setR('cp', e.target.value)} /></div>
           <div><label className={lbl}>Provincia</label><input className={inp} value={repdo.provincia} onChange={e => setR('provincia', e.target.value)} /></div>
           <div><label className={lbl}>Teléfono</label><input className={inp} value={repdo.telefono} onChange={e => setR('telefono', e.target.value)} /></div>
-          <div><label className={lbl}>E-mail</label><input className={inp} value={repdo.email} onChange={e => setR('email', e.target.value)} /></div>
+          <div className="relative" onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setShowEmailDD(false); }}>
+            <label className={lbl}>E-mail</label>
+            <div className="flex gap-1">
+              <input
+                className={inp + ' flex-1'}
+                value={repdo.email}
+                onChange={e => { setR('email', e.target.value); }}
+                onFocus={() => setShowEmailDD(true)}
+                placeholder="email@ejemplo.com"
+              />
+            </div>
+            {showEmailDD && emailSuggestions.length > 0 && (
+              <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                {emailSuggestions.map(email => (
+                  <div key={email} className="flex items-center justify-between px-3 py-1.5 hover:bg-gray-50 cursor-pointer group">
+                    <span className="text-sm text-gray-700 flex-1" onClick={() => { setR('email', email); setShowEmailDD(false); }}>{email}</span>
+                    <button type="button" onClick={() => removeEmailSuggestion(email)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex items-center gap-1 px-2 py-1.5 border-t border-gray-100">
+                  <input
+                    className="flex-1 text-xs border border-gray-200 rounded px-2 py-1 outline-none"
+                    placeholder="Añadir email…"
+                    value={newEmail}
+                    onChange={e => setNewEmail(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { addEmailSuggestion(newEmail); } }}
+                  />
+                  <button type="button" onClick={() => addEmailSuggestion(newEmail)} className="text-gray-500 hover:text-gray-800">
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </fieldset>
 
@@ -210,6 +288,59 @@ export function DesignacionRepresentante({ cliente, onClose }: DesignacionRepres
           </div>
           <div><label className={lbl}>Año</label><input className={inp} value={anio} maxLength={4} onChange={e => setAnio(e.target.value)} /></div>
         </div>
+      </fieldset>
+
+      {/* ── DOCUMENTO FIRMADO ── */}
+      <fieldset className="form-fieldset">
+        <legend className="form-legend">Documento firmado (subir una vez firmado)</legend>
+        <div className="flex items-center gap-3">
+          <label className="btn btn-secondary btn-sm cursor-pointer flex items-center gap-2">
+            <Upload className="w-4 h-4" />
+            {signedFile ? signedFile.name : 'Seleccionar PDF/imagen firmado'}
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0] || null;
+                setSignedFile(f);
+                setSignedUploadMsg(f ? `Archivo listo: ${f.name}` : null);
+              }}
+            />
+          </label>
+          {signedFile && (
+            <>
+              <span className="flex items-center gap-1 text-sm text-green-600">
+                <CheckCircle className="w-4 h-4" /> {signedFile.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => { setSignedFile(null); setSignedUploadMsg(null); }}
+                className="text-gray-400 hover:text-red-500"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+        {signedFile && (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm mt-3 flex items-center gap-2"
+            onClick={() => {
+              const url = URL.createObjectURL(signedFile);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = signedFile.name;
+              a.click();
+              URL.revokeObjectURL(url);
+              setSignedUploadMsg('Descargado');
+            }}
+          >
+            <Download className="w-3.5 h-3.5" /> Descargar firmado
+          </button>
+        )}
+        <p className="text-xs text-gray-400 mt-2">Adjunta aquí el documento después de que el cliente lo haya firmado.</p>
       </fieldset>
 
       {error && (

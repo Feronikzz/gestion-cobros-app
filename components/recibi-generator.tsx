@@ -93,36 +93,34 @@ export function RecibiGenerator({ cliente, recibi }: RecibiGeneratorProps) {
       <title>Recibí ${recibi.numero}</title>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap');
-        @page { size: 99mm 210mm; margin: 0; }
+        @page { size: 210mm 99mm; margin: 0; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'DM Sans', sans-serif; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        .talonario { width: 99mm; height: 210mm; padding: 5mm 6mm 5mm 10mm; position: relative; overflow: hidden; }
-        .stripe { position: absolute; top: 0; left: 0; width: 4mm; height: 100%; background: #111; }
+        .talonario { width: 210mm; height: 99mm; padding: 8mm 8mm 6mm 8mm; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+        .stripe { position: absolute; top: 0; left: 0; width: 100%; height: 3mm; background: #111; }
         .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 3mm; }
-        .logo img { max-height: 10mm; max-width: 28mm; object-fit: contain; }
+        .logo img { max-height: 8mm; max-width: 32mm; object-fit: contain; }
         .logo-name { font-size: 9pt; font-weight: 700; color: #111; }
-        .logo-sub { font-size: 6.5pt; color: #888; margin-top: 1pt; }
+        .logo-sub { font-size: 6pt; color: #888; margin-top: 1pt; }
         .title-r { text-align: right; }
-        .title-r h1 { font-family: 'DM Serif Display', Georgia, serif; font-size: 19pt; color: #111; line-height: 1; }
-        .title-r .num { font-size: 6.5pt; color: #999; letter-spacing: 1.5pt; margin-top: 2pt; }
-        .divider { height: 0.4pt; background: #e2e8f0; margin: 2mm 0; }
-        .amount-block { background: #111; color: #fff; padding: 3mm 4mm; margin-bottom: 3mm; }
-        .amount-label { font-size: 6pt; letter-spacing: 1.5pt; text-transform: uppercase; color: #888; margin-bottom: 2pt; }
-        .amount-value { font-family: 'DM Serif Display', Georgia, serif; font-size: 20pt; letter-spacing: -0.5pt; }
-        .amount-words { font-size: 6.5pt; color: #bbb; margin-top: 2pt; font-style: italic; line-height: 1.3; }
-        .parties { display: flex; gap: 3mm; margin-bottom: 3mm; }
-        .party { flex: 1; min-width: 0; }
-        .party-label { font-size: 5.5pt; font-weight: 700; letter-spacing: 1.5pt; text-transform: uppercase; color: #aaa; margin-bottom: 2pt; }
-        .party-name { font-size: 8pt; font-weight: 700; color: #111; }
-        .party-sub { font-size: 6.5pt; color: #888; margin-top: 1pt; line-height: 1.4; }
-        .detail { margin-bottom: 2mm; border-bottom: 0.4pt solid #f0f0f0; padding-bottom: 2pt; }
-        .detail-label { font-size: 5.5pt; font-weight: 700; letter-spacing: 1pt; text-transform: uppercase; color: #bbb; margin-bottom: 1pt; }
-        .detail-value { font-size: 7.5pt; color: #111; font-weight: 500; }
-        .sigs { display: flex; justify-content: space-between; margin-top: 4mm; gap: 4mm; }
-        .sig { flex: 1; }
-        .sig-space { height: 8mm; }
-        .sig-line { border-top: 0.4pt solid #999; padding-top: 3pt; font-size: 6pt; color: #aaa; line-height: 1.4; }
-        .footer { position: absolute; bottom: 3mm; left: 10mm; right: 6mm; display: flex; justify-content: space-between; font-size: 5.5pt; color: #ccc; border-top: 0.4pt solid #eee; padding-top: 2pt; }
+        .title-r h1 { font-family: 'DM Serif Display', Georgia, serif; font-size: 18pt; color: #111; line-height: 1; }
+        .title-r .num { font-size: 6pt; color: #999; letter-spacing: 1.5pt; margin-top: 2pt; }
+        .divider { height: 0.4pt; background: #ddd; margin-bottom: 3mm; }
+        .body-row { display: flex; gap: 6mm; flex: 1; }
+        .amount-block { min-width: 52mm; border-right: 0.4pt solid #e8e8e8; padding-right: 6mm; }
+        .amount-label { font-size: 5.5pt; letter-spacing: 1.5pt; text-transform: uppercase; color: #aaa; margin-bottom: 2pt; }
+        .amount-value { font-family: 'DM Serif Display', Georgia, serif; font-size: 18pt; letter-spacing: -0.5pt; color: #111; }
+        .amount-words { font-size: 6pt; color: #888; margin-top: 2pt; font-style: italic; line-height: 1.3; }
+        .middle { flex: 1; display: flex; flex-direction: column; gap: 2mm; border-right: 0.4pt solid #e8e8e8; padding-right: 6mm; }
+        .party-label { font-size: 5pt; font-weight: 700; letter-spacing: 1.5pt; text-transform: uppercase; color: #aaa; margin-bottom: 1pt; }
+        .party-name { font-size: 7.5pt; font-weight: 700; color: #111; }
+        .party-sub { font-size: 5.5pt; color: #888; margin-top: 0.5pt; }
+        .right { min-width: 46mm; display: flex; flex-direction: column; gap: 2mm; }
+        .detail-label { font-size: 5pt; font-weight: 700; letter-spacing: 1pt; text-transform: uppercase; color: #aaa; margin-bottom: 1pt; }
+        .detail-value { font-size: 7pt; color: #111; font-weight: 500; }
+        .sigs { display: flex; justify-content: space-between; gap: 4mm; margin-top: auto; padding-top: 3mm; border-top: 0.4pt solid #e8e8e8; }
+        .sig-line { font-size: 5.5pt; color: #aaa; line-height: 1.4; }
+        .footer { font-size: 5pt; color: #ccc; text-align: right; margin-top: 1mm; }
       </style></head><body>
       ${content.innerHTML}
     </body></html>`);
@@ -170,7 +168,7 @@ export function RecibiGenerator({ cliente, recibi }: RecibiGeneratorProps) {
           {showEmisorForm ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
 
-        <span className="text-xs text-gray-400 ml-1">Tamaño talonario (1/3 A4)</span>
+        <span className="text-xs text-gray-400 ml-1">Talonario horizontal (210×99mm)</span>
       </div>
 
       {/* ── Emisor profile form ── */}
@@ -211,99 +209,101 @@ export function RecibiGenerator({ cliente, recibi }: RecibiGeneratorProps) {
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <div ref={printRef}>
           <div className="talonario" style={{
-            width: '99mm', height: '210mm', padding: '5mm 6mm 5mm 10mm',
+            width: '210mm', height: '99mm', padding: '8mm 8mm 6mm 8mm',
             fontFamily: "'DM Sans', 'Segoe UI', Arial, sans-serif",
             background: '#fff', position: 'relative', overflow: 'hidden',
+            display: 'flex', flexDirection: 'column',
             boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
           }}>
-            {/* Stripe */}
-            <div style={{ position: 'absolute', top: 0, left: 0, width: '4mm', height: '100%', background: '#111' }} />
+            {/* Top stripe */}
+            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '3mm', background: '#111' }} />
 
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '3mm' }}>
               <div>
                 {logoB64
-                  ? <img src={logoB64} alt="logo" style={{ maxHeight: '10mm', maxWidth: '28mm', objectFit: 'contain' }} />
+                  ? <img src={logoB64} alt="logo" style={{ maxHeight: '8mm', maxWidth: '32mm', objectFit: 'contain' }} />
                   : <div style={{ fontSize: '9pt', fontWeight: 700, color: '#111' }}>{nombreEmisor}</div>
                 }
-                {emisor.nif && <div style={{ fontSize: '6.5pt', color: '#888', marginTop: '1pt' }}>NIF: {emisor.nif}</div>}
-                {emisor.direccion && <div style={{ fontSize: '6pt', color: '#aaa' }}>{emisor.direccion}</div>}
+                {emisor.nif && <div style={{ fontSize: '6pt', color: '#888', marginTop: '1pt' }}>NIF: {emisor.nif}</div>}
+                {emisor.direccion && <div style={{ fontSize: '5.5pt', color: '#aaa' }}>{emisor.direccion}</div>}
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontFamily: 'Georgia, serif', fontSize: '19pt', color: '#111', lineHeight: 1 }}>RECIBÍ</div>
-                <div style={{ fontSize: '6.5pt', color: '#999', letterSpacing: '1.5pt', marginTop: '2pt' }}>Nº {recibi.numero}</div>
-                <div style={{ fontSize: '6pt', color: '#bbb', marginTop: '1pt' }}>{fechaLarga}</div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '18pt', color: '#111', lineHeight: 1 }}>RECIBÍ</div>
+                <div style={{ fontSize: '6pt', color: '#999', letterSpacing: '1.5pt', marginTop: '2pt' }}>Nº {recibi.numero}</div>
+                <div style={{ fontSize: '5.5pt', color: '#bbb', marginTop: '1pt' }}>{fechaLarga}</div>
               </div>
             </div>
 
             {/* Divider */}
-            <div style={{ height: '0.4pt', background: '#e2e8f0', marginBottom: '3mm' }} />
+            <div style={{ height: '0.4pt', background: '#ddd', marginBottom: '3mm' }} />
 
-            {/* Amount */}
-            <div style={{ background: '#111', color: '#fff', padding: '3mm 4mm', marginBottom: '3mm' }}>
-              <div style={{ fontSize: '6pt', letterSpacing: '1.5pt', textTransform: 'uppercase' as const, color: '#888', marginBottom: '2pt' }}>IMPORTE RECIBIDO</div>
-              <div style={{ fontFamily: 'Georgia, serif', fontSize: '20pt', letterSpacing: '-0.5pt' }}>{fmt(recibi.importe)} €</div>
-              <div style={{ fontSize: '6.5pt', color: '#bbb', marginTop: '2pt', fontStyle: 'italic', lineHeight: 1.3 }}>
-                {importeEnLetras(recibi.importe)}
-              </div>
-            </div>
+            {/* Body: 3 columns */}
+            <div style={{ display: 'flex', gap: '6mm', flex: 1 }}>
 
-            {/* Parties */}
-            <div style={{ display: 'flex', gap: '3mm', marginBottom: '3mm' }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '5.5pt', fontWeight: 700, letterSpacing: '1.5pt', textTransform: 'uppercase' as const, color: '#aaa', marginBottom: '2pt' }}>EMISOR</div>
-                <div style={{ fontSize: '8pt', fontWeight: 700, color: '#111' }}>{nombreEmisor}</div>
-                {emisor.telefono && <div style={{ fontSize: '6.5pt', color: '#888', marginTop: '1pt' }}>{emisor.telefono}</div>}
-              </div>
-              <div style={{ width: '0.4pt', background: '#e8e8e8' }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: '5.5pt', fontWeight: 700, letterSpacing: '1.5pt', textTransform: 'uppercase' as const, color: '#aaa', marginBottom: '2pt' }}>PAGADOR</div>
-                <div style={{ fontSize: '8pt', fontWeight: 700, color: '#111' }}>{nombreCompleto}</div>
-                {cliente.nif && <div style={{ fontSize: '6.5pt', color: '#888', marginTop: '1pt' }}>Doc: {cliente.nif}</div>}
-              </div>
-            </div>
-
-            {/* Detail: concepto */}
-            <div style={{ marginBottom: '2mm', borderBottom: '0.4pt solid #f0f0f0', paddingBottom: '2pt' }}>
-              <div style={{ fontSize: '5.5pt', fontWeight: 700, letterSpacing: '1pt', textTransform: 'uppercase' as const, color: '#bbb', marginBottom: '1pt' }}>CONCEPTO</div>
-              <div style={{ fontSize: '7.5pt', color: '#111', fontWeight: 500 }}>{recibi.concepto}</div>
-            </div>
-
-            {/* Detail: forma pago */}
-            <div style={{ marginBottom: '2mm', borderBottom: '0.4pt solid #f0f0f0', paddingBottom: '2pt' }}>
-              <div style={{ fontSize: '5.5pt', fontWeight: 700, letterSpacing: '1pt', textTransform: 'uppercase' as const, color: '#bbb', marginBottom: '1pt' }}>FORMA DE PAGO</div>
-              <div style={{ fontSize: '7.5pt', color: '#111', fontWeight: 500 }}>{recibi.forma_pago}</div>
-            </div>
-
-            {(recibi as any).procedimiento_titulo && (
-              <div style={{ marginBottom: '2mm', borderBottom: '0.4pt solid #f0f0f0', paddingBottom: '2pt' }}>
-                <div style={{ fontSize: '5.5pt', fontWeight: 700, letterSpacing: '1pt', textTransform: 'uppercase' as const, color: '#bbb', marginBottom: '1pt' }}>EXPEDIENTE</div>
-                <div style={{ fontSize: '7.5pt', color: '#111', fontWeight: 500 }}>{(recibi as any).procedimiento_titulo}</div>
-              </div>
-            )}
-
-            {/* Signatures */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '4mm', marginTop: '5mm' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ height: '10mm' }} />
-                <div style={{ borderTop: '0.4pt solid #999', paddingTop: '3pt', fontSize: '6pt', color: '#aaa', lineHeight: 1.4 }}>
-                  Firma del pagador<br />
-                  <span style={{ fontSize: '5.5pt', color: '#ccc' }}>{nombreCompleto}</span>
+              {/* Col 1 — Importe */}
+              <div style={{ minWidth: '52mm', borderRight: '0.4pt solid #e8e8e8', paddingRight: '6mm' }}>
+                <div style={{ fontSize: '5.5pt', letterSpacing: '1.5pt', textTransform: 'uppercase' as const, color: '#aaa', marginBottom: '2pt' }}>IMPORTE RECIBIDO</div>
+                <div style={{ fontFamily: 'Georgia, serif', fontSize: '18pt', letterSpacing: '-0.5pt', color: '#111' }}>{fmt(recibi.importe)} €</div>
+                <div style={{ fontSize: '6pt', color: '#888', marginTop: '2pt', fontStyle: 'italic', lineHeight: 1.3 }}>
+                  {importeEnLetras(recibi.importe)}
+                </div>
+                <div style={{ marginTop: '4pt' }}>
+                  <div style={{ fontSize: '5pt', fontWeight: 700, letterSpacing: '1pt', textTransform: 'uppercase' as const, color: '#aaa', marginBottom: '1pt' }}>FORMA DE PAGO</div>
+                  <div style={{ fontSize: '7pt', color: '#111', fontWeight: 600 }}>{recibi.forma_pago}</div>
                 </div>
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ height: '10mm' }} />
-                <div style={{ borderTop: '0.4pt solid #999', paddingTop: '3pt', fontSize: '6pt', color: '#aaa', lineHeight: 1.4 }}>
-                  Firma y sello del emisor<br />
-                  <span style={{ fontSize: '5.5pt', color: '#ccc' }}>{nombreEmisor}</span>
+
+              {/* Col 2 — Partes */}
+              <div style={{ flex: 1, borderRight: '0.4pt solid #e8e8e8', paddingRight: '6mm', display: 'flex', flexDirection: 'column', gap: '3mm' }}>
+                <div>
+                  <div style={{ fontSize: '5pt', fontWeight: 700, letterSpacing: '1.5pt', textTransform: 'uppercase' as const, color: '#aaa', marginBottom: '1pt' }}>EMISOR</div>
+                  <div style={{ fontSize: '7.5pt', fontWeight: 700, color: '#111' }}>{nombreEmisor}</div>
+                  {emisor.nif && <div style={{ fontSize: '5.5pt', color: '#888' }}>NIF: {emisor.nif}</div>}
+                  {emisor.telefono && <div style={{ fontSize: '5.5pt', color: '#888' }}>{emisor.telefono}</div>}
                 </div>
+                <div>
+                  <div style={{ fontSize: '5pt', fontWeight: 700, letterSpacing: '1.5pt', textTransform: 'uppercase' as const, color: '#aaa', marginBottom: '1pt' }}>PAGADOR</div>
+                  <div style={{ fontSize: '7.5pt', fontWeight: 700, color: '#111' }}>{nombreCompleto}</div>
+                  {cliente.nif && <div style={{ fontSize: '5.5pt', color: '#888' }}>Doc: {cliente.nif}</div>}
+                  {cliente.telefono && <div style={{ fontSize: '5.5pt', color: '#888' }}>{cliente.telefono}</div>}
+                </div>
+              </div>
+
+              {/* Col 3 — Detalles */}
+              <div style={{ minWidth: '46mm', display: 'flex', flexDirection: 'column', gap: '3mm' }}>
+                <div>
+                  <div style={{ fontSize: '5pt', fontWeight: 700, letterSpacing: '1pt', textTransform: 'uppercase' as const, color: '#aaa', marginBottom: '1pt' }}>CONCEPTO</div>
+                  <div style={{ fontSize: '7pt', color: '#111', fontWeight: 500, lineHeight: 1.3 }}>{recibi.concepto}</div>
+                </div>
+                {(recibi as any).procedimiento_titulo && (
+                  <div>
+                    <div style={{ fontSize: '5pt', fontWeight: 700, letterSpacing: '1pt', textTransform: 'uppercase' as const, color: '#aaa', marginBottom: '1pt' }}>EXPEDIENTE</div>
+                    <div style={{ fontSize: '7pt', color: '#111', fontWeight: 500, lineHeight: 1.3 }}>{(recibi as any).procedimiento_titulo}</div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Footer */}
-            <div style={{ position: 'absolute', bottom: '3mm', left: '10mm', right: '6mm', display: 'flex', justifyContent: 'space-between', fontSize: '5.5pt', color: '#ccc', borderTop: '0.4pt solid #eee', paddingTop: '2pt' }}>
-              <span>Recibí Nº {recibi.numero}</span>
-              <span>{new Date().toLocaleDateString('es-ES')}</span>
+            {/* Signatures + footer */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 'auto', paddingTop: '3mm', borderTop: '0.4pt solid #e8e8e8' }}>
+              <div style={{ display: 'flex', gap: '16mm' }}>
+                <div>
+                  <div style={{ height: '6mm' }} />
+                  <div style={{ borderTop: '0.4pt solid #999', paddingTop: '2pt', fontSize: '5.5pt', color: '#aaa' }}>
+                    Firma del pagador — <span style={{ fontSize: '5pt', color: '#bbb' }}>{nombreCompleto}</span>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ height: '6mm' }} />
+                  <div style={{ borderTop: '0.4pt solid #999', paddingTop: '2pt', fontSize: '5.5pt', color: '#aaa' }}>
+                    Firma y sello del emisor — <span style={{ fontSize: '5pt', color: '#bbb' }}>{nombreEmisor}</span>
+                  </div>
+                </div>
+              </div>
+              <div style={{ fontSize: '5pt', color: '#ccc', textAlign: 'right' }}>
+                Recibí Nº {recibi.numero}<br />{new Date().toLocaleDateString('es-ES')}
+              </div>
             </div>
           </div>
         </div>
