@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Factura, DatosEmisor } from '@/lib/supabase/types';
 
 export function useFacturas() {
-  // Solo crear el cliente de Supabase en el cliente
-  const supabase = typeof window !== 'undefined' ? createClient() : null;
+  const supabase = useMemo(() => typeof window !== 'undefined' ? createClient() : null, []);
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [emisor, setEmisor] = useState<DatosEmisor | null>(null);
   const [loading, setLoading] = useState(true);

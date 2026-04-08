@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Cliente, ClienteInsert, ClienteUpdate } from '@/lib/supabase/types';
 
@@ -9,10 +9,9 @@ export function useClientes() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Solo crear el cliente de Supabase en el cliente
-  const supabase = typeof window !== 'undefined' ? createClient() : null;
+  const supabase = useMemo(() => typeof window !== 'undefined' ? createClient() : null, []);
 
-  const fetchClientes = async () => {
+  const fetchClientes = useCallback(async () => {
     if (!supabase) return;
     
     try {
@@ -29,7 +28,7 @@ export function useClientes() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
 
   const createCliente = async (input: Omit<ClienteInsert, 'user_id'>) => {
     if (!supabase) throw new Error('Supabase client no disponible');
@@ -73,7 +72,7 @@ export function useClientes() {
     if (typeof window !== 'undefined' && supabase) {
       fetchClientes();
     }
-  }, [supabase]);
+  }, [fetchClientes, supabase]);
 
   return { clientes, loading, error, fetchClientes, createCliente, updateCliente, deleteCliente };
 }

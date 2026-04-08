@@ -166,6 +166,10 @@ export interface Gasto {
   fecha_factura: string | null;
   notas: string | null;
   created_at: string;
+  // Recurrencia
+  es_recurrente: boolean | null;
+  periodicidad: 'mensual' | 'bimestral' | 'trimestral' | 'semestral' | 'anual' | 'semanal' | null;
+  gasto_plantilla_id: string | null;
 }
 
 // ─── Cierre mensual ────────────────────────────────────────

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Gasto } from '@/lib/supabase/types';
 
@@ -9,11 +9,9 @@ export function useGastos() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Solo crear el cliente de Supabase en el cliente
-  const supabase = typeof window !== 'undefined' ? createClient() : null;
+  const supabase = useMemo(() => typeof window !== 'undefined' ? createClient() : null, []);
 
-  // Cargar gastos
-  const fetchGastos = async () => {
+  const fetchGastos = useCallback(async () => {
     if (!supabase) return;
     
     try {
@@ -34,7 +32,7 @@ export function useGastos() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase]);
 
   // Crear gasto
   const createGasto = async (gasto: Omit<Gasto, 'id' | 'user_id' | 'created_at'>) => {
@@ -168,11 +166,10 @@ export function useGastos() {
   };
 
   useEffect(() => {
-    // Solo ejecutar en el cliente cuando supabase esté disponible
     if (typeof window !== 'undefined' && supabase) {
       fetchGastos();
     }
-  }, [supabase]);
+  }, [fetchGastos, supabase]);
 
   return {
     gastos,

@@ -21,7 +21,9 @@ export function GastoForm({ gasto, onSubmit, onCancel, onUploadFactura, isDuplic
     proveedor: gasto?.proveedor || '',
     conceptos: gasto?.conceptos.join(', ') || '',
     importe_total: gasto?.importe_total || 0,
-    notas: gasto?.notas || ''
+    notas: gasto?.notas || '',
+    es_recurrente: gasto?.es_recurrente || false,
+    periodicidad: gasto?.periodicidad || 'mensual' as Gasto['periodicidad'],
   });
   const [loading, setLoading] = useState(false);
   const [facturaFile, setFacturaFile] = useState<File | null>(null);
@@ -84,9 +86,12 @@ export function GastoForm({ gasto, onSubmit, onCancel, onUploadFactura, isDuplic
         proveedor: formatField(formData.proveedor, 'name'),
         conceptos: conceptosArray,
         factura_url: finalFacturaUrl,
-        numero_factura: null, // Campo null en vez de string vacío
-        fecha_factura: null, // Campo null en vez de string vacío
-        notas: formData.notas ? formatField(formData.notas, 'general') : ''
+        numero_factura: null,
+        fecha_factura: null,
+        notas: formData.notas ? formatField(formData.notas, 'general') : '',
+        es_recurrente: formData.es_recurrente,
+        periodicidad: formData.es_recurrente ? formData.periodicidad : null,
+        gasto_plantilla_id: gasto?.gasto_plantilla_id || null,
       };
 
       console.log('Datos finales del gasto:', gastoData);
@@ -234,6 +239,37 @@ export function GastoForm({ gasto, onSubmit, onCancel, onUploadFactura, isDuplic
         </div>
 
         </div>
+
+      {/* Recurrencia */}
+      <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg">
+        <label className="flex items-center gap-2 cursor-pointer mb-2">
+          <input
+            type="checkbox"
+            className="form-checkbox"
+            checked={formData.es_recurrente || false}
+            onChange={e => setFormData(prev => ({ ...prev, es_recurrente: e.target.checked }))}
+          />
+          <span className="text-sm font-medium text-amber-800">Gasto recurrente</span>
+        </label>
+        {formData.es_recurrente && (
+          <div className="ml-6">
+            <label className="block text-xs text-gray-600 mb-1">Periodicidad</label>
+            <select
+              className="form-input text-sm"
+              value={formData.periodicidad || 'mensual'}
+              onChange={e => setFormData(prev => ({ ...prev, periodicidad: e.target.value as Gasto['periodicidad'] }))}
+            >
+              <option value="semanal">Semanal</option>
+              <option value="mensual">Mensual</option>
+              <option value="bimestral">Bimestral (cada 2 meses)</option>
+              <option value="trimestral">Trimestral</option>
+              <option value="semestral">Semestral</option>
+              <option value="anual">Anual</option>
+            </select>
+            <p className="text-xs text-amber-700 mt-1">Se mostrará como pendiente de confirmar cada período</p>
+          </div>
+        )}
+      </div>
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">

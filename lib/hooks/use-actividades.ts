@@ -1,14 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Actividad, ActividadInsert, ActividadUpdate } from '@/lib/supabase/types';
 
 export function useActividades(clienteId?: string) {
-  const supabase = typeof window !== 'undefined' ? createClient() : null;
+  const supabase = useMemo(() => typeof window !== 'undefined' ? createClient() : null, []);
   const [actividades, setActividades] = useState<Actividad[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchActividades = async () => {
+  const fetchActividades = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
     try {
@@ -29,13 +29,13 @@ export function useActividades(clienteId?: string) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [supabase, clienteId]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && supabase) {
       fetchActividades();
     }
-  }, [supabase, clienteId]);
+  }, [fetchActividades, supabase, clienteId]);
 
   const createActividad = async (data: Omit<ActividadInsert, 'user_id'>) => {
     if (!supabase) return;

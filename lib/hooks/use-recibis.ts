@@ -1,13 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Recibi, RecibiInsert } from '@/lib/supabase/types';
 
 export function useRecibis(clienteId?: string) {
-  const supabase = typeof window !== 'undefined' ? createClient() : null;
+  const supabase = useMemo(() => typeof window !== 'undefined' ? createClient() : null, []);
   const [recibis, setRecibis] = useState<Recibi[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchRecibis = async () => {
+  const fetchRecibis = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
     let query = supabase.from('recibis').select('*').order('fecha', { ascending: false });
@@ -15,13 +15,13 @@ export function useRecibis(clienteId?: string) {
     const { data } = await query;
     setRecibis(data || []);
     setLoading(false);
-  };
+  }, [supabase, clienteId]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && supabase) {
       fetchRecibis();
     }
-  }, [supabase, clienteId]);
+  }, [fetchRecibis, supabase, clienteId]);
 
   const getNextNumero = async (): Promise<string> => {
     if (!supabase) return 'R-0001';

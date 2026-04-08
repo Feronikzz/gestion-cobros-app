@@ -7,7 +7,7 @@ import { Modal } from '@/components/modal';
 import { useGastos } from '@/lib/hooks/use-gastos';
 import type { Gasto } from '@/lib/supabase/types';
 import { eur, monthLabel } from '@/lib/utils';
-import { FileText, Download, Eye, Edit, Trash2, Receipt, TrendingUp, TrendingDown, Calendar, DollarSign, ShoppingCart, Building, Zap, Car, Phone, Mail, CreditCard, Search, Filter, ChevronDown, X, Copy } from 'lucide-react';
+import { FileText, Download, Eye, Edit, Trash2, Receipt, TrendingUp, TrendingDown, Calendar, DollarSign, ShoppingCart, Building, Zap, Car, Phone, Mail, CreditCard, Search, Filter, ChevronDown, X, Copy, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function GastosPage() {
   const { gastos, loading, error, createGasto, updateGasto, deleteGasto, uploadFactura } = useGastos();
@@ -193,30 +193,52 @@ export default function GastosPage() {
   };
 
   const handleDuplicate = (gasto: Gasto) => {
-    // Crear una copia del gasto sin ID, user_id, created_at y con fecha actual
-    const duplicatedGasto = {
-      categoria: gasto.categoria,
-      proveedor: gasto.proveedor,
-      conceptos: gasto.conceptos,
-      importe_total: gasto.importe_total,
-      notas: gasto.notas,
-      fecha: new Date().toISOString().split('T')[0], // Fecha actual
-      mes: new Date().toISOString().slice(0, 7), // Mes actual (YYYY-MM)
-      numero_factura: null, // Limpiar número de factura
-      fecha_factura: null, // Limpiar fecha de factura
-      factura_url: null, // Limpiar URL de factura
-    };
-    
-    // Crear un objeto Gasto sin ID para el formulario
     const gastoForForm = {
-      ...duplicatedGasto,
-      id: '', // ID vacío para indicar que es nuevo
-      user_id: '', // Se asignará automáticamente
-      created_at: '', // Se asignará automáticamente
+      ...gasto,
+      id: '',
+      user_id: '',
+      created_at: '',
+      fecha: new Date().toISOString().split('T')[0],
+      mes: new Date().toISOString().slice(0, 7),
+      numero_factura: null,
+      fecha_factura: null,
+      factura_url: null,
     } as Gasto;
-    
     setEditingGasto(gastoForForm);
     setIsModalOpen(true);
+  };
+
+  const mesActualStr = new Date().toISOString().slice(0, 7);
+
+  const gastosRecurrentesPendientes = useMemo(() => {
+    const plantillas = gastos.filter(g => g.es_recurrente && !g.gasto_plantilla_id);
+    return plantillas.filter(plantilla => {
+      return !gastos.some(
+        g => g.gasto_plantilla_id === plantilla.id && g.mes === mesActualStr
+      );
+    });
+  }, [gastos, mesActualStr]);
+
+  const confirmarRecurrente = (gasto: Gasto) => {
+    const gastoForForm = {
+      ...gasto,
+      id: '',
+      user_id: '',
+      created_at: '',
+      fecha: new Date().toISOString().split('T')[0],
+      mes: mesActualStr,
+      numero_factura: null,
+      fecha_factura: null,
+      factura_url: null,
+      gasto_plantilla_id: gasto.id,
+    } as Gasto;
+    setEditingGasto(gastoForForm);
+    setIsModalOpen(true);
+  };
+
+  const PERIODICIDAD_LABEL: Record<string, string> = {
+    semanal: 'Semanal', mensual: 'Mensual', bimestral: 'Bimestral',
+    trimestral: 'Trimestral', semestral: 'Semestral', anual: 'Anual',
   };
 
   if (loading) {
@@ -321,6 +343,43 @@ export default function GastosPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Panel gastos recurrentes pendientes ── */}
+      {gastosRecurrentesPendientes.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <RefreshCw className="w-4 h-4 text-amber-600" />
+            <h3 className="font-semibold text-amber-800 text-sm">
+              Gastos recurrentes pendientes de confirmar este mes ({gastosRecurrentesPendientes.length})
+            </h3>
+          </div>
+          <div className="space-y-2">
+            {gastosRecurrentesPendientes.map(gasto => (
+              <div key={gasto.id} className="flex items-center justify-between bg-white border border-amber-100 rounded-lg px-4 py-3 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                  <div>
+                    <span className="font-medium text-gray-800 text-sm">{gasto.proveedor}</span>
+                    <span className="text-gray-500 text-xs ml-2">{gasto.conceptos.join(', ')}</span>
+                  </div>
+                  <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                    {PERIODICIDAD_LABEL[gasto.periodicidad || 'mensual']}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-gray-700 text-sm">{eur(gasto.importe_total)}</span>
+                  <button
+                    onClick={() => confirmarRecurrente(gasto)}
+                    className="btn btn-primary btn-sm flex items-center gap-1 text-xs"
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" /> Confirmar
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Búsqueda y Filtros */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
@@ -512,7 +571,16 @@ export default function GastosPage() {
                       </div>
                     </span>
                   </td>
-                  <td className="font-medium text-red-600">{eur(gasto.importe_total)}</td>
+                  <td className="font-medium text-red-600">
+                    <div className="flex items-center gap-1.5">
+                      {eur(gasto.importe_total)}
+                      {gasto.es_recurrente && (
+                        <span title={`Recurrente ${PERIODICIDAD_LABEL[gasto.periodicidad || 'mensual']}`}>
+                          <RefreshCw className="w-3 h-3 text-amber-500" />
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td>
                     {gasto.factura_url ? (
                       <div className="flex gap-2">
