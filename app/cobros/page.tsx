@@ -243,41 +243,27 @@ export default function CobrosPage() {
         </button>
       </div>
 
-      {/* Estadísticas del Mes */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-green-100 text-sm font-medium mb-1">Cobrado este mes</div>
-              <div className="text-2xl font-bold">{eur(calcularCobradoMesActual())}</div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <DollarSign className="w-6 h-6 text-white" />
-            </div>
+      {/* Estadísticas */}
+      <div className="dashboard-metrics" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 'var(--space-lg)' }}>
+        <div className="metric-card metric-green">
+          <DollarSign className="metric-icon" />
+          <div>
+            <p className="metric-label">Cobrado este mes</p>
+            <p className="metric-value">{eur(calcularCobradoMesActual())}</p>
           </div>
         </div>
-        
-        <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-amber-100 text-sm font-medium mb-1">Pendiente de cobro</div>
-              <div className="text-2xl font-bold">{eur(calcularPendiente())}</div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <FileText className="w-6 h-6 text-white" />
-            </div>
+        <div className="metric-card metric-amber">
+          <FileText className="metric-icon" />
+          <div>
+            <p className="metric-label">Pendiente de cobro</p>
+            <p className="metric-value">{eur(calcularPendiente())}</p>
           </div>
         </div>
-        
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-blue-100 text-sm font-medium mb-1">Total cobros</div>
-              <div className="text-2xl font-bold">{cobros.length}</div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <CreditCard className="w-6 h-6 text-white" />
-            </div>
+        <div className="metric-card metric-blue">
+          <CreditCard className="metric-icon" />
+          <div>
+            <p className="metric-label">Total registros</p>
+            <p className="metric-value">{cobros.length}</p>
           </div>
         </div>
       </div>

@@ -48,7 +48,7 @@ export default function CierrePage() {
       description="Cierra el mes fiscal y genera informes. Calcula balances, arrastra saldos y prepara el siguiente período contable."
     >
       {/* ── Métricas ── */}
-      <div className="dashboard-metrics">
+      <div className="dashboard-metrics" style={{ gridTemplateColumns: 'repeat(3,1fr)' }}>
         <div className="metric-card metric-green">
           <TrendingUp className="metric-icon" />
           <div>
@@ -68,20 +68,6 @@ export default function CierrePage() {
           <div>
             <p className="metric-label">Saldo actual</p>
             <p className="metric-value">{eur(saldoActual)}</p>
-          </div>
-        </div>
-        <div className="metric-card metric-amber">
-          <Calendar className="metric-icon" />
-          <div>
-            <p className="metric-label">Meses cerrados</p>
-            <p className="metric-value">{mesesCerrados} / {activeMonthsSummary.length}</p>
-          </div>
-        </div>
-        <div className="metric-card metric-blue">
-          <Unlock className="metric-icon" />
-          <div>
-            <p className="metric-label">Meses abiertos</p>
-            <p className="metric-value">{mesesAbiertos}</p>
           </div>
         </div>
       </div>

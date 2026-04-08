@@ -274,72 +274,26 @@ export default function GastosPage() {
       </div>
 
       {/* Estadísticas de Gastos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-gradient-to-r from-red-500 to-pink-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-red-100 text-sm font-medium mb-1">Gasto este mes</div>
-              <div className="text-2xl font-bold">{eur(calcularGastoMesActual())}</div>
-              <div className="text-red-100 text-xs mt-1">
-                {getVariacionMesAnterior() > 0 ? (
-                  <span className="flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3" />
-                    +{getVariacionMesAnterior().toFixed(1)}% vs mes anterior
-                  </span>
-                ) : getVariacionMesAnterior() < 0 ? (
-                  <span className="flex items-center gap-1">
-                    <TrendingDown className="w-3 h-3" />
-                    {getVariacionMesAnterior().toFixed(1)}% vs mes anterior
-                  </span>
-                ) : (
-                  <span>Sin variación</span>
-                )}
-              </div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <Calendar className="w-6 h-6 text-white" />
-            </div>
+      <div className="dashboard-metrics" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 'var(--space-lg)' }}>
+        <div className="metric-card metric-red">
+          <TrendingDown className="metric-icon" />
+          <div>
+            <p className="metric-label">Gasto este mes</p>
+            <p className="metric-value">{eur(calcularGastoMesActual())}</p>
           </div>
         </div>
-        
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-blue-100 text-sm font-medium mb-1">Gasto mensual medio</div>
-              <div className="text-2xl font-bold">{eur(calcularGastoMensualMedio())}</div>
-              <div className="text-blue-100 text-xs mt-1">Promedio histórico</div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-white" />
-            </div>
+        <div className="metric-card metric-blue">
+          <Calendar className="metric-icon" />
+          <div>
+            <p className="metric-label">Media mensual</p>
+            <p className="metric-value">{eur(calcularGastoMensualMedio())}</p>
           </div>
         </div>
-        
-        <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-purple-100 text-sm font-medium mb-1">Categoría top</div>
-              <div className="text-xl font-bold">{getCategoriaMasGastada().categoria || 'N/A'}</div>
-              <div className="text-purple-100 text-xs mt-1">{eur(getCategoriaMasGastada().importe)}</div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              {getCategoriaIcon(getCategoriaMasGastada().categoria) && 
-                React.createElement(getCategoriaIcon(getCategoriaMasGastada().categoria), { className: "w-6 h-6 text-white" })
-              }
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-green-100 text-sm font-medium mb-1">Total gastos</div>
-              <div className="text-2xl font-bold">{gastos.length}</div>
-              <div className="text-green-100 text-xs mt-1">Registrados</div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <ShoppingCart className="w-6 h-6 text-white" />
-            </div>
+        <div className="metric-card metric-purple">
+          <ShoppingCart className="metric-icon" />
+          <div>
+            <p className="metric-label">Categoría top</p>
+            <p className="metric-value" style={{ fontSize: '0.9rem' }}>{getCategoriaMasGastada().categoria || '—'}</p>
           </div>
         </div>
       </div>

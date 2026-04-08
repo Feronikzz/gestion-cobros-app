@@ -84,13 +84,6 @@ export default function ExpedientesPage() {
     >
       {/* ─── Métricas ── */}
       <div className="dashboard-metrics">
-        <div className="metric-card metric-blue">
-          <FileText className="metric-icon" />
-          <div>
-            <p className="metric-label">Total expedientes</p>
-            <p className="metric-value">{stats.total}</p>
-          </div>
-        </div>
         <div className="metric-card metric-orange">
           <Clock className="metric-icon" />
           <div>
@@ -99,17 +92,10 @@ export default function ExpedientesPage() {
           </div>
         </div>
         <div className="metric-card metric-green">
-          <CheckCircle className="metric-icon" />
+          <TrendingUp className="metric-icon" />
           <div>
-            <p className="metric-label">Resueltos</p>
-            <p className="metric-value">{stats.resueltos}</p>
-          </div>
-        </div>
-        <div className="metric-card metric-purple">
-          <DollarSign className="metric-icon" />
-          <div>
-            <p className="metric-label">Presupuesto total</p>
-            <p className="metric-value">{eur(stats.presupuestoTotal)}</p>
+            <p className="metric-label">Cobrado total</p>
+            <p className="metric-value">{eur(stats.cobradoTotal)}</p>
           </div>
         </div>
         <div className="metric-card metric-red">
@@ -119,11 +105,11 @@ export default function ExpedientesPage() {
             <p className="metric-value">{eur(stats.pendienteTotal)}</p>
           </div>
         </div>
-        <div className="metric-card metric-green">
-          <TrendingUp className="metric-icon" />
+        <div className="metric-card metric-purple">
+          <DollarSign className="metric-icon" />
           <div>
-            <p className="metric-label">Cobrado total</p>
-            <p className="metric-value">{eur(stats.cobradoTotal)}</p>
+            <p className="metric-label">Presupuesto total</p>
+            <p className="metric-value">{eur(stats.presupuestoTotal)}</p>
           </div>
         </div>
       </div>

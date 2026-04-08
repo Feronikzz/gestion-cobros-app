@@ -289,19 +289,21 @@ body {
 }
 .metric-card {
   background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: var(--radius-xl); padding: var(--space-lg);
-  display: flex; align-items: center; gap: var(--space-md);
-  box-shadow: var(--shadow-sm); border-left: 4px solid transparent;
+  border-radius: var(--radius-lg); padding: var(--space-md) var(--space-lg);
+  display: flex; align-items: center; gap: var(--space-sm);
+  border-left: 3px solid transparent;
 }
-.metric-icon { width: 2rem; height: 2rem; flex-shrink: 0; }
-.metric-label { font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-text-secondary); margin: 0; }
-.metric-value { font-size: 1.375rem; font-weight: 800; margin: 0.125rem 0 0; }
-@media (max-width: 640px) { .metric-value { font-size: 1.125rem; } }
+.metric-icon { width: 1.25rem; height: 1.25rem; flex-shrink: 0; opacity: 0.7; }
+.metric-label { font-size: 0.625rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-text-tertiary); margin: 0; }
+.metric-value { font-size: 1.125rem; font-weight: 700; margin: 0.1rem 0 0; color: var(--color-text-primary); }
+@media (max-width: 640px) { .metric-value { font-size: 1rem; } }
 
-.metric-green { border-left-color: #16a34a; .metric-icon { color: #16a34a; } }
-.metric-red   { border-left-color: #dc2626; .metric-icon { color: #dc2626; } }
-.metric-blue  { border-left-color: #2563eb; .metric-icon { color: #2563eb; } }
-.metric-amber { border-left-color: var(--color-accent); .metric-icon { color: var(--color-accent); } }
+.metric-green  { border-left-color: #16a34a; .metric-icon { color: #16a34a; } }
+.metric-red    { border-left-color: #dc2626; .metric-icon { color: #dc2626; } }
+.metric-blue   { border-left-color: #2563eb; .metric-icon { color: #2563eb; } }
+.metric-amber  { border-left-color: var(--color-accent); .metric-icon { color: var(--color-accent); } }
+.metric-orange { border-left-color: #ea580c; .metric-icon { color: #ea580c; } }
+.metric-purple { border-left-color: #7c3aed; .metric-icon { color: #7c3aed; } }
 
 .dashboard-summary {
   display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-md);

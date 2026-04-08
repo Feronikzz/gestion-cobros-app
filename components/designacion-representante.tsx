@@ -6,6 +6,8 @@ import { Download, Save, User, FileText, RefreshCw, Upload, CheckCircle, X, Plus
 
 const STORAGE_KEY_REP = 'designacion_representante_perfil';
 const STORAGE_KEY_EMAILS = 'designacion_emails_sugeridos';
+const STORAGE_KEY_PDF = 'designacion_ultimo_pdf_b64';
+const STORAGE_KEY_PDF_NAME = 'designacion_ultimo_pdf_nombre';
 
 const EMAILS_DEFAULT = [
   'extranjeria@sepe.es',
@@ -100,9 +102,18 @@ export function DesignacionRepresentante({ cliente, onClose }: DesignacionRepres
     saveEmails(updated);
   };
 
+  // ── PDF generado guardado ──
+  const [savedPdfB64, setSavedPdfB64] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(STORAGE_KEY_PDF);
+  });
+  const [savedPdfName, setSavedPdfName] = useState<string>(() => {
+    if (typeof window === 'undefined') return '';
+    return localStorage.getItem(STORAGE_KEY_PDF_NAME) || 'designacion.pdf';
+  });
+
   // ── Signed file upload ──
   const [signedFile, setSignedFile] = useState<File | null>(null);
-  const [signedUploadMsg, setSignedUploadMsg] = useState<string | null>(null);
 
   const setR = (k: string, v: string) => setRepdo(p => ({ ...p, [k]: v }));
   const setT = (k: string, v: string) => setRepte(p => ({ ...p, [k]: v }));
@@ -132,10 +143,24 @@ export function DesignacionRepresentante({ cliente, onClose }: DesignacionRepres
         throw new Error(err.error || 'Error al generar el PDF');
       }
       const blob = await res.blob();
+      const fileName = `designacion-${repdo.apellido1 || 'representante'}.pdf`;
+
+      // Guardar en localStorage como base64
+      const reader = new FileReader();
+      reader.onload = () => {
+        const b64 = reader.result as string;
+        localStorage.setItem(STORAGE_KEY_PDF, b64);
+        localStorage.setItem(STORAGE_KEY_PDF_NAME, fileName);
+        setSavedPdfB64(b64);
+        setSavedPdfName(fileName);
+      };
+      reader.readAsDataURL(blob);
+
+      // Descargar inmediatamente
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `designacion-${repdo.apellido1 || 'representante'}.pdf`;
+      a.download = fileName;
       a.click();
       URL.revokeObjectURL(url);
     } catch (e: any) {
@@ -143,6 +168,21 @@ export function DesignacionRepresentante({ cliente, onClose }: DesignacionRepres
     } finally {
       setLoading(false);
     }
+  };
+
+  const downloadSavedPdf = () => {
+    if (!savedPdfB64) return;
+    const a = document.createElement('a');
+    a.href = savedPdfB64;
+    a.download = savedPdfName;
+    a.click();
+  };
+
+  const clearSavedPdf = () => {
+    localStorage.removeItem(STORAGE_KEY_PDF);
+    localStorage.removeItem(STORAGE_KEY_PDF_NAME);
+    setSavedPdfB64(null);
+    setSavedPdfName('');
   };
 
   const inp = 'form-input';
@@ -290,22 +330,47 @@ export function DesignacionRepresentante({ cliente, onClose }: DesignacionRepres
         </div>
       </fieldset>
 
+      {/* ── PDF GENERADO (sin firmar) ── */}
+      {savedPdfB64 && (
+        <fieldset className="form-fieldset">
+          <legend className="form-legend">Último PDF generado (sin firmar)</legend>
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1.5 text-sm text-gray-700">
+              <FileText className="w-4 h-4 text-blue-500" />
+              {savedPdfName}
+            </span>
+            <button
+              type="button"
+              onClick={downloadSavedPdf}
+              className="btn btn-secondary btn-sm flex items-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" /> Descargar
+            </button>
+            <button
+              type="button"
+              onClick={clearSavedPdf}
+              className="text-gray-400 hover:text-red-500 ml-auto"
+              title="Eliminar guardado"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">Se guardó automáticamente al generar. Puedes descargarlo de nuevo si necesitas modificar los datos y regenerarlo.</p>
+        </fieldset>
+      )}
+
       {/* ── DOCUMENTO FIRMADO ── */}
       <fieldset className="form-fieldset">
-        <legend className="form-legend">Documento firmado (subir una vez firmado)</legend>
-        <div className="flex items-center gap-3">
+        <legend className="form-legend">Documento firmado (adjuntar una vez firmado por el cliente)</legend>
+        <div className="flex items-center gap-3 flex-wrap">
           <label className="btn btn-secondary btn-sm cursor-pointer flex items-center gap-2">
             <Upload className="w-4 h-4" />
-            {signedFile ? signedFile.name : 'Seleccionar PDF/imagen firmado'}
+            {signedFile ? 'Cambiar archivo' : 'Seleccionar PDF/imagen firmado'}
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
               className="hidden"
-              onChange={e => {
-                const f = e.target.files?.[0] || null;
-                setSignedFile(f);
-                setSignedUploadMsg(f ? `Archivo listo: ${f.name}` : null);
-              }}
+              onChange={e => setSignedFile(e.target.files?.[0] || null)}
             />
           </label>
           {signedFile && (
@@ -315,32 +380,27 @@ export function DesignacionRepresentante({ cliente, onClose }: DesignacionRepres
               </span>
               <button
                 type="button"
-                onClick={() => { setSignedFile(null); setSignedUploadMsg(null); }}
-                className="text-gray-400 hover:text-red-500"
+                onClick={() => {
+                  const url = URL.createObjectURL(signedFile);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = signedFile.name;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="btn btn-primary btn-sm flex items-center gap-1.5"
               >
+                <Download className="w-3.5 h-3.5" /> Descargar firmado
+              </button>
+              <button type="button" onClick={() => setSignedFile(null)} className="text-gray-400 hover:text-red-500">
                 <X className="w-3.5 h-3.5" />
               </button>
             </>
           )}
         </div>
-        {signedFile && (
-          <button
-            type="button"
-            className="btn btn-primary btn-sm mt-3 flex items-center gap-2"
-            onClick={() => {
-              const url = URL.createObjectURL(signedFile);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = signedFile.name;
-              a.click();
-              URL.revokeObjectURL(url);
-              setSignedUploadMsg('Descargado');
-            }}
-          >
-            <Download className="w-3.5 h-3.5" /> Descargar firmado
-          </button>
+        {!signedFile && (
+          <p className="text-xs text-gray-400 mt-2">Una vez que el cliente firme el documento, adjúntalo aquí para tenerlo registrado.</p>
         )}
-        <p className="text-xs text-gray-400 mt-2">Adjunta aquí el documento después de que el cliente lo haya firmado.</p>
       </fieldset>
 
       {error && (
