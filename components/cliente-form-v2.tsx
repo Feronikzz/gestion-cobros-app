@@ -48,7 +48,7 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
     codigo_postal: cliente?.codigo_postal ?? '',
     localidad: cliente?.localidad ?? '',
     provincia: cliente?.provincia ?? '',
-    anio_nacimiento: cliente?.anio_nacimiento?.toString() ?? '',
+    fecha_nacimiento: cliente?.fecha_nacimiento ?? (cliente?.anio_nacimiento ? `${cliente.anio_nacimiento}-01-01` : ''),
     nacionalidad: cliente?.nacionalidad ?? '',
     fecha_entrada: cliente?.fecha_entrada ?? new Date().toISOString().split('T')[0],
     estado: cliente?.estado ?? ('activo' as Cliente['estado']),
@@ -136,7 +136,8 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
         codigo_postal: formData.codigo_postal || null,
         localidad: formData.localidad || null,
         provincia: formData.provincia || null,
-        anio_nacimiento: formData.anio_nacimiento ? parseInt(formData.anio_nacimiento) : null,
+        fecha_nacimiento: formData.fecha_nacimiento || null,
+        anio_nacimiento: formData.fecha_nacimiento ? parseInt(formData.fecha_nacimiento.slice(0, 4)) : null,
         nacionalidad: formData.nacionalidad || null,
         fecha_entrada: formData.fecha_entrada,
         documento_tipo: docPrincipal?.tipo || formData.documento_tipo || null,
@@ -186,8 +187,9 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
               <input type="text" value={formData.apellidos} onChange={e => set('apellidos', e.target.value)} className="form-input" placeholder="Apellido1 Apellido2" />
             </div>
             <div>
-              <label className="form-label">Año de nacimiento</label>
-              <input type="number" value={formData.anio_nacimiento} onChange={e => set('anio_nacimiento', e.target.value)} className="form-input" placeholder="1990" min="1900" max={new Date().getFullYear()} />
+              <label className="form-label">Fecha de nacimiento</label>
+              <input type="date" value={formData.fecha_nacimiento} onChange={e => set('fecha_nacimiento', e.target.value)} className="form-input" />
+              <p className="text-xs text-gray-400 mt-1">Si solo conoces el año, usa 01/01 como día y mes</p>
             </div>
             <div>
               <label className="form-label">Nacionalidad</label>
@@ -354,7 +356,7 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
               </div>
               <div>
                 <label className="form-label">Presupuesto *</label>
-                <input type="number" step="0.01" min="0" value={procForm.presupuesto || ''} onChange={e => setProcForm({ ...procForm, presupuesto: parseFloat(e.target.value) || 0 })} className="form-input" required={addProc} />
+                <input type="number" step="0.01" min="0" value={procForm.presupuesto} onChange={e => setProcForm({ ...procForm, presupuesto: parseFloat(e.target.value) || 0 })} className="form-input" required={addProc} />
               </div>
               <div>
                 <label className="form-label">Estado inicial</label>

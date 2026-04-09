@@ -25,6 +25,7 @@ export interface Cliente {
   localidad: string | null;
   provincia: string | null;
   anio_nacimiento: number | null;
+  fecha_nacimiento: string | null;
   nacionalidad: string | null;
   fecha_entrada: string;
   documento_tipo: string | null;

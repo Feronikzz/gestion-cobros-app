@@ -49,6 +49,7 @@ export function ClienteForm({ cliente, onSubmit, onCancel }: ClienteFormProps) {
         provincia: null,
         nacionalidad: null,
         documento_numero: null,
+        fecha_nacimiento: null,
       });
     } catch (error) {
       console.error('Error:', error);

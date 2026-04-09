@@ -49,6 +49,8 @@ export default function ClienteDetallePage() {
   const [editingActividad, setEditingActividad] = useState<Actividad | null>(null);
   const [viewRecibi, setViewRecibi] = useState<Recibi | null>(null);
   const [showEditClienteModal, setShowEditClienteModal] = useState(false);
+  const [editingCobro, setEditingCobro] = useState<Cobro | null>(null);
+  const [docsIdentidad, setDocsIdentidad] = useState<{tipo:string;numero:string;fecha_expedicion:string;fecha_caducidad:string;es_principal:boolean}[]>([]);
 
   // Hooks CRM
   const { actividades, createActividad, updateActividad, deleteActividad, completeActividad, stats: actStats } = useActividades(id);
@@ -74,16 +76,23 @@ export default function ClienteDetallePage() {
     }
     
     setLoading(true);
-    const [{ data: cli }, { data: procs }, { data: cobs }, { data: docs }] = await Promise.all([
+    const [{ data: cli }, { data: procs }, { data: cobs }, { data: docs }, { data: docsId }] = await Promise.all([
       supabase.from('clientes').select('*').eq('id', id).single(),
       supabase.from('procedimientos').select('*').eq('cliente_id', id).order('created_at', { ascending: false }),
       supabase.from('cobros').select('*').eq('cliente_id', id).order('fecha_cobro', { ascending: false }),
       supabase.from('documentos').select('*').order('created_at', { ascending: false }),
+      supabase.from('documentos_identidad').select('*').eq('cliente_id', id).order('created_at'),
     ]);
     setCliente(cli);
     setProcedimientos(procs || []);
     setCobros(cobs || []);
     setDocumentos(docs || []);
+    setDocsIdentidad((docsId || []).map(d => ({
+      tipo: d.tipo, numero: d.numero,
+      fecha_expedicion: d.fecha_expedicion || '',
+      fecha_caducidad: d.fecha_caducidad || '',
+      es_principal: d.es_principal,
+    })));
     setLoading(false);
   };
 
@@ -234,14 +243,19 @@ export default function ClienteDetallePage() {
     fetchData();
   };
 
-  // Guardar cobro
+  // Guardar cobro (crear o actualizar)
   const handleSaveCobro = async (data: Omit<Cobro, 'id' | 'user_id' | 'created_at'>) => {
     if (!supabase) return;
     
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    await supabase.from('cobros').insert({ ...data, user_id: user.id });
+    if (editingCobro) {
+      await supabase.from('cobros').update(data).eq('id', editingCobro.id);
+    } else {
+      await supabase.from('cobros').insert({ ...data, user_id: user.id });
+    }
     setShowCobroModal(false);
+    setEditingCobro(null);
     fetchData();
   };
 
@@ -409,7 +423,7 @@ export default function ClienteDetallePage() {
         </div>
         <div className="detail-grid">
           <div><span className="detail-label">Nombre</span><span className="detail-value">{[cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}</span></div>
-          <div><span className="detail-label">Año nacimiento</span><span className="detail-value">{cliente.anio_nacimiento || '—'}</span></div>
+          <div><span className="detail-label">Fecha nacimiento</span><span className="detail-value">{cliente.fecha_nacimiento || (cliente.anio_nacimiento ? `Año ${cliente.anio_nacimiento}` : '—')}</span></div>
           {cliente.nacionalidad && <div><span className="detail-label">Nacionalidad</span><span className="detail-value">{cliente.nacionalidad}</span></div>}
           <div><span className="detail-label">Documento</span><span className="detail-value">{cliente.documento_tipo || '—'} {cliente.documento_numero || cliente.nif || ''} {cliente.documento_caducidad ? `(cad. ${cliente.documento_caducidad})` : ''}</span></div>
           <div><span className="detail-label">Teléfono</span><span className="detail-value">{cliente.telefono || '—'}</span></div>
@@ -506,6 +520,9 @@ export default function ClienteDetallePage() {
         )}
       </div>
 
+      {/* ── Grid 2 columnas (desktop) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
       {/* ── Cobros del cliente ── */}
       <div className="section-block">
         <div className="section-header">
@@ -531,6 +548,13 @@ export default function ClienteDetallePage() {
                     <td>
                       <div className="flex gap-2">
                         <button 
+                          onClick={() => { setEditingCobro(c); setShowCobroModal(true); }} 
+                          className="action-btn action-edit" 
+                          title="Editar cobro"
+                        >
+                          <Edit className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
                           onClick={() => handleCreateFacturaFromCobro(c)} 
                           className="action-btn action-view" 
                           title="Crear factura"
@@ -554,13 +578,96 @@ export default function ClienteDetallePage() {
         )}
       </div>
 
-      {/* ── Modal: Nuevo Cobro ── */}
-      <Modal isOpen={showCobroModal} onClose={() => setShowCobroModal(false)} title="Nuevo cobro">
-        <CobroForm clienteIdFijo={id} onSubmit={handleSaveCobro} onCancel={() => setShowCobroModal(false)} />
+      {/* ── Actividades / CRM ── */}
+      <div className="section-block">
+        <div className="section-header">
+          <h3><Activity className="w-4 h-4 inline mr-1" /> Actividades
+            {actStats.pendientes > 0 && <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">{actStats.pendientes} pendientes</span>}
+            {actStats.vencidas > 0 && <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">{actStats.vencidas} vencidas</span>}
+          </h3>
+          <button className="btn btn-primary btn-sm" onClick={() => { setEditingActividad(null); setShowActividadModal(true); }}>
+            <Plus className="w-4 h-4" /> Nueva actividad
+          </button>
+        </div>
+        {actividades.length === 0 ? (
+          <p className="empty-state-inline">No hay actividades registradas. Registra llamadas, visitas, tareas y más.</p>
+        ) : (
+          <ActividadTimeline
+            actividades={actividades}
+            onComplete={(actId) => { if (window.confirm('¿Marcar como completada?')) completeActividad(actId); }}
+            onEdit={(act) => { setEditingActividad(act); setShowActividadModal(true); }}
+            onDelete={(actId) => { if (window.confirm('¿Eliminar esta actividad?')) deleteActividad(actId); }}
+          />
+        )}
+      </div>
+
+      {/* ── Recibís ── */}
+      <div className="section-block">
+        <div className="section-header">
+          <h3><Receipt className="w-4 h-4 inline mr-1" /> Recibís</h3>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowRecibiModal(true)}>
+            <Plus className="w-4 h-4" /> Nuevo recibí
+          </button>
+        </div>
+        {recibis.length === 0 ? (
+          <p className="empty-state-inline">No hay recibís generados para este cliente.</p>
+        ) : (
+          <div className="table-container">
+            <table className="table">
+              <thead><tr><th>Nº</th><th>Fecha</th><th>Importe</th><th>Concepto</th><th>Pago</th><th>Acciones</th></tr></thead>
+              <tbody>
+                {recibis.map(r => (
+                  <tr key={r.id}>
+                    <td className="font-medium">{r.numero}</td>
+                    <td>{r.fecha}</td>
+                    <td className="font-medium">{eur(r.importe)}</td>
+                    <td className="subtle-text truncate max-w-[200px]">{r.concepto}</td>
+                    <td>{r.forma_pago}</td>
+                    <td>
+                      <div className="flex gap-2">
+                        <button onClick={() => setViewRecibi(r)} className="action-btn action-view" title="Ver / Imprimir">
+                          <Printer className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => { if (window.confirm('¿Eliminar este recibí?')) deleteRecibi(r.id); }} className="action-btn action-delete" title="Eliminar">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Designación de representante ── */}
+      <div className="section-block">
+        <div className="section-header">
+          <h3><FileSignature className="w-4 h-4 inline mr-1" /> Documentos legales</h3>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowDesignacionModal(true)}>
+            <FileSignature className="w-4 h-4" /> Designación de representante
+          </button>
+        </div>
+        <p className="text-sm text-gray-500">Genera documentos legales utilizando los datos del cliente.</p>
+      </div>
+
+      {/* Sección de Notas */}
+      <div className="section">
+        <ClienteNotas clienteId={id!} />
+      </div>
+
+      </div>{/* cierre grid 2 columnas */}
+
+      {/* ══════ MODALES (fuera del grid) ══════ */}
+
+      {/* ── Modal: Cobro ── */}
+      <Modal isOpen={showCobroModal} onClose={() => { setShowCobroModal(false); setEditingCobro(null); }} title={editingCobro ? 'Editar cobro' : 'Nuevo cobro'} confirmClose>
+        <CobroForm cobro={editingCobro || undefined} clienteIdFijo={id} onSubmit={handleSaveCobro} onCancel={() => { setShowCobroModal(false); setEditingCobro(null); }} />
       </Modal>
 
-      {/* ── Modal: Procedimiento (mejorado con campos condicionales) ── */}
-      <Modal isOpen={showProcModal} onClose={() => setShowProcModal(false)} title={editingProc ? 'Editar procedimiento' : 'Nuevo procedimiento'}>
+      {/* ── Modal: Procedimiento ── */}
+      <Modal isOpen={showProcModal} onClose={() => setShowProcModal(false)} title={editingProc ? 'Editar procedimiento' : 'Nuevo procedimiento'} confirmClose>
         <ProcedimientoForm
           procedimiento={editingProc || undefined}
           clienteId={id}
@@ -644,31 +751,8 @@ export default function ClienteDetallePage() {
         </form>
       </Modal>
 
-      {/* ── Actividades / CRM ── */}
-      <div className="section-block">
-        <div className="section-header">
-          <h3><Activity className="w-4 h-4 inline mr-1" /> Actividades
-            {actStats.pendientes > 0 && <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">{actStats.pendientes} pendientes</span>}
-            {actStats.vencidas > 0 && <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded-full">{actStats.vencidas} vencidas</span>}
-          </h3>
-          <button className="btn btn-primary btn-sm" onClick={() => { setEditingActividad(null); setShowActividadModal(true); }}>
-            <Plus className="w-4 h-4" /> Nueva actividad
-          </button>
-        </div>
-        {actividades.length === 0 ? (
-          <p className="empty-state-inline">No hay actividades registradas. Registra llamadas, visitas, tareas y más.</p>
-        ) : (
-          <ActividadTimeline
-            actividades={actividades}
-            onComplete={(actId) => { if (window.confirm('¿Marcar como completada?')) completeActividad(actId); }}
-            onEdit={(act) => { setEditingActividad(act); setShowActividadModal(true); }}
-            onDelete={(actId) => { if (window.confirm('¿Eliminar esta actividad?')) deleteActividad(actId); }}
-          />
-        )}
-      </div>
-
       {/* ── Modal: Actividad ── */}
-      <Modal isOpen={showActividadModal} onClose={() => { setShowActividadModal(false); setEditingActividad(null); }} title={editingActividad ? 'Editar actividad' : 'Nueva actividad'}>
+      <Modal isOpen={showActividadModal} onClose={() => { setShowActividadModal(false); setEditingActividad(null); }} title={editingActividad ? 'Editar actividad' : 'Nueva actividad'} confirmClose>
         <ActividadForm
           actividad={editingActividad || undefined}
           clienteId={id}
@@ -685,48 +769,8 @@ export default function ClienteDetallePage() {
         />
       </Modal>
 
-      {/* ── Recibís ── */}
-      <div className="section-block">
-        <div className="section-header">
-          <h3><Receipt className="w-4 h-4 inline mr-1" /> Recibís</h3>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowRecibiModal(true)}>
-            <Plus className="w-4 h-4" /> Nuevo recibí
-          </button>
-        </div>
-        {recibis.length === 0 ? (
-          <p className="empty-state-inline">No hay recibís generados para este cliente.</p>
-        ) : (
-          <div className="table-container">
-            <table className="table">
-              <thead><tr><th>Nº</th><th>Fecha</th><th>Importe</th><th>Concepto</th><th>Pago</th><th>Acciones</th></tr></thead>
-              <tbody>
-                {recibis.map(r => (
-                  <tr key={r.id}>
-                    <td className="font-medium">{r.numero}</td>
-                    <td>{r.fecha}</td>
-                    <td className="font-medium">{eur(r.importe)}</td>
-                    <td className="subtle-text truncate max-w-[200px]">{r.concepto}</td>
-                    <td>{r.forma_pago}</td>
-                    <td>
-                      <div className="flex gap-2">
-                        <button onClick={() => setViewRecibi(r)} className="action-btn action-view" title="Ver / Imprimir">
-                          <Printer className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={() => { if (window.confirm('¿Eliminar este recibí?')) deleteRecibi(r.id); }} className="action-btn action-delete" title="Eliminar">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
       {/* ── Modal: Nuevo Recibí ── */}
-      <Modal isOpen={showRecibiModal} onClose={() => setShowRecibiModal(false)} title="Nuevo recibí">
+      <Modal isOpen={showRecibiModal} onClose={() => setShowRecibiModal(false)} title="Nuevo recibí" confirmClose>
         <RecibiFormInline
           clienteId={id}
           procedimientos={procedimientos}
@@ -746,36 +790,21 @@ export default function ClienteDetallePage() {
         )}
       </Modal>
 
-      {/* ── Designación de representante ── */}
-      <div className="section-block">
-        <div className="section-header">
-          <h3><FileSignature className="w-4 h-4 inline mr-1" /> Documentos legales</h3>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowDesignacionModal(true)}>
-            <FileSignature className="w-4 h-4" /> Designación de representante
-          </button>
-        </div>
-        <p className="text-sm text-gray-500">Genera documentos legales utilizando los datos del cliente.</p>
-      </div>
-
       {/* ── Modal: Designación de Representante ── */}
       <Modal isOpen={showDesignacionModal} onClose={() => setShowDesignacionModal(false)} title="Designación de Representante" size="wide">
         <DesignacionRepresentante cliente={cliente || undefined} onClose={() => setShowDesignacionModal(false)} />
       </Modal>
 
       {/* ── Modal: Editar datos del cliente ── */}
-      <Modal isOpen={showEditClienteModal} onClose={() => setShowEditClienteModal(false)} title="Editar datos del cliente" size="wide">
+      <Modal isOpen={showEditClienteModal} onClose={() => setShowEditClienteModal(false)} title="Editar datos del cliente" size="wide" confirmClose>
         <ClienteFormV2
           cliente={cliente || undefined}
           onSubmit={handleUpdateCliente}
           onCancel={() => setShowEditClienteModal(false)}
           allowProcedimiento={false}
+          initialDocs={docsIdentidad.length > 0 ? docsIdentidad : undefined}
         />
       </Modal>
-
-      {/* Sección de Notas */}
-      <div className="section">
-        <ClienteNotas clienteId={id!} />
-      </div>
     </LayoutShell>
   );
 }

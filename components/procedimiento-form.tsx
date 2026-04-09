@@ -98,7 +98,7 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
           </div>
           <div>
             <label className="form-label">Presupuesto (€) *</label>
-            <input type="number" step="0.01" min="0" value={form.presupuesto || ''} onChange={e => setForm({ ...form, presupuesto: parseFloat(e.target.value) || 0 })} className="form-input" required />
+            <input type="number" step="0.01" min="0" value={form.presupuesto} onChange={e => setForm({ ...form, presupuesto: parseFloat(e.target.value) || 0 })} className="form-input" required />
           </div>
           <div>
             <label className="form-label">Estado</label>
