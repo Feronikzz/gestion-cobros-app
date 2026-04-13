@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Cliente } from '@/lib/supabase/types';
 import { Download, Save, User, FileText, RefreshCw, Upload, CheckCircle, X, Plus } from 'lucide-react';
 
@@ -117,6 +117,11 @@ export function DesignacionRepresentante({ cliente, onClose }: DesignacionRepres
 
   const setR = (k: string, v: string) => setRepdo(p => ({ ...p, [k]: v }));
   const setT = (k: string, v: string) => setRepte(p => ({ ...p, [k]: v }));
+
+  // Auto-guardar perfil representante en localStorage cuando cambie
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_REP, JSON.stringify(repte));
+  }, [repte]);
 
   const saveRepPerfil = () => {
     localStorage.setItem(STORAGE_KEY_REP, JSON.stringify(repte));
@@ -282,7 +287,7 @@ export function DesignacionRepresentante({ cliente, onClose }: DesignacionRepres
       <fieldset className="form-fieldset">
         <legend className="form-legend">Datos del representante (Apoderado)</legend>
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-1.5 text-sm text-gray-500"><User className="w-3.5 h-3.5" /> Perfil guardado automáticamente</div>
+          <div className="flex items-center gap-1.5 text-sm text-gray-500"><User className="w-3.5 h-3.5" /> Se guarda automáticamente</div>
           <button type="button" onClick={saveRepPerfil} className="btn btn-secondary btn-sm flex items-center gap-1">
             <Save className="w-3 h-3" /> {savedMsg ? '✓ Guardado' : 'Guardar perfil'}
           </button>

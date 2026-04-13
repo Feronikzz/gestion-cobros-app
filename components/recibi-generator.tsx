@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { Cliente, Recibi } from '@/lib/supabase/types';
 import { Printer, ImageIcon, X, User, Save, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -61,6 +61,11 @@ export function RecibiGenerator({ cliente, recibi }: RecibiGeneratorProps) {
   const [showEmisorForm, setShowEmisorForm] = useState(false);
   const [emisorSaved, setEmisorSaved] = useState(false);
 
+  // Auto-guardar emisor en localStorage cuando cambie
+  useEffect(() => {
+    localStorage.setItem(EMISOR_KEY, JSON.stringify(emisor));
+  }, [emisor]);
+
   const saveEmisor = () => {
     localStorage.setItem(EMISOR_KEY, JSON.stringify(emisor));
     setEmisorSaved(true);
@@ -93,7 +98,7 @@ export function RecibiGenerator({ cliente, recibi }: RecibiGeneratorProps) {
       <title>Recibí ${recibi.numero}</title>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&display=swap');
-        @page { size: 210mm 99mm; margin: 0; }
+        @page { size: A4; margin: 0; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'DM Sans', sans-serif; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .talonario { width: 210mm; height: 99mm; padding: 8mm 8mm 6mm 8mm; position: relative; overflow: hidden; display: flex; flex-direction: column; }
