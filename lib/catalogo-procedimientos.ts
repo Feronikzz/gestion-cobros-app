@@ -6,6 +6,9 @@ export interface ProcedimientoCatalogo {
   documentos_requeridos: DocumentoRequerido[];
 }
 
+// Extender CategoriaProcedimiento para permitir categorías dinámicas
+export type CategoriaProcedimientoExtendida = CategoriaProcedimiento | string;
+
 export const CATEGORIA_LABELS: Record<CategoriaProcedimiento, string> = {
   extranjeria: 'Extranjería',
   civil: 'Civil',
@@ -14,6 +17,44 @@ export const CATEGORIA_LABELS: Record<CategoriaProcedimiento, string> = {
   administrativo: 'Administrativo',
   otro: 'Otro',
 };
+
+// Clave para localStorage
+const STORAGE_KEY = 'catalogo_procedimientos_v1';
+const STORAGE_KEY_CATS = 'catalogo_categorias_v1';
+
+// Obtener catálogo custom de localStorage
+function getCustomCatalogo(): ProcedimientoCatalogo[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch { return []; }
+}
+
+// Guardar catálogo custom
+function saveCustomCatalogo(custom: ProcedimientoCatalogo[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(custom));
+  } catch { }
+}
+
+// Obtener categorías custom
+export function getCategoriasCustom(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_CATS);
+    return saved ? JSON.parse(saved) : {};
+  } catch { return {}; }
+}
+
+// Guardar categorías custom
+export function saveCategoriasCustom(cats: Record<string, string>) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(STORAGE_KEY_CATS, JSON.stringify(cats));
+  } catch { }
+}
 
 // ─── Catálogo de procedimientos predefinidos ─────────────
 export const CATALOGO_PROCEDIMIENTOS: ProcedimientoCatalogo[] = [
@@ -254,22 +295,86 @@ export const CATALOGO_PROCEDIMIENTOS: ProcedimientoCatalogo[] = [
   },
 ];
 
+// ─── Funciones de gestión del catálogo ─────────────────────────────
+
+// Obtener catálogo completo (defaults + custom)
+export function getCatalogoCompleto(): ProcedimientoCatalogo[] {
+  const custom = getCustomCatalogo();
+  // Combinar y eliminar duplicados (custom tiene prioridad)
+  const map = new Map<string, ProcedimientoCatalogo>();
+  [...CATALOGO_PROCEDIMIENTOS, ...custom].forEach(p => {
+    map.set(p.titulo, p);
+  });
+  return Array.from(map.values());
+}
+
+// Añadir procedimiento al catálogo custom
+export function addProcedimientoCatalogo(proc: ProcedimientoCatalogo): boolean {
+  const custom = getCustomCatalogo();
+  if (custom.find(p => p.titulo === proc.titulo)) {
+    return false; // Ya existe
+  }
+  custom.push(proc);
+  saveCustomCatalogo(custom);
+  return true;
+}
+
+// Actualizar procedimiento en catálogo custom
+export function updateProcedimientoCatalogo(tituloOriginal: string, proc: ProcedimientoCatalogo): boolean {
+  // Si es un default, lo añadimos a custom con los cambios (override)
+  const custom = getCustomCatalogo();
+  const idx = custom.findIndex(p => p.titulo === tituloOriginal);
+  
+  if (idx >= 0) {
+    // Actualizar existente
+    custom[idx] = proc;
+  } else if (CATALOGO_PROCEDIMIENTOS.find(p => p.titulo === tituloOriginal)) {
+    // Es un default, añadir a custom como override
+    custom.push(proc);
+  } else {
+    return false;
+  }
+  
+  saveCustomCatalogo(custom);
+  return true;
+}
+
+// Eliminar procedimiento del catálogo custom
+export function deleteProcedimientoCatalogo(titulo: string): boolean {
+  const custom = getCustomCatalogo();
+  const filtered = custom.filter(p => p.titulo !== titulo);
+  if (filtered.length === custom.length) return false;
+  saveCustomCatalogo(filtered);
+  return true;
+}
+
+// ─── Funciones getter (usando catálogo completo) ─────────────────────
+
 // Obtener títulos únicos para autocompletar
 export function getTitulosPorCategoria(categoria?: CategoriaProcedimiento): string[] {
+  const catalogo = getCatalogoCompleto();
   const filtered = categoria
-    ? CATALOGO_PROCEDIMIENTOS.filter(p => p.categoria === categoria)
-    : CATALOGO_PROCEDIMIENTOS;
+    ? catalogo.filter(p => p.categoria === categoria)
+    : catalogo;
   return filtered.map(p => p.titulo);
 }
 
 // Obtener documentos requeridos según el título del procedimiento
 export function getDocumentosRequeridos(titulo: string): DocumentoRequerido[] {
-  const proc = CATALOGO_PROCEDIMIENTOS.find(p => p.titulo === titulo);
+  const catalogo = getCatalogoCompleto();
+  const proc = catalogo.find(p => p.titulo === titulo);
   return proc ? proc.documentos_requeridos.map(d => ({ ...d })) : [];
 }
 
 // Obtener la categoría según el título
 export function getCategoriaByTitulo(titulo: string): CategoriaProcedimiento | null {
-  const proc = CATALOGO_PROCEDIMIENTOS.find(p => p.titulo === titulo);
+  const catalogo = getCatalogoCompleto();
+  const proc = catalogo.find(p => p.titulo === titulo);
   return proc ? proc.categoria : null;
+}
+
+// Obtener labels de todas las categorías (incluyendo custom)
+export function getAllCategoriaLabels(): Record<string, string> {
+  const customCats = getCategoriasCustom();
+  return { ...CATEGORIA_LABELS, ...customCats };
 }

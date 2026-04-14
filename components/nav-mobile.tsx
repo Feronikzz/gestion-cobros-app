@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { X, Home, Users, CreditCard, PieChart, FileText, Calendar, Receipt, TrendingUp, FolderOpen, History } from 'lucide-react';
+import { X, Home, Users, CreditCard, PieChart, FileText, Calendar, Receipt, TrendingUp, FolderOpen, History, Activity, BookOpen } from 'lucide-react';
 import { LogoutButton } from '@/components/logout-button';
 
 interface NavMobileProps {
@@ -18,7 +18,9 @@ export function NavMobile({ open, onClose }: NavMobileProps) {
     { href: '/dashboard', label: 'Inicio', icon: Home },
     { href: '/clientes', label: 'Clientes', icon: Users },
     { href: '/expedientes', label: 'Expedientes', icon: FolderOpen },
+    { href: '/catalogo', label: 'Catálogo', icon: BookOpen },
     { href: '/cobros', label: 'Cobros', icon: CreditCard },
+    { href: '/actividades', label: 'Actividades', icon: Activity },
     { href: '/gastos', label: 'Gastos', icon: FileText },
     { href: '/finanzas', label: 'Finanzas', icon: TrendingUp },
     { href: '/repartos', label: 'Repartos', icon: PieChart },

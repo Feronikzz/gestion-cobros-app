@@ -3,7 +3,14 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import type { Procedimiento, EstadoProcedimiento, CategoriaProcedimiento, DocumentoRequerido } from '@/lib/supabase/types';
 import { formatField } from '@/lib/utils/text';
-import { CATALOGO_PROCEDIMIENTOS, CATEGORIA_LABELS, getDocumentosRequeridos, getCategoriaByTitulo } from '@/lib/catalogo-procedimientos';
+import { 
+  getCatalogoCompleto, 
+  getAllCategoriaLabels, 
+  getDocumentosRequeridos, 
+  getCategoriaByTitulo,
+  addProcedimientoCatalogo,
+  type ProcedimientoCatalogo
+} from '@/lib/catalogo-procedimientos';
 import { Search, CheckSquare, Square, Plus, X, FileText } from 'lucide-react';
 
 interface ProcedimientoFormProps {
@@ -73,23 +80,39 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  // Catálogo completo (incluye custom añadidos desde la página de catálogo)
+  const catalogoCompleto = useMemo(() => getCatalogoCompleto(), []);
+  const categoriaLabels = useMemo(() => getAllCategoriaLabels(), []);
+
   // Filtered catalog suggestions
   const catalogSuggestions = useMemo(() => {
     const search = tituloSearch.toLowerCase();
     const catFilter = form.categoria || undefined;
-    return CATALOGO_PROCEDIMIENTOS.filter(p => {
+    return catalogoCompleto.filter(p => {
       const matchSearch = !search || p.titulo.toLowerCase().includes(search);
       const matchCat = !catFilter || p.categoria === catFilter;
       return matchSearch && matchCat;
     });
-  }, [tituloSearch, form.categoria]);
+  }, [tituloSearch, form.categoria, catalogoCompleto]);
 
   // Select a catalog procedure
-  const selectCatalogProc = (titulo: string) => {
+  const selectCatalogProc = (titulo: string, categoriaForzada?: CategoriaProcedimiento) => {
     setTituloSearch(titulo);
     setForm(prev => ({ ...prev, titulo }));
-    const cat = getCategoriaByTitulo(titulo);
-    if (cat) setForm(prev => ({ ...prev, titulo, categoria: cat }));
+    
+    // Solo asignar categoría automáticamente si:
+    // 1. Se fuerza explícitamente (nuevo título), O
+    // 2. El usuario no ha seleccionado categoría manualmente
+    const catFromCatalog = getCategoriaByTitulo(titulo);
+    if (categoriaForzada) {
+      // Nuevo título añadido: usar la categoría que tenía seleccionada el usuario
+      setForm(prev => ({ ...prev, titulo, categoria: categoriaForzada }));
+    } else if (catFromCatalog && !form.categoria) {
+      // Título existente del catálogo y usuario no ha seleccionado categoría
+      setForm(prev => ({ ...prev, titulo, categoria: catFromCatalog }));
+    }
+    // Si el usuario ya seleccionó categoría manualmente, no la tocamos
+    
     // Auto-load required docs only if no existing docs
     if (docsRequeridos.length === 0) {
       setDocsRequeridos(getDocumentosRequeridos(titulo));
@@ -168,8 +191,8 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
               className="form-input"
             >
               <option value="">Seleccionar categoría...</option>
-              {(Object.keys(CATEGORIA_LABELS) as CategoriaProcedimiento[]).map(cat => (
-                <option key={cat} value={cat}>{CATEGORIA_LABELS[cat]}</option>
+              {(Object.keys(categoriaLabels) as CategoriaProcedimiento[]).map(cat => (
+                <option key={cat} value={cat}>{categoriaLabels[cat]}</option>
               ))}
             </select>
           </div>
@@ -204,7 +227,7 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
                       className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors flex items-center justify-between"
                     >
                       <span>{p.titulo}</span>
-                      <span className="text-xs text-gray-400">{CATEGORIA_LABELS[p.categoria]}</span>
+                      <span className="text-xs text-gray-400">{categoriaLabels[p.categoria] || p.categoria}</span>
                     </button>
                   ))
                 ) : tituloSearch.trim() ? (
@@ -213,19 +236,22 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
                     <button
                       type="button"
                       onClick={() => {
-                        // Añadir al catálogo local (sesión actual)
-                        const nuevo = {
+                        // Añadir al catálogo local (sesión actual) con la categoría seleccionada
+                        const catSeleccionada = (form.categoria || 'otro') as CategoriaProcedimiento;
+                        const nuevo: ProcedimientoCatalogo = {
                           titulo: tituloSearch.trim(),
-                          categoria: (form.categoria || 'otro') as CategoriaProcedimiento,
+                          categoria: catSeleccionada,
                           documentos_requeridos: []
                         };
-                        CATALOGO_PROCEDIMIENTOS.push(nuevo);
-                        selectCatalogProc(nuevo.titulo);
+                        addProcedimientoCatalogo(nuevo);
+                        // Pasar explícitamente la categoría para que se respete
+                        selectCatalogProc(nuevo.titulo, catSeleccionada);
                       }}
                       className="w-full text-left px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors flex items-center gap-2"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       Añadir "{tituloSearch}" al catálogo
+                      {form.categoria && <span className="text-xs text-blue-500">({categoriaLabels[form.categoria]})</span>}
                     </button>
                   </div>
                 ) : null}

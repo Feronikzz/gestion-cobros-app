@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, Home, Users, CreditCard, PieChart, FileText, Calendar, Receipt, TrendingUp, FolderOpen, History, Activity } from 'lucide-react';
+import { Menu, Home, Users, CreditCard, PieChart, FileText, Calendar, Receipt, TrendingUp, FolderOpen, History, Activity, BookOpen } from 'lucide-react';
 import { LogoutButton } from '@/components/logout-button';
 import { NavMobile } from '@/components/nav-mobile';
 
@@ -15,6 +15,7 @@ export function Nav() {
     { href: '/dashboard', label: 'Inicio', icon: Home },
     { href: '/clientes', label: 'Clientes', icon: Users },
     { href: '/expedientes', label: 'Expedientes', icon: FolderOpen },
+    { href: '/catalogo', label: 'Catálogo', icon: BookOpen },
     { href: '/cobros', label: 'Cobros', icon: CreditCard },
     { href: '/gastos', label: 'Gastos', icon: FileText },
     { href: '/finanzas', label: 'Finanzas', icon: TrendingUp },
