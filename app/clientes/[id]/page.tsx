@@ -54,8 +54,10 @@ export default function ClienteDetallePage() {
   const [editingCobro, setEditingCobro] = useState<Cobro | null>(null);
   const [docsIdentidad, setDocsIdentidad] = useState<{tipo:string;numero:string;fecha_expedicion:string;fecha_caducidad:string;es_principal:boolean}[]>([]);
   const [expandedDocChecklist, setExpandedDocChecklist] = useState<string | null>(null);
+  const [expandedFiles, setExpandedFiles] = useState<string | null>(null);
   const [nuevoDocChecklist, setNuevoDocChecklist] = useState<Record<string, string>>({});
   const [uploadProcId, setUploadProcId] = useState<string | null>(null);
+  const [editingDocName, setEditingDocName] = useState<{docId: string; value: string} | null>(null);
   const [uploadingFiles, setUploadingFiles] = useState(false);
 
   // Hooks CRM
@@ -249,9 +251,10 @@ export default function ClienteDetallePage() {
     const newDocs = [...proc.documentos_requeridos];
     newDocs[docIndex] = { ...newDocs[docIndex], adjuntado: !newDocs[docIndex].adjuntado };
     
-    // Verificar si todos los documentos están completos y el estado es 'pendiente'
+    // Verificar si todos los documentos están completos y el estado es 'pendiente' o 'en_proceso'
     const todosAdjuntados = newDocs.every(d => d.adjuntado);
-    const actualizarEstado = todosAdjuntados && proc.estado === 'pendiente';
+    const estadosPermitidosAuto = ['pendiente', 'en_proceso'];
+    const actualizarEstado = todosAdjuntados && estadosPermitidosAuto.includes(proc.estado);
     
     await supabase.from('procedimientos').update({ 
       documentos_requeridos: newDocs,
@@ -448,6 +451,40 @@ export default function ClienteDetallePage() {
     }
   };
 
+  // Descargar todos los archivos de un procedimiento
+  const handleDownloadAllDocs = async (procId: string) => {
+    const docs = docsForProc(procId).filter(d => d.archivo_url);
+    if (docs.length === 0) {
+      alert('No hay archivos para descargar');
+      return;
+    }
+    
+    // Descargar secuencialmente para no saturar el navegador
+    for (const doc of docs) {
+      await handleDownloadDoc(doc);
+      // Pequeña pausa entre descargas
+      await new Promise(r => setTimeout(r, 300));
+    }
+  };
+
+  // Renombrar documento
+  const handleRenameDoc = async (docId: string, nuevoNombre: string) => {
+    if (!supabase) return;
+    if (!nuevoNombre.trim()) return;
+    
+    const { error } = await supabase
+      .from('documentos')
+      .update({ nombre: nuevoNombre.trim() })
+      .eq('id', docId);
+    
+    if (error) {
+      console.error('Error renombrando documento:', error);
+      alert('Error al renombrar: ' + error.message);
+    } else {
+      fetchData();
+    }
+  };
+
   // Subir archivos a un procedimiento
   const handleUploadFilesParaProcedimiento = async (procId: string, files: File[]) => {
     if (!supabase || !id) return;
@@ -474,15 +511,20 @@ export default function ClienteDetallePage() {
           .getPublicUrl(filePath);
         
         // 3. Crear registro en la tabla documentos
-        await supabase.from('documentos').insert({
+        const docPayload = {
           user_id: user.id,
           cliente_id: id,
           procedimiento_id: procId,
           nombre: file.name,
           tipo: fileExt?.toUpperCase() || 'OTRO',
           archivo_url: publicUrl,
-          fecha_subida: new Date().toISOString(),
-        });
+        };
+        console.log('Insertando documento:', docPayload);
+        const { error: docError } = await supabase.from('documentos').insert(docPayload);
+        if (docError) {
+          console.error('Error insertando documento:', docError);
+          throw new Error(`Error al guardar registro: ${docError.message}`);
+        }
       }
       
       setUploadProcId(null);
@@ -710,27 +752,106 @@ export default function ClienteDetallePage() {
                     );
                   })()}
                   {p.notas && <p className="proc-notas">{p.notas}</p>}
-                  {docs.length > 0 && (
-                    <div className="proc-docs">
-                      {docs.map(d => (
-                        <span key={d.id} className="proc-doc-tag">
-                          <Paperclip className="w-3 h-3" /> {d.nombre} ({d.tipo})
-                          <div className="proc-doc-actions">
-                            {d.archivo_url && (
-                              <button 
-                                onClick={() => handleDownloadDoc(d)} 
-                                className="proc-doc-download" 
-                                title="Descargar archivo"
+                  {/* Acordeón de archivos subidos */}
+                  {docs.length > 0 && (() => {
+                    const total = docs.length;
+                    const isOpen = expandedFiles === p.id;
+                    return (
+                      <div className="mt-2 rounded-lg border overflow-hidden border-blue-200">
+                        {/* Cabecera del acordeón */}
+                        <button
+                          type="button"
+                          onClick={() => setExpandedFiles(isOpen ? null : p.id)}
+                          className="w-full flex items-center justify-between p-2 text-xs bg-blue-50 hover:opacity-80 transition-opacity"
+                        >
+                          <div className="flex items-center gap-1.5 font-medium">
+                            <Paperclip className="w-3 h-3" />
+                            Archivos adjuntos: <span className="text-blue-700">{total}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {total > 1 && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownloadAllDocs(p.id);
+                                }}
+                                className="text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                                title="Descargar todos"
                               >
-                                <Download className="w-3 h-3" />
+                                <Download className="w-3.5 h-3.5" />
                               </button>
                             )}
-                            <button onClick={() => handleDeleteDoc(d.id)} className="proc-doc-remove" title="Eliminar">&times;</button>
+                            {isOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                           </div>
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                        </button>
+                        {/* Contenido del acordeón */}
+                        {isOpen && (
+                          <div className="p-2 bg-white space-y-1">
+                            {docs.map(d => (
+                              <div key={d.id} className="flex items-center gap-2 py-1 group border-b border-gray-50 last:border-0">
+                                <Paperclip className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                                {editingDocName?.docId === d.id ? (
+                                  <input
+                                    type="text"
+                                    value={editingDocName.value}
+                                    onChange={(e) => setEditingDocName({ docId: d.id, value: e.target.value })}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        handleRenameDoc(d.id, editingDocName.value);
+                                        setEditingDocName(null);
+                                      }
+                                      if (e.key === 'Escape') {
+                                        setEditingDocName(null);
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      handleRenameDoc(d.id, editingDocName.value);
+                                      setEditingDocName(null);
+                                    }}
+                                    autoFocus
+                                    className="flex-1 text-xs px-1 py-0.5 border border-blue-300 rounded"
+                                  />
+                                ) : (
+                                  <span 
+                                    onClick={() => setEditingDocName({ docId: d.id, value: d.nombre })}
+                                    className="flex-1 text-sm text-gray-700 cursor-pointer hover:text-blue-600 truncate"
+                                    title={`${d.nombre} (${d.tipo}) - Click para renombrar`}
+                                  >
+                                    {d.nombre}
+                                  </span>
+                                )}
+                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => setEditingDocName({ docId: d.id, value: d.nombre })}
+                                    className="text-gray-300 hover:text-blue-600"
+                                    title="Renombrar"
+                                  >
+                                    <Edit className="w-3 h-3" />
+                                  </button>
+                                  {d.archivo_url && (
+                                    <button 
+                                      onClick={() => handleDownloadDoc(d)} 
+                                      className="text-gray-300 hover:text-green-600"
+                                      title="Descargar"
+                                    >
+                                      <Download className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                  <button 
+                                    onClick={() => handleDeleteDoc(d.id)} 
+                                    className="text-gray-300 hover:text-red-500"
+                                    title="Eliminar"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   
                   {/* Botón y zona de subida de archivos */}
                   <div className="mt-2">
