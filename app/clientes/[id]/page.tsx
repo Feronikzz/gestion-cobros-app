@@ -249,7 +249,19 @@ export default function ClienteDetallePage() {
     const newDocs = [...proc.documentos_requeridos];
     newDocs[docIndex] = { ...newDocs[docIndex], adjuntado: !newDocs[docIndex].adjuntado };
     
-    await supabase.from('procedimientos').update({ documentos_requeridos: newDocs }).eq('id', procedimientoId);
+    // Verificar si todos los documentos están completos y el estado es 'pendiente'
+    const todosAdjuntados = newDocs.every(d => d.adjuntado);
+    const actualizarEstado = todosAdjuntados && proc.estado === 'pendiente';
+    
+    await supabase.from('procedimientos').update({ 
+      documentos_requeridos: newDocs,
+      ...(actualizarEstado && { estado: 'pendiente_presentar' })
+    }).eq('id', procedimientoId);
+    
+    if (actualizarEstado) {
+      alert('¡Documentación completa! Estado cambiado a "Pte. presentar"');
+    }
+    
     fetchData();
   };
 
