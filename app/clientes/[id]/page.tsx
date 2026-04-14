@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { eur } from '@/lib/utils';
 import type { Cliente, Procedimiento, Cobro } from '@/lib/supabase/types';
 import type { Documento, EstadoProcedimiento } from '@/lib/supabase/types';
-import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download, Activity, FileSignature, Printer, ChevronUp, ChevronDown, CheckSquare, Square, X } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download, Activity, FileSignature, Printer, ChevronUp, ChevronDown, CheckSquare, Square, X, Eye } from 'lucide-react';
 import { formatField } from '@/lib/utils/text';
 import { ProcedimientoForm } from '@/components/procedimiento-form';
 import { ActividadForm } from '@/components/actividad-form';
@@ -59,6 +59,9 @@ export default function ClienteDetallePage() {
   const [uploadProcId, setUploadProcId] = useState<string | null>(null);
   const [editingDocName, setEditingDocName] = useState<{docId: string; value: string} | null>(null);
   const [uploadingFiles, setUploadingFiles] = useState(false);
+
+  // Previsualización de documentos
+  const [previewDoc, setPreviewDoc] = useState<Documento | null>(null);
 
   // Hooks CRM
   const { actividades, createActividad, updateActividad, deleteActividad, completeActividad, stats: actStats } = useActividades(id);
@@ -829,13 +832,22 @@ export default function ClienteDetallePage() {
                                     <Edit className="w-3 h-3" />
                                   </button>
                                   {d.archivo_url && (
-                                    <button 
-                                      onClick={() => handleDownloadDoc(d)} 
-                                      className="text-gray-300 hover:text-green-600"
-                                      title="Descargar"
-                                    >
-                                      <Download className="w-3 h-3" />
-                                    </button>
+                                    <>
+                                      <button 
+                                        onClick={() => setPreviewDoc(d)} 
+                                        className="text-gray-300 hover:text-blue-600"
+                                        title="Previsualizar"
+                                      >
+                                        <Eye className="w-3 h-3" />
+                                      </button>
+                                      <button 
+                                        onClick={() => handleDownloadDoc(d)} 
+                                        className="text-gray-300 hover:text-green-600"
+                                        title="Descargar"
+                                      >
+                                        <Download className="w-3 h-3" />
+                                      </button>
+                                    </>
                                   )}
                                   <button 
                                     onClick={() => handleDeleteDoc(d.id)} 
@@ -1156,6 +1168,71 @@ export default function ClienteDetallePage() {
           onClose={() => setShowDesignacionModal(false)} 
           onUploaded={() => fetchData()}
         />
+      </Modal>
+
+      {/* ── Modal: Previsualización de Documento ── */}
+      <Modal isOpen={!!previewDoc} onClose={() => setPreviewDoc(null)} title={previewDoc?.nombre || 'Documento'} size="wide">
+        {previewDoc && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <span>Tipo: <span className="font-medium uppercase">{previewDoc.tipo}</span></span>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => handleDownloadDoc(previewDoc)}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Descargar
+                </button>
+              </div>
+            </div>
+            
+            {/* Visualizador según tipo de archivo */}
+            {previewDoc.archivo_url && (
+              <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50" style={{ height: '70vh' }}>
+                {(() => {
+                  const ext = previewDoc.archivo_url?.split('.').pop()?.toLowerCase();
+                  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext || '');
+                  const isPdf = ext === 'pdf';
+                  
+                  if (isImage) {
+                    return (
+                      <img 
+                        src={previewDoc.archivo_url} 
+                        alt={previewDoc.nombre}
+                        className="w-full h-full object-contain"
+                        style={{ maxHeight: '100%' }}
+                      />
+                    );
+                  } else if (isPdf) {
+                    return (
+                      <iframe 
+                        src={`https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(previewDoc.archivo_url)}`}
+                        className="w-full h-full"
+                        title={previewDoc.nombre}
+                      />
+                    );
+                  } else {
+                    return (
+                      <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                        <FileText className="w-16 h-16 text-gray-300 mb-4" />
+                        <p className="text-gray-600 mb-2">Este tipo de archivo no se puede previsualizar</p>
+                        <p className="text-sm text-gray-400 mb-4">{previewDoc.nombre}</p>
+                        <button 
+                          onClick={() => handleDownloadDoc(previewDoc)}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          <Download className="w-4 h-4" />
+                          Descargar archivo
+                        </button>
+                      </div>
+                    );
+                  }
+                })()}
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
 
       {/* ── Modal: Editar datos del cliente ── */}
