@@ -64,6 +64,27 @@ export default function ExpedientesPage() {
   // Catálogo para selectores
   const catalogo = useMemo(() => getCatalogoCompleto(), []);
   const categoriasLabels = useMemo(() => getAllCategoriaLabels(), []);
+  
+  // Catálogo agrupado por categorías para edición inline
+  const catalogoPorCategoria = useMemo(() => {
+    const grouped: Record<string, ProcedimientoCatalogo[]> = {};
+    catalogo.forEach(proc => {
+      const cat = proc.categoria || 'Otro';
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(proc);
+    });
+    return grouped;
+  }, [catalogo]);
+  
+  // Obtener títulos disponibles para una categoría
+  const getTitulosPorCategoria = useCallback((categoria: string | null | undefined) => {
+    if (!categoria || categoria === 'Otro') {
+      // Si no hay categoría, mostrar todos los títulos
+      return catalogo.map(p => ({ value: p.titulo, label: p.titulo }));
+    }
+    const titulos = catalogoPorCategoria[categoria] || [];
+    return titulos.map(p => ({ value: p.titulo, label: p.titulo }));
+  }, [catalogo, catalogoPorCategoria]);
 
   // Aplicar filtros
   const filteredExpedientes = useMemo(() => {
@@ -587,13 +608,51 @@ export default function ExpedientesPage() {
                     <td>
                       {isEditing ? (
                         <div className="space-y-1">
-                          <input
-                            type="text"
-                            value={inlineForm.titulo || ''}
-                            onChange={(e) => setInlineForm({ ...inlineForm, titulo: e.target.value })}
+                          {/* Selector de Categoría */}
+                          <select
+                            value={inlineForm.categoria || ''}
+                            onChange={(e) => {
+                              const newCategoria = e.target.value as CategoriaProcedimiento;
+                              const availableTitles = getTitulosPorCategoria(newCategoria);
+                              // Si el título actual no está en la nueva categoría, limpiarlo
+                              const currentTitleValid = availableTitles.some(t => t.value === inlineForm.titulo);
+                              setInlineForm({ 
+                                ...inlineForm, 
+                                categoria: newCategoria,
+                                titulo: currentTitleValid ? inlineForm.titulo : ''
+                              });
+                            }}
                             className="w-full px-2 py-1 text-sm border border-blue-300 rounded"
-                            placeholder="Título"
-                          />
+                          >
+                            <option value="">Sin categoría</option>
+                            {Object.entries(categoriasLabels).map(([key, label]) => (
+                              <option key={key} value={key}>{label}</option>
+                            ))}
+                          </select>
+                          
+                          {/* Selector de Título (dependiente de categoría) */}
+                          <select
+                            value={inlineForm.titulo || ''}
+                            onChange={(e) => {
+                              const newTitulo = e.target.value;
+                              setInlineForm({ 
+                                ...inlineForm, 
+                                titulo: newTitulo
+                              });
+                            }}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                          >
+                            <option value="">Selecciona título...</option>
+                            {getTitulosPorCategoria(inlineForm.categoria || undefined).map((t) => (
+                              <option key={t.value} value={t.value}>{t.label}</option>
+                            ))}
+                            {/* Opción para título personalizado */}
+                            {inlineForm.titulo && !getTitulosPorCategoria(inlineForm.categoria || undefined).some(t => t.value === inlineForm.titulo) && (
+                              <option value={inlineForm.titulo}>{inlineForm.titulo} (personalizado)</option>
+                            )}
+                          </select>
+                          
+                          {/* Input de Concepto */}
                           <input
                             type="text"
                             value={inlineForm.concepto || ''}
@@ -601,16 +660,6 @@ export default function ExpedientesPage() {
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
                             placeholder="Concepto"
                           />
-                          <select
-                            value={inlineForm.categoria || ''}
-                            onChange={(e) => setInlineForm({ ...inlineForm, categoria: e.target.value as CategoriaProcedimiento })}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
-                          >
-                            <option value="">Sin categoría</option>
-                            {Object.entries(categoriasLabels).map(([key, label]) => (
-                              <option key={key} value={key}>{label}</option>
-                            ))}
-                          </select>
                         </div>
                       ) : (
                         <div>
