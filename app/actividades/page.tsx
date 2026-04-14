@@ -5,22 +5,30 @@ import { LayoutShell } from '@/components/layout-shell';
 import { Modal } from '@/components/modal';
 import { ActividadForm } from '@/components/actividad-form';
 import { ActividadMasivaForm } from '@/components/actividad-masiva-form';
+import { ActividadCompleteDialog } from '@/components/actividad-complete-dialog';
 import { ActividadTimeline } from '@/components/actividad-timeline';
+import { ClienteFormV2 } from '@/components/cliente-form-v2';
 import { useActividades } from '@/lib/hooks/use-actividades';
 import { useClientes } from '@/lib/hooks/use-clientes';
 import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import { createClient } from '@/lib/supabase/client';
-import type { Actividad, ActividadInsert } from '@/lib/supabase/types';
-import { Plus, Activity, Clock, AlertTriangle, Calendar, Users } from 'lucide-react';
+import type { Actividad, ActividadInsert, Cliente } from '@/lib/supabase/types';
+import { Plus, Activity, Clock, AlertTriangle, Calendar, Users, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 
 export default function ActividadesPage() {
   const { actividades, loading, createActividad, updateActividad, deleteActividad, completeActividad, stats, refetch } = useActividades();
-  const { clientes } = useClientes();
+  const { clientes, updateCliente } = useClientes();
   const { procedimientos } = useProcedimientos();
   const [showModal, setShowModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [editingActividad, setEditingActividad] = useState<Actividad | null>(null);
   const [clienteNombres, setClienteNombres] = useState<Record<string, string>>({});
+  // Client detail modal
+  const [showClienteModal, setShowClienteModal] = useState(false);
+  const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
+  // Completion workflow
+  const [completingActividad, setCompletingActividad] = useState<Actividad | null>(null);
 
   // Cargar nombres de clientes para la vista global
   useEffect(() => {
@@ -108,11 +116,18 @@ export default function ActividadesPage() {
         ) : (
           <ActividadTimeline
             actividades={actividades}
-            onComplete={(actId) => { if (window.confirm('¿Marcar como completada?')) completeActividad(actId); }}
+            onComplete={(actId) => {
+              const act = actividades.find(a => a.id === actId);
+              if (act) setCompletingActividad(act);
+            }}
             onEdit={(act) => { setEditingActividad(act); setShowModal(true); }}
             onDelete={(actId) => { if (window.confirm('¿Eliminar esta actividad?')) deleteActividad(actId); }}
             showCliente
             clienteNombres={clienteNombres}
+            onClienteClick={(clienteId) => {
+              const c = clientes.find(cl => cl.id === clienteId);
+              if (c) { setViewingCliente(c); setShowClienteModal(true); }
+            }}
           />
         )}
       </div>
@@ -132,6 +147,63 @@ export default function ActividadesPage() {
           }}
           onCancel={() => { setShowModal(false); setEditingActividad(null); }}
         />
+      </Modal>
+
+      {/* Modal completar actividad */}
+      <Modal
+        isOpen={!!completingActividad}
+        onClose={() => setCompletingActividad(null)}
+        title="Completar actividad"
+      >
+        {completingActividad && (
+          <ActividadCompleteDialog
+            actividad={completingActividad}
+            clienteNombre={completingActividad.cliente_id ? clienteNombres[completingActividad.cliente_id] : undefined}
+            onComplete={async (resultado) => {
+              await completeActividad(completingActividad.id, resultado || undefined);
+              setCompletingActividad(null);
+            }}
+            onCompleteAndSchedule={async (resultado, nuevaAct) => {
+              await completeActividad(completingActividad.id, resultado || undefined);
+              await createActividad(nuevaAct);
+              setCompletingActividad(null);
+            }}
+            onCancel={() => setCompletingActividad(null)}
+          />
+        )}
+      </Modal>
+
+      {/* Modal ficha cliente */}
+      <Modal
+        isOpen={showClienteModal}
+        onClose={() => { setShowClienteModal(false); setViewingCliente(null); }}
+        title={viewingCliente ? `${[viewingCliente.nombre, viewingCliente.apellidos].filter(Boolean).join(' ')}` : 'Cliente'}
+        size="wide"
+        confirmClose
+      >
+        {viewingCliente && (
+          <div>
+            <div className="flex justify-end mb-3">
+              <Link
+                href={`/clientes/${viewingCliente.id}`}
+                className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                target="_blank"
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> Abrir ficha completa
+              </Link>
+            </div>
+            <ClienteFormV2
+              cliente={viewingCliente}
+              onSubmit={async (data, _docs, _proc) => {
+                await updateCliente(viewingCliente.id, data);
+                setShowClienteModal(false);
+                setViewingCliente(null);
+              }}
+              onCancel={() => { setShowClienteModal(false); setViewingCliente(null); }}
+              allowProcedimiento={false}
+            />
+          </div>
+        )}
       </Modal>
 
       {/* Modal masiva */}

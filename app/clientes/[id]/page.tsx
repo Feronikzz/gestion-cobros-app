@@ -19,6 +19,7 @@ import { DesignacionRepresentante } from '@/components/designacion-representante
 import { RecibiGenerator } from '@/components/recibi-generator';
 import { RecibiFormInline } from '@/components/recibi-form';
 import { ClienteFormV2 } from '@/components/cliente-form-v2';
+import { CarpetaLocalViewer } from '@/components/carpeta-local-viewer';
 import { useActividades } from '@/lib/hooks/use-actividades';
 import { useRecibis } from '@/lib/hooks/use-recibis';
 import type { Actividad, Recibi, RecibiInsert, ClienteInsert, ClienteUpdate } from '@/lib/supabase/types';
@@ -442,11 +443,14 @@ export default function ClienteDetallePage() {
                 href={`file:///${cliente.carpeta_local.replace(/\\/g, '/')}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="detail-value text-blue-600 hover:text-blue-800 underline cursor-pointer inline-flex items-center gap-1"
+                className="detail-value text-blue-600 hover:text-blue-800 underline cursor-pointer inline-flex items-center gap-1 mb-2"
                 title="Abrir carpeta local"
               >
                 📁 {cliente.carpeta_local}
               </a>
+              <div className="mt-2">
+                <CarpetaLocalViewer basePath={cliente.carpeta_local} />
+              </div>
             </div>
           )}
         </div>

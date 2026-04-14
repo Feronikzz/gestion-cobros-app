@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { Actividad, TipoActividad, EstadoActividad } from '@/lib/supabase/types';
 import { TIPO_ICONS, TIPO_LABELS, PRIORIDAD_COLORS } from '@/components/actividad-form';
-import { Check, X, Clock, Edit, Trash2, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { Check, X, Clock, Edit, Trash2, ChevronDown, ChevronUp, AlertTriangle, User, ExternalLink } from 'lucide-react';
 
 const ESTADO_ICONS: Record<EstadoActividad, React.ReactNode> = {
   pendiente: <Clock className="w-3.5 h-3.5 text-yellow-600" />,
@@ -26,9 +26,10 @@ interface ActividadTimelineProps {
   onDelete: (id: string) => void;
   showCliente?: boolean;
   clienteNombres?: Record<string, string>;
+  onClienteClick?: (clienteId: string) => void;
 }
 
-export function ActividadTimeline({ actividades, onComplete, onEdit, onDelete, showCliente, clienteNombres }: ActividadTimelineProps) {
+export function ActividadTimeline({ actividades, onComplete, onEdit, onDelete, showCliente, clienteNombres, onClienteClick }: ActividadTimelineProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'todas' | 'pendientes' | 'completadas'>('todas');
 
@@ -136,7 +137,15 @@ export function ActividadTimeline({ actividades, onComplete, onEdit, onDelete, s
                           )}
                           {a.duracion_minutos && <span>{a.duracion_minutos} min</span>}
                           {showCliente && a.cliente_id && clienteNombres?.[a.cliente_id] && (
-                            <span className="text-blue-600">{clienteNombres[a.cliente_id]}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); onClienteClick?.(a.cliente_id!); }}
+                              className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                              title="Ver ficha del cliente"
+                            >
+                              <User className="w-3 h-3" />
+                              {clienteNombres[a.cliente_id]}
+                            </button>
                           )}
                         </div>
                       </div>
