@@ -12,10 +12,9 @@ import {
   updateProcedimientoCatalogo,
   deleteProcedimientoCatalogo,
   getAllCategoriaLabels,
-  type ProcedimientoCatalogo,
-  type CategoriaProcedimiento 
+  type ProcedimientoCatalogo
 } from '@/lib/catalogo-procedimientos';
-import type { DocumentoRequerido } from '@/lib/supabase/types';
+import type { DocumentoRequerido, CategoriaProcedimiento } from '@/lib/supabase/types';
 import { 
   Plus, 
   Edit2, 
