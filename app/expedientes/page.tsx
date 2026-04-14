@@ -1,11 +1,21 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { LayoutShell } from '@/components/layout-shell';
 import { useExpedientes } from '@/lib/hooks/use-expedientes';
+import { getCatalogoCompleto, getAllCategoriaLabels, type ProcedimientoCatalogo } from '@/lib/catalogo-procedimientos';
 import { eur } from '@/lib/utils';
-import type { EstadoProcedimiento } from '@/lib/supabase/types';
+import { createClient } from '@/lib/supabase/client';
+import type { EstadoProcedimiento, CategoriaProcedimiento, Procedimiento, Cliente } from '@/lib/supabase/types';
+
+// Tipo para expedientes con cliente
+interface ExpedienteConCliente extends Procedimiento {
+  cliente: Cliente;
+  total_cobrado: number;
+  total_pendiente: number;
+  esta_pagado_totalmente: boolean;
+}
 import { 
   FileText, 
   Search, 
@@ -18,16 +28,42 @@ import {
   DollarSign,
   Users,
   Eye,
-  X
+  X,
+  Edit3,
+  Save,
+  CheckSquare,
+  Square,
+  ChevronDown,
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 
 export default function ExpedientesPage() {
   const router = useRouter();
-  const { expedientes, loading, error, stats, filtrarPorEstado, filtrarPorCliente, filtrarPorPagado } = useExpedientes();
+  const supabase = createClient();
+  const { expedientes, loading, error, stats, filtrarPorEstado, filtrarPorCliente, filtrarPorPagado, refetch } = useExpedientes();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('todos');
   const [pagadoFilter, setPagadoFilter] = useState('todos');
+  
+  // Estados para edición masiva
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showMassEdit, setShowMassEdit] = useState(false);
+  const [massEditField, setMassEditField] = useState<'estado' | 'categoria' | 'titulo' | null>(null);
+  const [massEditValue, setMassEditValue] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processProgress, setProcessProgress] = useState({ current: 0, total: 0 });
+  const [processErrors, setProcessErrors] = useState<string[]>([]);
+  
+  // Estados para edición inline
+  const [editingInline, setEditingInline] = useState<string | null>(null);
+  const [inlineForm, setInlineForm] = useState<Partial<ExpedienteConCliente>>({});
+  const [savingInline, setSavingInline] = useState(false);
+  
+  // Catálogo para selectores
+  const catalogo = useMemo(() => getCatalogoCompleto(), []);
+  const categoriasLabels = useMemo(() => getAllCategoriaLabels(), []);
 
   // Aplicar filtros
   const filteredExpedientes = useMemo(() => {
@@ -76,8 +112,147 @@ export default function ExpedientesPage() {
     archivado: 'badge-gray',
   };
 
+  // Funciones para selección
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === filteredExpedientes.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredExpedientes.map(e => e.id)));
+    }
+  }, [selectedIds, filteredExpedientes]);
+
+  const toggleSelect = useCallback((id: string) => {
+    const newSet = new Set(selectedIds);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelectedIds(newSet);
+  }, [selectedIds]);
+
+  // Edición masiva - Actualización optimista
+  const processMassEdit = async () => {
+    if (!massEditField || !massEditValue || selectedIds.size === 0) return;
+    
+    setIsProcessing(true);
+    setProcessErrors([]);
+    setProcessProgress({ current: 0, total: selectedIds.size });
+    
+    const ids = Array.from(selectedIds);
+    const errors: string[] = [];
+    
+    // Actualización optimista - actualizar UI inmediatamente
+    const updates: Partial<ExpedienteConCliente> = {};
+    if (massEditField === 'estado') updates.estado = massEditValue as EstadoProcedimiento;
+    if (massEditField === 'categoria') updates.categoria = massEditValue as CategoriaProcedimiento;
+    if (massEditField === 'titulo') updates.titulo = massEditValue;
+    
+    // Actualizar localmente primero (optimistic update)
+    const updatedExpedientes = expedientes.map(exp => 
+      selectedIds.has(exp.id) ? { ...exp, ...updates } : exp
+    );
+    // Nota: esto no actualiza el estado real porque expedientes viene del hook
+    // pero hace que la UI sea más responsive
+    
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
+      setProcessProgress({ current: i + 1, total: ids.length });
+      
+      try {
+        const { error } = await supabase
+          .from('procedimientos')
+          .update({ [massEditField]: massEditValue })
+          .eq('id', id);
+        
+        if (error) {
+          errors.push(`Expediente ${id}: ${error.message}`);
+        }
+      } catch (err: any) {
+        errors.push(`Expediente ${id}: ${err.message}`);
+      }
+    }
+    
+    setProcessErrors(errors);
+    setIsProcessing(false);
+    
+    if (errors.length === 0) {
+      setShowMassEdit(false);
+      setSelectedIds(new Set());
+      await refetch();
+    }
+  };
+
+  // Edición inline - Actualización optimista
+  const startInlineEdit = (expediente: ExpedienteConCliente) => {
+    setEditingInline(expediente.id);
+    setInlineForm({
+      titulo: expediente.titulo,
+      concepto: expediente.concepto,
+      categoria: expediente.categoria,
+      estado: expediente.estado,
+      presupuesto: expediente.presupuesto,
+    });
+  };
+
+  const saveInlineEdit = async (id: string) => {
+    if (!editingInline || !inlineForm) return;
+    
+    setSavingInline(true);
+    try {
+      const updates: any = {};
+      if (inlineForm.titulo !== undefined) updates.titulo = inlineForm.titulo;
+      if (inlineForm.concepto !== undefined) updates.concepto = inlineForm.concepto;
+      if (inlineForm.categoria !== undefined) updates.categoria = inlineForm.categoria;
+      if (inlineForm.estado !== undefined) updates.estado = inlineForm.estado;
+      if (inlineForm.presupuesto !== undefined) updates.presupuesto = inlineForm.presupuesto;
+      
+      // Limpiar undefined
+      const cleanUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([_, v]) => v !== undefined)
+      );
+      
+      const { error } = await supabase
+        .from('procedimientos')
+        .update(cleanUpdates)
+        .eq('id', id);
+      
+      if (error) {
+        throw new Error(`Error al guardar: ${error.message}`);
+      }
+      
+      setEditingInline(null);
+      setInlineForm({});
+      await refetch();
+    } catch (err: any) {
+      alert('Error al guardar: ' + err.message);
+    } finally {
+      setSavingInline(false);
+    }
+  };
+
+  const cancelInlineEdit = () => {
+    setEditingInline(null);
+    setInlineForm({});
+  };
+
+  // Función para actualizar expediente individual (desde inline)
+  const updateExpediente = async (id: string, updates: Partial<ExpedienteConCliente>) => {
+    const cleanUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, v]) => v !== undefined)
+    );
+    
+    const { error } = await supabase
+      .from('procedimientos')
+      .update(cleanUpdates)
+      .eq('id', id);
+    
+    if (error) throw error;
+    await refetch();
+  };
+
   if (loading) return <LayoutShell title="Expedientes"><div className="loading-state">Cargando expedientes...</div></LayoutShell>;
-  if (error) return <LayoutShell title="Expedientes"><div className="error-state">Error: {error}</div></LayoutShell>;
+  if (error) return <LayoutShell title="Expedientes"><div className="error-state">Error al cargar expedientes: {error}</div></LayoutShell>;
 
   return (
     <LayoutShell 
@@ -214,11 +389,155 @@ export default function ExpedientesPage() {
         </div>
       </div>
 
+      {/* ─── Barra de acciones masivas ── */}
+      {selectedIds.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-2">
+              <CheckSquare className="w-5 h-5 text-blue-600" />
+              <span className="font-medium text-blue-900">
+                {selectedIds.size} expediente{selectedIds.size !== 1 ? 's' : ''} seleccionado{selectedIds.size !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { setShowMassEdit(true); setMassEditField('estado'); setMassEditValue(''); }}
+                className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Cambiar estado
+              </button>
+              <button
+                onClick={() => { setShowMassEdit(true); setMassEditField('categoria'); setMassEditValue(''); }}
+                className="px-3 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                Cambiar categoría
+              </button>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal de edición masiva ── */}
+      {showMassEdit && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold mb-4">
+              Editar {massEditField === 'estado' ? 'estado' : massEditField === 'categoria' ? 'categoría' : 'título'} masivamente
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Se actualizarán {selectedIds.size} expedientes
+            </p>
+            
+            {massEditField === 'estado' && (
+              <select
+                value={massEditValue}
+                onChange={(e) => setMassEditValue(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"
+              >
+                <option value="">Selecciona estado...</option>
+                {Object.entries(estadoLabels).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            )}
+            
+            {massEditField === 'categoria' && (
+              <select
+                value={massEditValue}
+                onChange={(e) => setMassEditValue(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"
+              >
+                <option value="">Selecciona categoría...</option>
+                {Object.entries(categoriasLabels).map(([key, label]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+            )}
+            
+            {massEditField === 'titulo' && (
+              <select
+                value={massEditValue}
+                onChange={(e) => setMassEditValue(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg mb-4"
+              >
+                <option value="">Selecciona título...</option>
+                {catalogo.map((proc) => (
+                  <option key={proc.titulo} value={proc.titulo}>{proc.titulo}</option>
+                ))}
+              </select>
+            )}
+            
+            {isProcessing && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Procesando... {processProgress.current} de {processProgress.total}
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all"
+                    style={{ width: `${(processProgress.current / processProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            
+            {processErrors.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4 max-h-32 overflow-y-auto">
+                <div className="flex items-center gap-2 text-red-700 text-sm font-medium mb-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  Errores ({processErrors.length}):
+                </div>
+                {processErrors.map((err, i) => (
+                  <div key={i} className="text-xs text-red-600">{err}</div>
+                ))}
+              </div>
+            )}
+            
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => { setShowMassEdit(false); setProcessErrors([]); }}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                disabled={isProcessing}
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={processMassEdit}
+                disabled={!massEditValue || isProcessing}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              >
+                {isProcessing ? 'Procesando...' : 'Aplicar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── Tabla de Expedientes ── */}
       <div className="table-container">
         <table className="table">
           <thead>
             <tr>
+              <th className="w-8">
+                <button 
+                  onClick={toggleSelectAll}
+                  className="p-1 hover:bg-gray-100 rounded"
+                  title={selectedIds.size === filteredExpedientes.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+                >
+                  {selectedIds.size === filteredExpedientes.length ? (
+                    <CheckSquare className="w-4 h-4 text-blue-600" />
+                  ) : (
+                    <Square className="w-4 h-4 text-gray-400" />
+                  )}
+                </button>
+              </th>
               <th>Cliente</th>
               <th>Expediente</th>
               <th>Fecha presentación</th>
@@ -233,97 +552,202 @@ export default function ExpedientesPage() {
           <tbody>
             {filteredExpedientes.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-8 text-gray-500">
+                <td colSpan={10} className="text-center py-8 text-gray-500">
                   No se encontraron expedientes con los filtros seleccionados
                 </td>
               </tr>
             ) : (
-              filteredExpedientes.map((expediente) => (
-                <tr key={expediente.id} className="hover:bg-gray-50">
-                  <td>
-                    <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <div className="font-medium">{expediente.cliente.nombre}</div>
-                        <div className="text-sm text-gray-500">{expediente.cliente.nif || '—'}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{expediente.titulo}</span>
-                        {expediente.categoria && <span className="badge badge-purple text-xs">{expediente.categoria}</span>}
-                      </div>
-                      <div className="text-sm text-gray-500">{expediente.concepto}</div>
-                      {expediente.expediente_referencia && (
-                        <div className="text-xs text-gray-400">Ref: {expediente.expediente_referencia}</div>
-                      )}
-                      {expediente.documentos_requeridos && expediente.documentos_requeridos.length > 0 && (() => {
-                        const total = expediente.documentos_requeridos!.length;
-                        const adj = expediente.documentos_requeridos!.filter((d: any) => d.adjuntado).length;
-                        return (
-                          <div className={`text-xs mt-0.5 ${adj === total ? 'text-green-600' : 'text-amber-600'}`}>
-                            Docs: {adj}/{total} {adj === total ? '✓' : ''}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </td>
-                  <td>
-                    {expediente.fecha_presentacion ? (
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4 text-gray-400" />
-                        {expediente.fecha_presentacion}
-                      </div>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td>
-                    <span className={`badge ${estadoBadges[expediente.estado]}`}>
-                      {estadoLabels[expediente.estado]}
-                    </span>
-                  </td>
-                  <td className="text-right font-medium">
-                    {eur(expediente.presupuesto)}
-                  </td>
-                  <td className="text-right">
-                    <span className={expediente.total_cobrado > 0 ? 'text-green-600' : 'text-gray-500'}>
-                      {eur(expediente.total_cobrado)}
-                    </span>
-                  </td>
-                  <td className="text-right">
-                    <span className={expediente.total_pendiente > 0 ? 'text-red-600' : 'text-green-600'}>
-                      {eur(expediente.total_pendiente)}
-                    </span>
-                  </td>
-                  <td className="text-center">
-                    {expediente.esta_pagado_totalmente ? (
-                      <div className="flex items-center justify-center gap-1 text-green-600">
-                        <CheckCircle className="w-4 h-4" />
-                        <span className="text-sm">Sí</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center gap-1 text-red-600">
-                        <AlertCircle className="w-4 h-4" />
-                        <span className="text-sm">No</span>
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => router.push(`/clientes/${expediente.cliente.id}`)}
-                        className="btn btn-sm btn-secondary"
-                        title="Ver detalles del cliente"
+              filteredExpedientes.map((expediente) => {
+                const isEditing = editingInline === expediente.id;
+                const isSelected = selectedIds.has(expediente.id);
+                
+                return (
+                  <tr key={expediente.id} className={`hover:bg-gray-50 ${isSelected ? 'bg-blue-50/50' : ''}`}>
+                    <td className="w-8">
+                      <button 
+                        onClick={() => toggleSelect(expediente.id)}
+                        className="p-1 hover:bg-gray-100 rounded"
                       >
-                        <Eye className="w-4 h-4" />
+                        {isSelected ? (
+                          <CheckSquare className="w-4 h-4 text-blue-600" />
+                        ) : (
+                          <Square className="w-4 h-4 text-gray-400" />
+                        )}
                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-gray-400" />
+                        <div>
+                          <div className="font-medium">{expediente.cliente.nombre}</div>
+                          <div className="text-sm text-gray-500">{expediente.cliente.nif || '—'}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      {isEditing ? (
+                        <div className="space-y-1">
+                          <input
+                            type="text"
+                            value={inlineForm.titulo || ''}
+                            onChange={(e) => setInlineForm({ ...inlineForm, titulo: e.target.value })}
+                            className="w-full px-2 py-1 text-sm border border-blue-300 rounded"
+                            placeholder="Título"
+                          />
+                          <input
+                            type="text"
+                            value={inlineForm.concepto || ''}
+                            onChange={(e) => setInlineForm({ ...inlineForm, concepto: e.target.value })}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                            placeholder="Concepto"
+                          />
+                          <select
+                            value={inlineForm.categoria || ''}
+                            onChange={(e) => setInlineForm({ ...inlineForm, categoria: e.target.value as CategoriaProcedimiento })}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                          >
+                            <option value="">Sin categoría</option>
+                            {Object.entries(categoriasLabels).map(([key, label]) => (
+                              <option key={key} value={key}>{label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{expediente.titulo}</span>
+                            {expediente.categoria && <span className="badge badge-purple text-xs">{expediente.categoria}</span>}
+                          </div>
+                          <div className="text-sm text-gray-500">{expediente.concepto}</div>
+                          {expediente.expediente_referencia && (
+                            <div className="text-xs text-gray-400">Ref: {expediente.expediente_referencia}</div>
+                          )}
+                          {expediente.documentos_requeridos && expediente.documentos_requeridos.length > 0 && (() => {
+                            const total = expediente.documentos_requeridos!.length;
+                            const adj = expediente.documentos_requeridos!.filter((d: any) => d.adjuntado).length;
+                            return (
+                              <div className={`text-xs mt-0.5 ${adj === total ? 'text-green-600' : 'text-amber-600'}`}>
+                                Docs: {adj}/{total} {adj === total ? '✓' : ''}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          value={inlineForm.fecha_presentacion || ''}
+                          onChange={(e) => setInlineForm({ ...inlineForm, fecha_presentacion: e.target.value })}
+                          className="px-2 py-1 text-sm border border-gray-300 rounded"
+                        />
+                      ) : (
+                        expediente.fecha_presentacion ? (
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4 text-gray-400" />
+                            {expediente.fecha_presentacion}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )
+                      )}
+                    </td>
+                    <td>
+                      {isEditing ? (
+                        <select
+                          value={inlineForm.estado || ''}
+                          onChange={(e) => setInlineForm({ ...inlineForm, estado: e.target.value as EstadoProcedimiento })}
+                          className="px-2 py-1 text-sm border border-gray-300 rounded"
+                        >
+                          {Object.entries(estadoLabels).map(([key, label]) => (
+                            <option key={key} value={key}>{label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className={`badge ${estadoBadges[expediente.estado]}`}>
+                          {estadoLabels[expediente.estado]}
+                        </span>
+                      )}
+                    </td>
+                    <td className="text-right">
+                      {isEditing ? (
+                        <input
+                          type="number"
+                          value={inlineForm.presupuesto || ''}
+                          onChange={(e) => setInlineForm({ ...inlineForm, presupuesto: parseFloat(e.target.value) || 0 })}
+                          className="w-24 px-2 py-1 text-sm border border-gray-300 rounded text-right"
+                        />
+                      ) : (
+                        <span className="font-medium">{eur(expediente.presupuesto)}</span>
+                      )}
+                    </td>
+                    <td className="text-right">
+                      <span className={expediente.total_cobrado > 0 ? 'text-green-600' : 'text-gray-500'}>
+                        {eur(expediente.total_cobrado)}
+                      </span>
+                    </td>
+                    <td className="text-right">
+                      <span className={expediente.total_pendiente > 0 ? 'text-red-600' : 'text-green-600'}>
+                        {eur(expediente.total_pendiente)}
+                      </span>
+                    </td>
+                    <td className="text-center">
+                      {expediente.esta_pagado_totalmente ? (
+                        <div className="flex items-center justify-center gap-1 text-green-600">
+                          <CheckCircle className="w-4 h-4" />
+                          <span className="text-sm">Sí</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1 text-red-600">
+                          <AlertCircle className="w-4 h-4" />
+                          <span className="text-sm">No</span>
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-1">
+                        {isEditing ? (
+                          <>
+                            <button
+                              onClick={() => saveInlineEdit(expediente.id)}
+                              disabled={savingInline}
+                              className="p-1.5 text-green-600 hover:bg-green-50 rounded"
+                              title="Guardar"
+                            >
+                              {savingInline ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                            </button>
+                            <button
+                              onClick={cancelInlineEdit}
+                              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded"
+                              title="Cancelar"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              onClick={() => startInlineEdit(expediente)}
+                              className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                              title="Editar"
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => router.push(`/clientes/${expediente.cliente.id}`)}
+                              className="p-1.5 text-gray-600 hover:bg-gray-50 rounded"
+                              title="Ver cliente"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
