@@ -1,10 +1,15 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { LayoutShell } from '@/components/layout-shell';
 import { useExpedientes } from '@/lib/hooks/use-expedientes';
-import { getCatalogoCompleto, getAllCategoriaLabels, type ProcedimientoCatalogo } from '@/lib/catalogo-procedimientos';
+import { 
+  getCatalogoCompleto, 
+  getAllCategoriaLabels, 
+  type ProcedimientoCatalogo,
+  CATEGORIA_LABELS
+} from '@/lib/catalogo-procedimientos';
 import { eur } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import type { EstadoProcedimiento, CategoriaProcedimiento, Procedimiento, Cliente } from '@/lib/supabase/types';
@@ -61,9 +66,30 @@ export default function ExpedientesPage() {
   const [inlineForm, setInlineForm] = useState<Partial<ExpedienteConCliente>>({});
   const [savingInline, setSavingInline] = useState(false);
   
-  // Catálogo para selectores
-  const catalogo = useMemo(() => getCatalogoCompleto(), []);
-  const categoriasLabels = useMemo(() => getAllCategoriaLabels(), []);
+  // Catálogo desde Supabase (async)
+  const [catalogo, setCatalogo] = useState<ProcedimientoCatalogo[]>([]);
+  const [categoriasLabels, setCategoriasLabels] = useState<Record<string, string>>(CATEGORIA_LABELS);
+  const [catalogoLoading, setCatalogoLoading] = useState(true);
+  
+  // Cargar catálogo al montar
+  useEffect(() => {
+    const loadCatalogo = async () => {
+      setCatalogoLoading(true);
+      try {
+        const [catData, labelsData] = await Promise.all([
+          getCatalogoCompleto(),
+          getAllCategoriaLabels()
+        ]);
+        setCatalogo(catData);
+        setCategoriasLabels(labelsData);
+      } catch (err) {
+        console.error('Error cargando catálogo:', err);
+      } finally {
+        setCatalogoLoading(false);
+      }
+    };
+    loadCatalogo();
+  }, []);
   
   // Catálogo agrupado por categorías para edición inline
   const catalogoPorCategoria = useMemo(() => {
@@ -76,7 +102,7 @@ export default function ExpedientesPage() {
     return grouped;
   }, [catalogo]);
   
-  // Obtener títulos disponibles para una categoría
+  // Obtener títulos disponibles para una categoría (síncrono - usa cache local)
   const getTitulosPorCategoria = useCallback((categoria: string | null | undefined) => {
     if (!categoria || categoria === 'Otro') {
       // Si no hay categoría, mostrar todos los títulos

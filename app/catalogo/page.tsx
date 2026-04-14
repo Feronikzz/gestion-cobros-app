@@ -7,11 +7,13 @@ import {
   CATEGORIA_LABELS, 
   getCatalogoCompleto,
   getCategoriasCustom,
-  saveCategoriasCustom,
+  saveCategoriaCustom,
+  deleteCategoriaCustom,
   addProcedimientoCatalogo,
   updateProcedimientoCatalogo,
   deleteProcedimientoCatalogo,
   getAllCategoriaLabels,
+  invalidateCache,
   type ProcedimientoCatalogo
 } from '@/lib/catalogo-procedimientos';
 import type { DocumentoRequerido, CategoriaProcedimiento } from '@/lib/supabase/types';
@@ -53,22 +55,46 @@ export default function CatalogoPage() {
   const [nuevaCategoriaNombre, setNuevaCategoriaNombre] = useState('');
   const [nuevaCategoriaId, setNuevaCategoriaId] = useState('');
 
-  // Cargar datos al montar
+  // Cargar datos al montar (async desde Supabase)
   useEffect(() => {
-    setCatalogo(getCatalogoCompleto());
-    setCategoriasCustom(getCategoriasCustom());
-    setLoading(false);
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [catalogoData, categoriasData] = await Promise.all([
+          getCatalogoCompleto(),
+          getCategoriasCustom()
+        ]);
+        setCatalogo(catalogoData);
+        setCategoriasCustom(categoriasData);
+      } catch (err) {
+        console.error('Error cargando catálogo:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
   }, []);
 
-  // Recargar cuando cambian las dependencias de localStorage
-  const recargarCatalogo = () => {
-    setCatalogo(getCatalogoCompleto());
-    setCategoriasCustom(getCategoriasCustom());
+  // Recargar datos desde Supabase
+  const recargarCatalogo = async () => {
+    invalidateCache();
+    const [catalogoData, categoriasData] = await Promise.all([
+      getCatalogoCompleto(),
+      getCategoriasCustom()
+    ]);
+    setCatalogo(catalogoData);
+    setCategoriasCustom(categoriasData);
   };
 
-  // Categorías combinadas (defaults + custom)
-  const todasCategorias = useMemo(() => {
-    return getAllCategoriaLabels();
+  // Categorías combinadas (defaults + custom) - ahora async
+  const [todasCategorias, setTodasCategorias] = useState<Record<string, string>>(CATEGORIA_LABELS);
+  
+  useEffect(() => {
+    const loadCategorias = async () => {
+      const cats = await getAllCategoriaLabels();
+      setTodasCategorias(cats);
+    };
+    loadCategorias();
   }, [categoriasCustom]);
 
   // Agrupar por categoría
@@ -96,7 +122,7 @@ export default function CatalogoPage() {
     });
   };
 
-  const handleAddProc = () => {
+  const handleAddProc = async () => {
     if (!formTitulo.trim()) return;
     
     const nuevo: ProcedimientoCatalogo = {
@@ -105,8 +131,9 @@ export default function CatalogoPage() {
       documentos_requeridos: formDocs,
     };
     
-    if (addProcedimientoCatalogo(nuevo)) {
-      recargarCatalogo();
+    const success = await addProcedimientoCatalogo(nuevo);
+    if (success) {
+      await recargarCatalogo();
       resetForm();
       setShowAddModal(false);
     } else {
@@ -114,7 +141,7 @@ export default function CatalogoPage() {
     }
   };
 
-  const handleUpdateProc = () => {
+  const handleUpdateProc = async () => {
     if (!editingProc || !formTitulo.trim()) return;
     
     const actualizado: ProcedimientoCatalogo = {
@@ -123,46 +150,45 @@ export default function CatalogoPage() {
       documentos_requeridos: formDocs,
     };
     
-    if (updateProcedimientoCatalogo(editingProc.titulo, actualizado)) {
-      recargarCatalogo();
+    const success = await updateProcedimientoCatalogo(editingProc.titulo, actualizado);
+    if (success) {
+      await recargarCatalogo();
       resetForm();
       setEditingProc(null);
       setShowAddModal(false);
     }
   };
 
-  const handleDeleteProc = (titulo: string) => {
+  const handleDeleteProc = async (titulo: string) => {
     if (!window.confirm(`¿Eliminar "${titulo}" del catálogo?`)) return;
-    deleteProcedimientoCatalogo(titulo);
-    recargarCatalogo();
+    await deleteProcedimientoCatalogo(titulo);
+    await recargarCatalogo();
   };
 
-  const handleAddCategoria = () => {
+  const handleAddCategoria = async () => {
     if (!nuevaCategoriaId.trim() || !nuevaCategoriaNombre.trim()) return;
     
     const id = nuevaCategoriaId.toLowerCase().replace(/\s+/g, '_');
-    const nuevasCats = {
-      ...categoriasCustom,
-      [id]: nuevaCategoriaNombre.trim()
-    };
-    setCategoriasCustom(nuevasCats);
-    saveCategoriasCustom(nuevasCats);
-    setNuevaCategoriaId('');
-    setNuevaCategoriaNombre('');
-    setShowAddCategoriaModal(false);
+    const success = await saveCategoriaCustom(id, nuevaCategoriaNombre.trim());
+    if (success) {
+      await recargarCatalogo();
+      setNuevaCategoriaId('');
+      setNuevaCategoriaNombre('');
+      setShowAddCategoriaModal(false);
+    } else {
+      alert('Error al guardar la categoría');
+    }
   };
 
-  const handleDeleteCategoria = (catId: string) => {
-    if (!window.confirm(`¿Eliminar la categoría "${todasCategorias[catId]}"? Los procedimientos pasarán a "Otro".`)) return;
+  const handleDeleteCategoria = async (catId: string) => {
+    if (!window.confirm(`¿Eliminar la categoría "${todasCategorias[catId]}"? Los procedimientos pasarán a "Otro".\n\nIMPORTANTE: Esto no se puede deshacer.`)) return;
     
-    // Eliminar de custom
-    const { [catId]: _, ...rest } = categoriasCustom;
-    setCategoriasCustom(rest);
-    saveCategoriasCustom(rest);
-    
-    // Los procedimientos de esa categoría quedarán con una categoría que ya no existe
-    // Al recargar se mostrarán con el ID de categoría directamente
-    recargarCatalogo();
+    const success = await deleteCategoriaCustom(catId);
+    if (success) {
+      await recargarCatalogo();
+    } else {
+      alert('Error al eliminar la categoría');
+    }
   };
 
   const addDocToForm = () => {

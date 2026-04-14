@@ -9,7 +9,9 @@ import {
   getDocumentosRequeridos, 
   getCategoriaByTitulo,
   addProcedimientoCatalogo,
-  type ProcedimientoCatalogo
+  invalidateCache,
+  type ProcedimientoCatalogo,
+  CATEGORIA_LABELS
 } from '@/lib/catalogo-procedimientos';
 import { Search, CheckSquare, Square, Plus, X, FileText } from 'lucide-react';
 
@@ -80,9 +82,29 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Catálogo completo (incluye custom añadidos desde la página de catálogo)
-  const catalogoCompleto = useMemo(() => getCatalogoCompleto(), []);
-  const categoriaLabels = useMemo(() => getAllCategoriaLabels(), []);
+  // Catálogo completo - ahora async desde Supabase
+  const [catalogoCompleto, setCatalogoCompleto] = useState<ProcedimientoCatalogo[]>([]);
+  const [categoriaLabels, setCategoriaLabels] = useState<Record<string, string>>(CATEGORIA_LABELS);
+  const [catalogoLoading, setCatalogoLoading] = useState(true);
+  
+  useEffect(() => {
+    const loadCatalogo = async () => {
+      setCatalogoLoading(true);
+      try {
+        const [catalogo, labels] = await Promise.all([
+          getCatalogoCompleto(),
+          getAllCategoriaLabels()
+        ]);
+        setCatalogoCompleto(catalogo);
+        setCategoriaLabels(labels);
+      } catch (err) {
+        console.error('Error cargando catálogo:', err);
+      } finally {
+        setCatalogoLoading(false);
+      }
+    };
+    loadCatalogo();
+  }, []);
 
   // Filtered catalog suggestions
   const catalogSuggestions = useMemo(() => {
@@ -95,29 +117,46 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
     });
   }, [tituloSearch, form.categoria, catalogoCompleto]);
 
-  // Select a catalog procedure
-  const selectCatalogProc = (titulo: string, categoriaForzada?: CategoriaProcedimiento) => {
+  // Estado para docs por defecto del título seleccionado
+  const [docsPorDefecto, setDocsPorDefecto] = useState<DocumentoRequerido[]>([]);
+  
+  // Cargar docs por defecto cuando cambia el título
+  useEffect(() => {
+    const loadDocs = async () => {
+      if (form.titulo) {
+        const docs = await getDocumentosRequeridos(form.titulo);
+        setDocsPorDefecto(docs);
+      } else {
+        setDocsPorDefecto([]);
+      }
+    };
+    loadDocs();
+  }, [form.titulo]);
+
+  // Select a catalog procedure (async)
+  const selectCatalogProc = async (titulo: string, categoriaForzada?: CategoriaProcedimiento) => {
     setTituloSearch(titulo);
-    setForm(prev => ({ ...prev, titulo }));
-    
-    // Solo asignar categoría automáticamente si:
-    // 1. Se fuerza explícitamente (nuevo título), O
-    // 2. El usuario no ha seleccionado categoría manualmente
-    const catFromCatalog = getCategoriaByTitulo(titulo);
-    if (categoriaForzada) {
-      // Nuevo título añadido: usar la categoría que tenía seleccionada el usuario
-      setForm(prev => ({ ...prev, titulo, categoria: categoriaForzada }));
-    } else if (catFromCatalog && !form.categoria) {
-      // Título existente del catálogo y usuario no ha seleccionado categoría
-      setForm(prev => ({ ...prev, titulo, categoria: catFromCatalog }));
-    }
-    // Si el usuario ya seleccionó categoría manualmente, no la tocamos
-    
-    // Auto-load required docs only if no existing docs
-    if (docsRequeridos.length === 0) {
-      setDocsRequeridos(getDocumentosRequeridos(titulo));
-    }
     setShowTituloDropdown(false);
+    
+    // Get catalog data (async)
+    const docsFromCatalog = await getDocumentosRequeridos(titulo);
+    const categoriaDetectada = categoriaForzada || await getCategoriaByTitulo(titulo);
+    
+    setForm(prev => ({
+      ...prev,
+      titulo,
+      // Solo asignar categoría si no hay una manual seleccionada o si se fuerza
+      categoria: (categoriaForzada || (!prev.categoria && categoriaDetectada)) ? (categoriaForzada || categoriaDetectada || 'otro') : prev.categoria,
+    }));
+    
+    // Merge docs: mantener docs existentes del procedimiento, añadir nuevos del catálogo
+    if (docsFromCatalog.length > 0) {
+      setDocsRequeridos(prev => {
+        const existentes = new Set(prev.map(d => d.nombre));
+        const nuevos = docsFromCatalog.filter(d => !existentes.has(d.nombre));
+        return [...prev, ...nuevos];
+      });
+    }
   };
 
   // Add custom document
@@ -368,15 +407,14 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
             )}
           </span>
           {/* Botón para cargar docs por defecto si hay un título seleccionado del catálogo */}
-          {form.titulo && getDocumentosRequeridos(form.titulo).length > 0 && (
+          {form.titulo && docsPorDefecto.length > 0 && (
             <button
               type="button"
               onClick={() => {
-                const docsDefault = getDocumentosRequeridos(form.titulo);
-                if (docsDefault.length > 0) {
+                if (docsPorDefecto.length > 0) {
                   // Merge: mantener estado adjuntado de docs existentes, añadir nuevos
                   const merged = [...docsRequeridos];
-                  docsDefault.forEach((d: DocumentoRequerido) => {
+                  docsPorDefecto.forEach((d: DocumentoRequerido) => {
                     if (!merged.find(m => m.nombre === d.nombre)) {
                       merged.push({ ...d });
                     }

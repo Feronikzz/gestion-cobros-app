@@ -1,14 +1,18 @@
 import type { CategoriaProcedimiento, DocumentoRequerido } from '@/lib/supabase/types';
+import { createClient } from '@/lib/supabase/client';
 
 export interface ProcedimientoCatalogo {
+  id?: string;
   titulo: string;
   categoria: CategoriaProcedimiento;
+  concepto?: string;
   documentos_requeridos: DocumentoRequerido[];
 }
 
 // Extender CategoriaProcedimiento para permitir categorías dinámicas
 export type CategoriaProcedimientoExtendida = CategoriaProcedimiento | string;
 
+// Categorías por defecto (predefinidas)
 export const CATEGORIA_LABELS: Record<CategoriaProcedimiento, string> = {
   extranjeria: 'Extranjería',
   civil: 'Civil',
@@ -18,42 +22,287 @@ export const CATEGORIA_LABELS: Record<CategoriaProcedimiento, string> = {
   otro: 'Otro',
 };
 
-// Clave para localStorage
-const STORAGE_KEY = 'catalogo_procedimientos_v1';
-const STORAGE_KEY_CATS = 'catalogo_categorias_v1';
+// Cache en memoria para evitar peticiones excesivas
+let cacheCategorias: Record<string, string> | null = null;
+let cacheCatalogo: ProcedimientoCatalogo[] | null = null;
+let lastFetch: number = 0;
+const CACHE_DURATION = 30000; // 30 segundos
 
-// Obtener catálogo custom de localStorage
-function getCustomCatalogo(): ProcedimientoCatalogo[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
-  } catch { return []; }
+// Cliente Supabase
+function getSupabase() {
+  return createClient();
 }
 
-// Guardar catálogo custom
-function saveCustomCatalogo(custom: ProcedimientoCatalogo[]) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(custom));
-  } catch { }
+// ─── FUNCIONES SUPABASE - CATEGORÍAS ─────────────────────────────
+
+// Obtener categorías personalizadas de Supabase
+export async function getCategoriasCustom(): Promise<Record<string, string>> {
+  // Usar cache si es reciente
+  if (cacheCategorias && Date.now() - lastFetch < CACHE_DURATION) {
+    return cacheCategorias;
+  }
+  
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return {};
+  
+  const { data, error } = await supabase
+    .from('catalogo_categorias')
+    .select('key, label')
+    .eq('user_id', user.id);
+  
+  if (error) {
+    console.error('Error cargando categorías:', error);
+    return {};
+  }
+  
+  const cats: Record<string, string> = {};
+  data?.forEach(cat => {
+    cats[cat.key] = cat.label;
+  });
+  
+  cacheCategorias = cats;
+  return cats;
 }
 
-// Obtener categorías custom
-export function getCategoriasCustom(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY_CATS);
-    return saved ? JSON.parse(saved) : {};
-  } catch { return {}; }
+// Guardar categoría en Supabase
+export async function saveCategoriaCustom(key: string, label: string): Promise<boolean> {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  
+  const { error } = await supabase
+    .from('catalogo_categorias')
+    .upsert({ user_id: user.id, key, label }, { onConflict: 'user_id,key' });
+  
+  if (error) {
+    console.error('Error guardando categoría:', error);
+    return false;
+  }
+  
+  // Invalidar cache
+  cacheCategorias = null;
+  return true;
 }
 
-// Guardar categorías custom
-export function saveCategoriasCustom(cats: Record<string, string>) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(STORAGE_KEY_CATS, JSON.stringify(cats));
-  } catch { }
+// Eliminar categoría de Supabase
+export async function deleteCategoriaCustom(key: string): Promise<boolean> {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  
+  const { error } = await supabase
+    .from('catalogo_categorias')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('key', key);
+  
+  if (error) {
+    console.error('Error eliminando categoría:', error);
+    return false;
+  }
+  
+  cacheCategorias = null;
+  return true;
+}
+
+// ─── FUNCIONES SUPABASE - CATÁLOGO ───────────────────────────────
+
+// Obtener catálogo personalizado de Supabase
+export async function getCustomCatalogo(): Promise<ProcedimientoCatalogo[]> {
+  // Usar cache si es reciente
+  if (cacheCatalogo && Date.now() - lastFetch < CACHE_DURATION) {
+    return cacheCatalogo;
+  }
+  
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+  
+  // Obtener procedimientos con sus documentos
+  const { data: procedimientos, error } = await supabase
+    .from('catalogo_procedimientos')
+    .select('*')
+    .eq('user_id', user.id);
+  
+  if (error) {
+    console.error('Error cargando catálogo:', error);
+    return [];
+  }
+  
+  // Obtener documentos requeridos
+  const { data: documentos, error: docsError } = await supabase
+    .from('catalogo_documentos_requeridos')
+    .select('*')
+    .in('procedimiento_id', procedimientos?.map(p => p.id) || []);
+  
+  if (docsError) {
+    console.error('Error cargando documentos:', docsError);
+  }
+  
+  // Agrupar documentos por procedimiento
+  const docsByProc: Record<string, DocumentoRequerido[]> = {};
+  documentos?.forEach(doc => {
+    if (!docsByProc[doc.procedimiento_id]) docsByProc[doc.procedimiento_id] = [];
+    docsByProc[doc.procedimiento_id].push({
+      nombre: doc.nombre,
+      adjuntado: false,
+      notas: null,
+    });
+  });
+  
+  const result: ProcedimientoCatalogo[] = procedimientos?.map(p => ({
+    id: p.id,
+    titulo: p.titulo,
+    categoria: p.categoria as CategoriaProcedimiento,
+    concepto: p.concepto,
+    documentos_requeridos: docsByProc[p.id] || [],
+  })) || [];
+  
+  cacheCatalogo = result;
+  lastFetch = Date.now();
+  return result;
+}
+
+// Añadir procedimiento al catálogo (Supabase)
+export async function addProcedimientoCatalogo(proc: ProcedimientoCatalogo): Promise<boolean> {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  
+  // Verificar si ya existe
+  const { data: existing } = await supabase
+    .from('catalogo_procedimientos')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('titulo', proc.titulo)
+    .single();
+  
+  if (existing) return false;
+  
+  // Insertar procedimiento
+  const { data: newProc, error } = await supabase
+    .from('catalogo_procedimientos')
+    .insert({
+      user_id: user.id,
+      titulo: proc.titulo,
+      categoria: proc.categoria,
+      concepto: proc.concepto,
+    })
+    .select()
+    .single();
+  
+  if (error || !newProc) {
+    console.error('Error añadiendo procedimiento:', error);
+    return false;
+  }
+  
+  // Insertar documentos requeridos
+  if (proc.documentos_requeridos?.length > 0) {
+    const { error: docsError } = await supabase
+      .from('catalogo_documentos_requeridos')
+      .insert(
+        proc.documentos_requeridos.map(doc => ({
+          procedimiento_id: newProc.id,
+          nombre: doc.nombre,
+          obligatorio: true,
+        }))
+      );
+    
+    if (docsError) {
+      console.error('Error añadiendo documentos:', docsError);
+    }
+  }
+  
+  cacheCatalogo = null;
+  return true;
+}
+
+// Actualizar procedimiento en catálogo (Supabase)
+export async function updateProcedimientoCatalogo(
+  tituloOriginal: string, 
+  proc: ProcedimientoCatalogo
+): Promise<boolean> {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  
+  // Buscar el procedimiento a actualizar
+  const { data: existing } = await supabase
+    .from('catalogo_procedimientos')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('titulo', tituloOriginal)
+    .single();
+  
+  if (!existing) {
+    // Si no existe, lo creamos como nuevo
+    return addProcedimientoCatalogo(proc);
+  }
+  
+  // Actualizar procedimiento
+  const { error } = await supabase
+    .from('catalogo_procedimientos')
+    .update({
+      titulo: proc.titulo,
+      categoria: proc.categoria,
+      concepto: proc.concepto,
+    })
+    .eq('id', existing.id);
+  
+  if (error) {
+    console.error('Error actualizando procedimiento:', error);
+    return false;
+  }
+  
+  // Eliminar documentos antiguos y añadir nuevos
+  await supabase
+    .from('catalogo_documentos_requeridos')
+    .delete()
+    .eq('procedimiento_id', existing.id);
+  
+  if (proc.documentos_requeridos?.length > 0) {
+    await supabase
+      .from('catalogo_documentos_requeridos')
+      .insert(
+        proc.documentos_requeridos.map(doc => ({
+          procedimiento_id: existing.id,
+          nombre: doc.nombre,
+          obligatorio: true,
+        }))
+      );
+  }
+  
+  cacheCatalogo = null;
+  return true;
+}
+
+// Eliminar procedimiento del catálogo (Supabase)
+export async function deleteProcedimientoCatalogo(titulo: string): Promise<boolean> {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return false;
+  
+  const { error } = await supabase
+    .from('catalogo_procedimientos')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('titulo', titulo);
+  
+  if (error) {
+    console.error('Error eliminando procedimiento:', error);
+    return false;
+  }
+  
+  cacheCatalogo = null;
+  return true;
+}
+
+// Forzar recarga del cache
+export function invalidateCache() {
+  cacheCategorias = null;
+  cacheCatalogo = null;
+  lastFetch = 0;
 }
 
 // ─── Catálogo de procedimientos predefinidos ─────────────
@@ -298,8 +547,8 @@ export const CATALOGO_PROCEDIMIENTOS: ProcedimientoCatalogo[] = [
 // ─── Funciones de gestión del catálogo ─────────────────────────────
 
 // Obtener catálogo completo (defaults + custom)
-export function getCatalogoCompleto(): ProcedimientoCatalogo[] {
-  const custom = getCustomCatalogo();
+export async function getCatalogoCompleto(): Promise<ProcedimientoCatalogo[]> {
+  const custom = await getCustomCatalogo();
   // Combinar y eliminar duplicados (custom tiene prioridad)
   const map = new Map<string, ProcedimientoCatalogo>();
   [...CATALOGO_PROCEDIMIENTOS, ...custom].forEach(p => {
@@ -308,51 +557,11 @@ export function getCatalogoCompleto(): ProcedimientoCatalogo[] {
   return Array.from(map.values());
 }
 
-// Añadir procedimiento al catálogo custom
-export function addProcedimientoCatalogo(proc: ProcedimientoCatalogo): boolean {
-  const custom = getCustomCatalogo();
-  if (custom.find(p => p.titulo === proc.titulo)) {
-    return false; // Ya existe
-  }
-  custom.push(proc);
-  saveCustomCatalogo(custom);
-  return true;
-}
-
-// Actualizar procedimiento en catálogo custom
-export function updateProcedimientoCatalogo(tituloOriginal: string, proc: ProcedimientoCatalogo): boolean {
-  // Si es un default, lo añadimos a custom con los cambios (override)
-  const custom = getCustomCatalogo();
-  const idx = custom.findIndex(p => p.titulo === tituloOriginal);
-  
-  if (idx >= 0) {
-    // Actualizar existente
-    custom[idx] = proc;
-  } else if (CATALOGO_PROCEDIMIENTOS.find(p => p.titulo === tituloOriginal)) {
-    // Es un default, añadir a custom como override
-    custom.push(proc);
-  } else {
-    return false;
-  }
-  
-  saveCustomCatalogo(custom);
-  return true;
-}
-
-// Eliminar procedimiento del catálogo custom
-export function deleteProcedimientoCatalogo(titulo: string): boolean {
-  const custom = getCustomCatalogo();
-  const filtered = custom.filter(p => p.titulo !== titulo);
-  if (filtered.length === custom.length) return false;
-  saveCustomCatalogo(filtered);
-  return true;
-}
-
 // ─── Funciones getter (usando catálogo completo) ─────────────────────
 
 // Obtener títulos únicos para autocompletar
-export function getTitulosPorCategoria(categoria?: CategoriaProcedimiento): string[] {
-  const catalogo = getCatalogoCompleto();
+export async function getTitulosPorCategoria(categoria?: CategoriaProcedimiento): Promise<string[]> {
+  const catalogo = await getCatalogoCompleto();
   const filtered = categoria
     ? catalogo.filter(p => p.categoria === categoria)
     : catalogo;
@@ -360,21 +569,21 @@ export function getTitulosPorCategoria(categoria?: CategoriaProcedimiento): stri
 }
 
 // Obtener documentos requeridos según el título del procedimiento
-export function getDocumentosRequeridos(titulo: string): DocumentoRequerido[] {
-  const catalogo = getCatalogoCompleto();
+export async function getDocumentosRequeridos(titulo: string): Promise<DocumentoRequerido[]> {
+  const catalogo = await getCatalogoCompleto();
   const proc = catalogo.find(p => p.titulo === titulo);
   return proc ? proc.documentos_requeridos.map(d => ({ ...d })) : [];
 }
 
 // Obtener la categoría según el título
-export function getCategoriaByTitulo(titulo: string): CategoriaProcedimiento | null {
-  const catalogo = getCatalogoCompleto();
+export async function getCategoriaByTitulo(titulo: string): Promise<CategoriaProcedimiento | null> {
+  const catalogo = await getCatalogoCompleto();
   const proc = catalogo.find(p => p.titulo === titulo);
   return proc ? proc.categoria : null;
 }
 
 // Obtener labels de todas las categorías (incluyendo custom)
-export function getAllCategoriaLabels(): Record<string, string> {
-  const customCats = getCategoriasCustom();
+export async function getAllCategoriaLabels(): Promise<Record<string, string>> {
+  const customCats = await getCategoriasCustom();
   return { ...CATEGORIA_LABELS, ...customCats };
 }
