@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { LayoutShell } from '@/components/layout-shell';
 import { Modal } from '@/components/modal';
 import { ActividadForm } from '@/components/actividad-form';
@@ -11,7 +11,6 @@ import { ClienteFormV2 } from '@/components/cliente-form-v2';
 import { useActividades } from '@/lib/hooks/use-actividades';
 import { useClientes } from '@/lib/hooks/use-clientes';
 import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
-import { createClient } from '@/lib/supabase/client';
 import type { Actividad, ActividadInsert, Cliente } from '@/lib/supabase/types';
 import { Plus, Activity, Clock, AlertTriangle, Calendar, Users, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
@@ -23,25 +22,26 @@ export default function ActividadesPage() {
   const [showModal, setShowModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [editingActividad, setEditingActividad] = useState<Actividad | null>(null);
-  const [clienteNombres, setClienteNombres] = useState<Record<string, string>>({});
   // Client detail modal
   const [showClienteModal, setShowClienteModal] = useState(false);
   const [viewingCliente, setViewingCliente] = useState<Cliente | null>(null);
   // Completion workflow
   const [completingActividad, setCompletingActividad] = useState<Actividad | null>(null);
 
-  // Cargar nombres de clientes para la vista global
-  useEffect(() => {
-    const supabase = typeof window !== 'undefined' ? createClient() : null;
-    if (!supabase) return;
-    supabase.from('clientes').select('id, nombre, apellidos').then(({ data }) => {
-      if (data) {
-        const map: Record<string, string> = {};
-        data.forEach(c => { map[c.id] = [c.nombre, c.apellidos].filter(Boolean).join(' '); });
-        setClienteNombres(map);
-      }
+  // Derivar nombres y contactos de clientes
+  const clienteNombres = useMemo(() => {
+    const map: Record<string, string> = {};
+    clientes.forEach(c => { map[c.id] = [c.nombre, c.apellidos].filter(Boolean).join(' '); });
+    return map;
+  }, [clientes]);
+
+  const clienteContactos = useMemo(() => {
+    const map: Record<string, { telefono?: string | null; telefono2?: string | null; email?: string | null; direccion?: string | null }> = {};
+    clientes.forEach(c => {
+      map[c.id] = { telefono: c.telefono, telefono2: c.telefono2, email: c.email, direccion: c.direccion };
     });
-  }, []);
+    return map;
+  }, [clientes]);
 
   if (loading) return <LayoutShell title="Actividades"><div className="loading-state">Cargando actividades...</div></LayoutShell>;
 
@@ -124,6 +124,7 @@ export default function ActividadesPage() {
             onDelete={(actId) => { if (window.confirm('¿Eliminar esta actividad?')) deleteActividad(actId); }}
             showCliente
             clienteNombres={clienteNombres}
+            clienteContactos={clienteContactos}
             onClienteClick={(clienteId) => {
               const c = clientes.find(cl => cl.id === clienteId);
               if (c) { setViewingCliente(c); setShowClienteModal(true); }

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { Actividad, TipoActividad, EstadoActividad } from '@/lib/supabase/types';
 import { TIPO_ICONS, TIPO_LABELS, PRIORIDAD_COLORS } from '@/components/actividad-form';
-import { Check, X, Clock, Edit, Trash2, ChevronDown, ChevronUp, AlertTriangle, User, ExternalLink } from 'lucide-react';
+import { Check, X, Clock, Edit, Trash2, ChevronDown, ChevronUp, AlertTriangle, User, ExternalLink, Phone, Mail, MapPin, MessageCircle } from 'lucide-react';
 
 const ESTADO_ICONS: Record<EstadoActividad, React.ReactNode> = {
   pendiente: <Clock className="w-3.5 h-3.5 text-yellow-600" />,
@@ -19,6 +19,13 @@ const ESTADO_LABELS: Record<EstadoActividad, string> = {
   cancelada: 'Cancelada',
 };
 
+interface ClienteContacto {
+  telefono?: string | null;
+  telefono2?: string | null;
+  email?: string | null;
+  direccion?: string | null;
+}
+
 interface ActividadTimelineProps {
   actividades: Actividad[];
   onComplete: (id: string) => void;
@@ -26,10 +33,39 @@ interface ActividadTimelineProps {
   onDelete: (id: string) => void;
   showCliente?: boolean;
   clienteNombres?: Record<string, string>;
+  clienteContactos?: Record<string, ClienteContacto>;
   onClienteClick?: (clienteId: string) => void;
 }
 
-export function ActividadTimeline({ actividades, onComplete, onEdit, onDelete, showCliente, clienteNombres, onClienteClick }: ActividadTimelineProps) {
+// Map activity type to relevant contact fields
+function getContactInfo(tipo: string, contacto?: ClienteContacto): { icon: React.ReactNode; text: string } | null {
+  if (!contacto) return null;
+  switch (tipo) {
+    case 'llamada_entrante':
+    case 'llamada_saliente':
+      if (contacto.telefono) return { icon: <Phone className="w-3 h-3" />, text: [contacto.telefono, contacto.telefono2].filter(Boolean).join(' / ') };
+      break;
+    case 'email_enviado':
+    case 'email_recibido':
+      if (contacto.email) return { icon: <Mail className="w-3 h-3" />, text: contacto.email };
+      break;
+    case 'whatsapp':
+    case 'sms':
+      if (contacto.telefono) return { icon: <MessageCircle className="w-3 h-3" />, text: [contacto.telefono, contacto.telefono2].filter(Boolean).join(' / ') };
+      break;
+    case 'visita':
+      if (contacto.direccion) return { icon: <MapPin className="w-3 h-3" />, text: contacto.direccion };
+      break;
+    case 'reunion':
+      // Show both phone and address for meetings
+      const parts = [contacto.telefono, contacto.direccion].filter(Boolean);
+      if (parts.length > 0) return { icon: <User className="w-3 h-3" />, text: parts.join(' | ') };
+      break;
+  }
+  return null;
+}
+
+export function ActividadTimeline({ actividades, onComplete, onEdit, onDelete, showCliente, clienteNombres, clienteContactos, onClienteClick }: ActividadTimelineProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filter, setFilter] = useState<'todas' | 'pendientes' | 'completadas'>('todas');
 
@@ -147,6 +183,17 @@ export function ActividadTimeline({ actividades, onComplete, onEdit, onDelete, s
                               {clienteNombres[a.cliente_id]}
                             </button>
                           )}
+                          {/* Contact info based on activity type */}
+                          {a.cliente_id && clienteContactos?.[a.cliente_id] && (() => {
+                            const info = getContactInfo(a.tipo, clienteContactos[a.cliente_id]);
+                            if (!info) return null;
+                            return (
+                              <span className="inline-flex items-center gap-1 text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                                {info.icon}
+                                {info.text}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
 

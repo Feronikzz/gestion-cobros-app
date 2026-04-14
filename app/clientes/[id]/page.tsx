@@ -499,6 +499,7 @@ export default function ClienteDetallePage() {
                   </div>
                   <p className="proc-concepto">{p.concepto}</p>
                   <div className="proc-details">
+                    {p.categoria && <span className="badge badge-purple text-xs">{p.categoria}</span>}
                     <span>Presupuesto: <strong>{eur(p.presupuesto)}</strong></span>
                     {p.tiene_entrada && <span>Entrada: <strong>{eur(p.importe_entrada)}</strong></span>}
                     <span>Pendiente: <strong className={getPendienteProcedimiento(p.id) > 0 ? "text-red-600" : "text-green-600"}>
@@ -511,6 +512,26 @@ export default function ClienteDetallePage() {
                     {p.fecha_resolucion && <span>Resolución: {p.fecha_resolucion}</span>}
                     <span className={`badge ${estadoProcBadge[p.estado]}`}>{estadoProcLabel[p.estado]}</span>
                   </div>
+                  {/* Checklist de documentos */}
+                  {p.documentos_requeridos && p.documentos_requeridos.length > 0 && (() => {
+                    const total = p.documentos_requeridos!.length;
+                    const adjuntados = p.documentos_requeridos!.filter(d => d.adjuntado).length;
+                    const completo = adjuntados === total;
+                    return (
+                      <div className={`mt-2 p-2 rounded-lg border text-xs ${completo ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
+                        <div className="flex items-center gap-1.5 font-medium mb-1">
+                          <FileText className="w-3 h-3" />
+                          Documentación: <span className={completo ? 'text-green-700' : 'text-amber-700'}>{adjuntados}/{total}</span>
+                          {completo && <span className="text-green-600">✓ Completa</span>}
+                        </div>
+                        {!completo && (
+                          <div className="text-gray-500">
+                            Faltan: {p.documentos_requeridos!.filter(d => !d.adjuntado).map(d => d.nombre).join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {p.notas && <p className="proc-notas">{p.notas}</p>}
                   {docs.length > 0 && (
                     <div className="proc-docs">

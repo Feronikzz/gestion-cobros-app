@@ -1,8 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import type { Procedimiento, EstadoProcedimiento } from '@/lib/supabase/types';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import type { Procedimiento, EstadoProcedimiento, CategoriaProcedimiento, DocumentoRequerido } from '@/lib/supabase/types';
 import { formatField } from '@/lib/utils/text';
+import { CATALOGO_PROCEDIMIENTOS, CATEGORIA_LABELS, getDocumentosRequeridos, getCategoriaByTitulo } from '@/lib/catalogo-procedimientos';
+import { Search, CheckSquare, Square, Plus, X, FileText } from 'lucide-react';
 
 interface ProcedimientoFormProps {
   procedimiento?: Procedimiento;
@@ -34,6 +36,7 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
   const [form, setForm] = useState({
     titulo: procedimiento?.titulo || '',
     concepto: procedimiento?.concepto || '',
+    categoria: (procedimiento?.categoria || '') as CategoriaProcedimiento | '',
     presupuesto: procedimiento?.presupuesto || 0,
     tiene_entrada: procedimiento?.tiene_entrada || false,
     importe_entrada: procedimiento?.importe_entrada || 0,
@@ -46,7 +49,68 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
     notas: procedimiento?.notas || '',
   });
 
+  // Document checklist state
+  const [docsRequeridos, setDocsRequeridos] = useState<DocumentoRequerido[]>(
+    procedimiento?.documentos_requeridos || []
+  );
+  const [nuevoDocNombre, setNuevoDocNombre] = useState('');
+
+  // Title search state
+  const [tituloSearch, setTituloSearch] = useState(form.titulo);
+  const [showTituloDropdown, setShowTituloDropdown] = useState(false);
+  const tituloRef = useRef<HTMLDivElement>(null);
+
   const [loading, setLoading] = useState(false);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (tituloRef.current && !tituloRef.current.contains(e.target as Node)) {
+        setShowTituloDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  // Filtered catalog suggestions
+  const catalogSuggestions = useMemo(() => {
+    const search = tituloSearch.toLowerCase();
+    const catFilter = form.categoria || undefined;
+    return CATALOGO_PROCEDIMIENTOS.filter(p => {
+      const matchSearch = !search || p.titulo.toLowerCase().includes(search);
+      const matchCat = !catFilter || p.categoria === catFilter;
+      return matchSearch && matchCat;
+    });
+  }, [tituloSearch, form.categoria]);
+
+  // Select a catalog procedure
+  const selectCatalogProc = (titulo: string) => {
+    setTituloSearch(titulo);
+    setForm(prev => ({ ...prev, titulo }));
+    const cat = getCategoriaByTitulo(titulo);
+    if (cat) setForm(prev => ({ ...prev, titulo, categoria: cat }));
+    // Auto-load required docs only if no existing docs
+    if (docsRequeridos.length === 0) {
+      setDocsRequeridos(getDocumentosRequeridos(titulo));
+    }
+    setShowTituloDropdown(false);
+  };
+
+  // Add custom document
+  const addDoc = () => {
+    if (!nuevoDocNombre.trim()) return;
+    setDocsRequeridos(prev => [...prev, { nombre: nuevoDocNombre.trim(), adjuntado: false, notas: null }]);
+    setNuevoDocNombre('');
+  };
+
+  const toggleDoc = (idx: number) => {
+    setDocsRequeridos(prev => prev.map((d, i) => i === idx ? { ...d, adjuntado: !d.adjuntado } : d));
+  };
+
+  const removeDoc = (idx: number) => {
+    setDocsRequeridos(prev => prev.filter((_, i) => i !== idx));
+  };
 
   // ¿Mostrar campos de post-presentación?
   const showPostPresentacion = isEditing && CAMPOS_POST_PRESENTACION.includes(form.estado);
@@ -57,7 +121,7 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
 
   // Estados disponibles según si es creación o edición
   const estadosDisponibles: EstadoProcedimiento[] = isEditing
-    ? ['pendiente', 'pendiente_presentar', 'presentado', 'pendiente_resolucion', 'pendiente_recurso', 'resuelto', 'cerrado', 'archivado']
+    ? ['pendiente', 'pendiente_presentar', 'en_proceso', 'presentado', 'pendiente_resolucion', 'pendiente_recurso', 'resuelto', 'cerrado', 'archivado']
     : ['pendiente', 'pendiente_presentar'];
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -66,14 +130,16 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
     try {
       await onSubmit({
         ...form,
-        titulo: formatField(form.titulo, 'general'),
+        titulo: formatField(form.titulo || tituloSearch, 'general'),
         concepto: formatField(form.concepto, 'general'),
+        categoria: form.categoria || null,
         nie_interesado: form.nie_interesado ? formatField(form.nie_interesado, 'nif') : null,
         nombre_interesado: form.nombre_interesado ? formatField(form.nombre_interesado, 'name') : null,
         expediente_referencia: form.expediente_referencia || null,
         fecha_presentacion: form.fecha_presentacion || null,
         fecha_resolucion: form.fecha_resolucion || null,
         notas: form.notas ? formatField(form.notas, 'general') : null,
+        documentos_requeridos: docsRequeridos.length > 0 ? docsRequeridos : null,
         cliente_id: clienteId,
       });
     } catch (err) {
@@ -83,16 +149,67 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
     }
   };
 
+  // Completion stats
+  const docsTotal = docsRequeridos.length;
+  const docsAdjuntados = docsRequeridos.filter(d => d.adjuntado).length;
+
   return (
     <form onSubmit={handleSubmit} className="form-grid">
       {/* ── Datos básicos (siempre visibles) ── */}
       <fieldset className="form-fieldset">
         <legend className="form-legend">Datos del procedimiento</legend>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Categoría */}
           <div>
-            <label className="form-label">Título *</label>
-            <input type="text" value={form.titulo} onChange={e => setForm({ ...form, titulo: e.target.value })} className="form-input" required placeholder="Ej: Solicitud NIE" />
+            <label className="form-label">Categoría</label>
+            <select
+              value={form.categoria}
+              onChange={e => setForm({ ...form, categoria: e.target.value as CategoriaProcedimiento | '' })}
+              className="form-input"
+            >
+              <option value="">Seleccionar categoría...</option>
+              {(Object.keys(CATEGORIA_LABELS) as CategoriaProcedimiento[]).map(cat => (
+                <option key={cat} value={cat}>{CATEGORIA_LABELS[cat]}</option>
+              ))}
+            </select>
           </div>
+
+          {/* Título con buscador */}
+          <div ref={tituloRef} className="relative">
+            <label className="form-label">Título *</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={tituloSearch}
+                onChange={e => {
+                  setTituloSearch(e.target.value);
+                  setForm(prev => ({ ...prev, titulo: e.target.value }));
+                  setShowTituloDropdown(true);
+                }}
+                onFocus={() => setShowTituloDropdown(true)}
+                className="form-input pl-10"
+                required
+                placeholder="Buscar o escribir procedimiento..."
+              />
+            </div>
+            {showTituloDropdown && catalogSuggestions.length > 0 && (
+              <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {catalogSuggestions.map(p => (
+                  <button
+                    key={p.titulo}
+                    type="button"
+                    onClick={() => selectCatalogProc(p.titulo)}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors flex items-center justify-between"
+                  >
+                    <span>{p.titulo}</span>
+                    <span className="text-xs text-gray-400">{CATEGORIA_LABELS[p.categoria]}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div>
             <label className="form-label">Concepto *</label>
             <input type="text" value={form.concepto} onChange={e => setForm({ ...form, concepto: e.target.value })} className="form-input" required placeholder="Ej: Tramitación NIE por arraigo" />
@@ -188,6 +305,55 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
           </div>
         </fieldset>
       )}
+
+      {/* ── Documentos requeridos (checklist) ── */}
+      <fieldset className="form-fieldset">
+        <legend className="form-legend">
+          <FileText className="w-4 h-4 inline mr-1" />
+          Documentos requeridos
+          {docsTotal > 0 && (
+            <span className={`ml-2 text-xs font-normal px-2 py-0.5 rounded-full ${docsAdjuntados === docsTotal ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+              {docsAdjuntados}/{docsTotal}
+            </span>
+          )}
+        </legend>
+
+        {docsRequeridos.length > 0 ? (
+          <div className="space-y-1 mb-3">
+            {docsRequeridos.map((doc, idx) => (
+              <div key={idx} className={`flex items-center gap-2 p-2 rounded-lg border transition-colors ${doc.adjuntado ? 'bg-green-50/50 border-green-200' : 'border-gray-200 hover:border-gray-300'}`}>
+                <button type="button" onClick={() => toggleDoc(idx)} className="flex-shrink-0">
+                  {doc.adjuntado
+                    ? <CheckSquare className="w-4 h-4 text-green-600" />
+                    : <Square className="w-4 h-4 text-gray-300" />
+                  }
+                </button>
+                <span className={`flex-1 text-sm ${doc.adjuntado ? 'line-through text-gray-400' : 'text-gray-800'}`}>{doc.nombre}</span>
+                <button type="button" onClick={() => removeDoc(idx)} className="p-0.5 text-gray-300 hover:text-red-500 transition-colors" title="Eliminar">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 mb-3">No hay documentos requeridos. Selecciona un procedimiento del catálogo o añádelos manualmente.</p>
+        )}
+
+        {/* Añadir documento manual */}
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={nuevoDocNombre}
+            onChange={e => setNuevoDocNombre(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addDoc(); } }}
+            className="form-input flex-1 text-sm"
+            placeholder="Añadir documento requerido..."
+          />
+          <button type="button" onClick={addDoc} className="btn btn-secondary btn-sm" disabled={!nuevoDocNombre.trim()}>
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </fieldset>
 
       {/* ── Notas ── */}
       <div>

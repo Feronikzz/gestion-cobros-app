@@ -251,11 +251,23 @@ export default function ExpedientesPage() {
                   </td>
                   <td>
                     <div>
-                      <div className="font-medium">{expediente.titulo}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{expediente.titulo}</span>
+                        {expediente.categoria && <span className="badge badge-purple text-xs">{expediente.categoria}</span>}
+                      </div>
                       <div className="text-sm text-gray-500">{expediente.concepto}</div>
                       {expediente.expediente_referencia && (
                         <div className="text-xs text-gray-400">Ref: {expediente.expediente_referencia}</div>
                       )}
+                      {expediente.documentos_requeridos && expediente.documentos_requeridos.length > 0 && (() => {
+                        const total = expediente.documentos_requeridos!.length;
+                        const adj = expediente.documentos_requeridos!.filter((d: any) => d.adjuntado).length;
+                        return (
+                          <div className={`text-xs mt-0.5 ${adj === total ? 'text-green-600' : 'text-amber-600'}`}>
+                            Docs: {adj}/{total} {adj === total ? '✓' : ''}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </td>
                   <td>

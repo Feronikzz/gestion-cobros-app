@@ -91,6 +91,16 @@ export interface Recibi {
   created_at: string;
 }
 
+// ─── Categoría de procedimiento ───────────────────────────
+export type CategoriaProcedimiento = 'extranjeria' | 'civil' | 'laboral' | 'bancario' | 'administrativo' | 'otro';
+
+// ─── Documento requerido (checklist por expediente) ───────
+export interface DocumentoRequerido {
+  nombre: string;
+  adjuntado: boolean;
+  notas: string | null;
+}
+
 // ─── Procedimiento / Expediente ───────────────────────────
 export interface Procedimiento {
   id: string;
@@ -98,6 +108,7 @@ export interface Procedimiento {
   cliente_id: string;
   titulo: string;
   concepto: string;
+  categoria: CategoriaProcedimiento | null;
   presupuesto: number;
   tiene_entrada: boolean;
   importe_entrada: number;
@@ -110,6 +121,7 @@ export interface Procedimiento {
   fecha_resolucion: string | null;
   estado: EstadoProcedimiento;
   notas: string | null;
+  documentos_requeridos: DocumentoRequerido[] | null;
   created_at: string;
 }
 
