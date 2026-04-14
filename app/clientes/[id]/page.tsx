@@ -154,7 +154,17 @@ export default function ClienteDetallePage() {
 
     if (editingProc) {
       const { cliente_id, user_id, ...updates } = payload;
-      await supabase.from('procedimientos').update(updates).eq('id', editingProc.id);
+      // Filtrar campos undefined para evitar errores 400
+      const cleanUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([_, v]) => v !== undefined)
+      );
+      console.log('Actualizando procedimiento:', editingProc.id, cleanUpdates);
+      const { error } = await supabase.from('procedimientos').update(cleanUpdates).eq('id', editingProc.id);
+      if (error) {
+        console.error('Error actualizando procedimiento:', error);
+        alert('Error al guardar: ' + error.message);
+        return;
+      }
       
       // Si se añade entrada en edición y no existía antes, crear cobro
       if (formData.tiene_entrada && formData.importe_entrada > 0 && !editingProc.tiene_entrada) {
