@@ -357,13 +357,38 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
 
       {/* ── Documentos requeridos (checklist) ── */}
       <fieldset className="form-fieldset">
-        <legend className="form-legend">
-          <FileText className="w-4 h-4 inline mr-1" />
-          Documentos requeridos
-          {docsTotal > 0 && (
-            <span className={`ml-2 text-xs font-normal px-2 py-0.5 rounded-full ${docsAdjuntados === docsTotal ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-              {docsAdjuntados}/{docsTotal}
-            </span>
+        <legend className="form-legend flex items-center justify-between w-full">
+          <span>
+            <FileText className="w-4 h-4 inline mr-1" />
+            Documentos requeridos
+            {docsTotal > 0 && (
+              <span className={`ml-2 text-xs font-normal px-2 py-0.5 rounded-full ${docsAdjuntados === docsTotal ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                {docsAdjuntados}/{docsTotal}
+              </span>
+            )}
+          </span>
+          {/* Botón para cargar docs por defecto si hay un título seleccionado del catálogo */}
+          {form.titulo && getDocumentosRequeridos(form.titulo).length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                const docsDefault = getDocumentosRequeridos(form.titulo);
+                if (docsDefault.length > 0) {
+                  // Merge: mantener estado adjuntado de docs existentes, añadir nuevos
+                  const merged = [...docsRequeridos];
+                  docsDefault.forEach((d: DocumentoRequerido) => {
+                    if (!merged.find(m => m.nombre === d.nombre)) {
+                      merged.push({ ...d });
+                    }
+                  });
+                  setDocsRequeridos(merged);
+                }
+              }}
+              className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+            >
+              <Plus className="w-3 h-3" />
+              Cargar docs por defecto
+            </button>
           )}
         </legend>
 

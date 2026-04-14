@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { eur } from '@/lib/utils';
 import type { Cliente, Procedimiento, Cobro } from '@/lib/supabase/types';
 import type { Documento, EstadoProcedimiento } from '@/lib/supabase/types';
-import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download, Activity, FileSignature, Printer, ChevronUp, ChevronDown, CheckSquare, Square } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download, Activity, FileSignature, Printer, ChevronUp, ChevronDown, CheckSquare, Square, X } from 'lucide-react';
 import { formatField } from '@/lib/utils/text';
 import { ProcedimientoForm } from '@/components/procedimiento-form';
 import { ActividadForm } from '@/components/actividad-form';
@@ -54,6 +54,7 @@ export default function ClienteDetallePage() {
   const [editingCobro, setEditingCobro] = useState<Cobro | null>(null);
   const [docsIdentidad, setDocsIdentidad] = useState<{tipo:string;numero:string;fecha_expedicion:string;fecha_caducidad:string;es_principal:boolean}[]>([]);
   const [expandedDocChecklist, setExpandedDocChecklist] = useState<string | null>(null);
+  const [nuevoDocChecklist, setNuevoDocChecklist] = useState<Record<string, string>>({});
   const [uploadProcId, setUploadProcId] = useState<string | null>(null);
   const [uploadingFiles, setUploadingFiles] = useState(false);
 
@@ -237,6 +238,38 @@ export default function ClienteDetallePage() {
     
     const newDocs = [...proc.documentos_requeridos];
     newDocs[docIndex] = { ...newDocs[docIndex], adjuntado: !newDocs[docIndex].adjuntado };
+    
+    await supabase.from('procedimientos').update({ documentos_requeridos: newDocs }).eq('id', procedimientoId);
+    fetchData();
+  };
+
+  // Añadir documento requerido al checklist
+  const handleAddDocRequerido = async (procedimientoId: string) => {
+    if (!supabase) return;
+    const nombre = nuevoDocChecklist[procedimientoId]?.trim();
+    if (!nombre) return;
+    
+    const proc = procedimientos.find(p => p.id === procedimientoId);
+    if (!proc) return;
+    
+    const newDocs = [...(proc.documentos_requeridos || []), { 
+      nombre, 
+      adjuntado: false, 
+      notas: null 
+    }];
+    
+    await supabase.from('procedimientos').update({ documentos_requeridos: newDocs }).eq('id', procedimientoId);
+    setNuevoDocChecklist(prev => ({ ...prev, [procedimientoId]: '' }));
+    fetchData();
+  };
+
+  // Eliminar documento requerido del checklist
+  const handleRemoveDocRequerido = async (procedimientoId: string, docIndex: number) => {
+    if (!supabase) return;
+    const proc = procedimientos.find(p => p.id === procedimientoId);
+    if (!proc || !proc.documentos_requeridos) return;
+    
+    const newDocs = proc.documentos_requeridos.filter((_, i) => i !== docIndex);
     
     await supabase.from('procedimientos').update({ documentos_requeridos: newDocs }).eq('id', procedimientoId);
     fetchData();
@@ -601,7 +634,7 @@ export default function ClienteDetallePage() {
                         {isOpen && (
                           <div className="p-2 bg-white space-y-1">
                             {p.documentos_requeridos!.map((doc, idx) => (
-                              <div key={idx} className="flex items-center gap-2 py-1">
+                              <div key={idx} className="flex items-center gap-2 py-1 group">
                                 <button
                                   type="button"
                                   onClick={() => handleToggleDocRequerido(p.id, idx)}
@@ -615,8 +648,40 @@ export default function ClienteDetallePage() {
                                 <span className={`text-sm flex-1 ${doc.adjuntado ? 'line-through text-gray-400' : 'text-gray-700'}`}>
                                   {doc.nombre}
                                 </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveDocRequerido(p.id, idx)}
+                                  className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-opacity"
+                                  title="Eliminar documento de la lista"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
                               </div>
                             ))}
+                            {/* Añadir nuevo documento */}
+                            <div className="flex items-center gap-2 pt-2 border-t border-gray-100 mt-2">
+                              <input
+                                type="text"
+                                value={nuevoDocChecklist[p.id] || ''}
+                                onChange={(e) => setNuevoDocChecklist(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleAddDocRequerido(p.id);
+                                  }
+                                }}
+                                placeholder="Añadir documento..."
+                                className="flex-1 text-sm px-2 py-1 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleAddDocRequerido(p.id)}
+                                disabled={!nuevoDocChecklist[p.id]?.trim()}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded disabled:text-gray-300"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         )}
                       </div>
