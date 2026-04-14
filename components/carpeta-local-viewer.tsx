@@ -44,9 +44,16 @@ function formatDate(iso: string | null): string {
 export function CarpetaLocalViewer({ basePath }: CarpetaLocalViewerProps) {
   const [currentPath, setCurrentPath] = useState(basePath);
   const [items, setItems] = useState<FolderItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pathHistory, setPathHistory] = useState<string[]>([]);
+  const [isLocal, setIsLocal] = useState<boolean | null>(null);
+
+  // Detect if running on localhost
+  useEffect(() => {
+    const host = window.location.hostname;
+    setIsLocal(host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.'));
+  }, []);
 
   const fetchContents = useCallback(async (folderPath: string) => {
     setLoading(true);
@@ -61,7 +68,7 @@ export function CarpetaLocalViewer({ basePath }: CarpetaLocalViewerProps) {
         setItems(data.items || []);
       }
     } catch (err: any) {
-      setError('No se pudo conectar con el servidor. Asegúrate de que la app se ejecuta localmente.');
+      setError('No se pudo conectar con el servidor.');
       setItems([]);
     } finally {
       setLoading(false);
@@ -69,8 +76,25 @@ export function CarpetaLocalViewer({ basePath }: CarpetaLocalViewerProps) {
   }, []);
 
   useEffect(() => {
-    fetchContents(currentPath);
-  }, [currentPath, fetchContents]);
+    if (isLocal) fetchContents(currentPath);
+  }, [currentPath, fetchContents, isLocal]);
+
+  // If running remotely, show a simple message instead of the viewer
+  if (isLocal === false) {
+    return (
+      <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+        <div className="flex items-start gap-2 text-sm text-gray-500">
+          <Folder className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <p>El listado de archivos solo está disponible cuando la app se ejecuta en local.</p>
+            <p className="text-xs text-gray-400 mt-1">Para ver los archivos, ejecuta la app con <code className="bg-gray-200 px-1 rounded">npm run dev</code> en el mismo equipo donde están las carpetas.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLocal === null) return null; // still detecting
 
   const navigateToFolder = (folderName: string) => {
     setPathHistory(prev => [...prev, currentPath]);
