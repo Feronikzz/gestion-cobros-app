@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Cliente } from '@/lib/supabase/types';
-import { Download, Save, User, FileText, RefreshCw, Upload, CheckCircle, X, Plus } from 'lucide-react';
+import { Download, Save, User, FileText, RefreshCw, Upload, CheckCircle, X, Plus, Loader2 } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
 
 const STORAGE_KEY_REP = 'designacion_representante_perfil';
 const STORAGE_KEY_EMAILS = 'designacion_emails_sugeridos';
@@ -37,7 +38,10 @@ interface RepresentanteProfile {
 
 interface DesignacionRepresentanteProps {
   cliente?: Cliente;
+  clienteId?: string;
+  procedimientoId?: string;
   onClose?: () => void;
+  onUploaded?: () => void;
 }
 
 function loadRepPerfil(): RepresentanteProfile | null {
@@ -45,7 +49,8 @@ function loadRepPerfil(): RepresentanteProfile | null {
   try { const r = localStorage.getItem(STORAGE_KEY_REP); return r ? JSON.parse(r) : null; } catch { return null; }
 }
 
-export function DesignacionRepresentante({ cliente, onClose }: DesignacionRepresentanteProps) {
+export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, onClose, onUploaded }: DesignacionRepresentanteProps) {
+  const supabase = typeof window !== 'undefined' ? createClient() : null;
   const today = new Date();
   const saved = loadRepPerfil();
 
@@ -114,6 +119,8 @@ export function DesignacionRepresentante({ cliente, onClose }: DesignacionRepres
 
   // ── Signed file upload ──
   const [signedFile, setSignedFile] = useState<File | null>(null);
+  const [uploadingSigned, setUploadingSigned] = useState(false);
+  const [uploadedSignedUrl, setUploadedSignedUrl] = useState<string | null>(null);
 
   const setR = (k: string, v: string) => setRepdo(p => ({ ...p, [k]: v }));
   const setT = (k: string, v: string) => setRepte(p => ({ ...p, [k]: v }));
@@ -127,6 +134,58 @@ export function DesignacionRepresentante({ cliente, onClose }: DesignacionRepres
     localStorage.setItem(STORAGE_KEY_REP, JSON.stringify(repte));
     setSavedMsg(true);
     setTimeout(() => setSavedMsg(false), 2000);
+  };
+
+  // Subir documento firmado a Supabase
+  const handleUploadSigned = async () => {
+    if (!signedFile || !supabase) return;
+    if (!clienteId && !cliente?.id) {
+      alert('No se puede subir: falta ID del cliente');
+      return;
+    }
+    
+    setUploadingSigned(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No autenticado');
+      
+      const finalClienteId = clienteId || cliente?.id;
+      
+      // 1. Subir archivo a Storage
+      const fileExt = signedFile.name.split('.').pop();
+      const filePath = `${user.id}/designaciones/${Date.now()}_${signedFile.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('documentos')
+        .upload(filePath, signedFile);
+      
+      if (uploadError) throw uploadError;
+      
+      // 2. Obtener URL pública
+      const { data: { publicUrl } } = supabase.storage
+        .from('documentos')
+        .getPublicUrl(filePath);
+      
+      // 3. Crear registro en documentos
+      await supabase.from('documentos').insert({
+        user_id: user.id,
+        cliente_id: finalClienteId,
+        procedimiento_id: procedimientoId || null,
+        nombre: `Designación firmada - ${repdo.apellido1 || 'cliente'}`,
+        tipo: 'DESIGNACION_FIRMADA',
+        archivo_url: publicUrl,
+        fecha_subida: new Date().toISOString(),
+      });
+      
+      setUploadedSignedUrl(publicUrl);
+      onUploaded?.();
+      alert('Documento firmado subido correctamente');
+    } catch (error: any) {
+      console.error('Error subiendo designación firmada:', error);
+      alert('Error al subir: ' + error.message);
+    } finally {
+      setUploadingSigned(false);
+    }
   };
 
   const handleDownload = async () => {
@@ -367,44 +426,88 @@ export function DesignacionRepresentante({ cliente, onClose }: DesignacionRepres
       {/* ── DOCUMENTO FIRMADO ── */}
       <fieldset className="form-fieldset">
         <legend className="form-legend">Documento firmado (adjuntar una vez firmado por el cliente)</legend>
-        <div className="flex items-center gap-3 flex-wrap">
-          <label className="btn btn-secondary btn-sm cursor-pointer flex items-center gap-2">
-            <Upload className="w-4 h-4" />
-            {signedFile ? 'Cambiar archivo' : 'Seleccionar PDF/imagen firmado'}
-            <input
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
-              className="hidden"
-              onChange={e => setSignedFile(e.target.files?.[0] || null)}
-            />
-          </label>
-          {signedFile && (
-            <>
-              <span className="flex items-center gap-1 text-sm text-green-600">
-                <CheckCircle className="w-4 h-4" /> {signedFile.name}
-              </span>
+        
+        {uploadedSignedUrl ? (
+          <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center gap-2 text-green-700">
+              <CheckCircle className="w-5 h-5" />
+              <span className="font-medium">Documento firmado subido correctamente</span>
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <a
+                href={uploadedSignedUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary btn-sm flex items-center gap-1.5"
+              >
+                <FileText className="w-3.5 h-3.5" /> Ver documento
+              </a>
               <button
                 type="button"
                 onClick={() => {
-                  const url = URL.createObjectURL(signedFile);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = signedFile.name;
-                  a.click();
-                  URL.revokeObjectURL(url);
+                  setUploadedSignedUrl(null);
+                  setSignedFile(null);
                 }}
-                className="btn btn-primary btn-sm flex items-center gap-1.5"
+                className="text-gray-400 hover:text-red-500"
               >
-                <Download className="w-3.5 h-3.5" /> Descargar firmado
+                <X className="w-3.5 h-3.5" /> Subir otro
               </button>
-              <button type="button" onClick={() => setSignedFile(null)} className="text-gray-400 hover:text-red-500">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </>
-          )}
-        </div>
-        {!signedFile && (
-          <p className="text-xs text-gray-400 mt-2">Una vez que el cliente firme el documento, adjúntalo aquí para tenerlo registrado.</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="btn btn-secondary btn-sm cursor-pointer flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                {signedFile ? 'Cambiar archivo' : 'Seleccionar PDF/imagen firmado'}
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  className="hidden"
+                  onChange={e => setSignedFile(e.target.files?.[0] || null)}
+                />
+              </label>
+              {signedFile && (
+                <>
+                  <span className="flex items-center gap-1 text-sm text-green-600">
+                    <CheckCircle className="w-4 h-4" /> {signedFile.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = URL.createObjectURL(signedFile);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = signedFile.name;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="btn btn-secondary btn-sm flex items-center gap-1.5"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Descargar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleUploadSigned}
+                    disabled={uploadingSigned}
+                    className="btn btn-primary btn-sm flex items-center gap-1.5"
+                  >
+                    {uploadingSigned ? (
+                      <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Subiendo…</>
+                    ) : (
+                      <><Upload className="w-3.5 h-3.5" /> Subir a la app</>
+                    )}
+                  </button>
+                  <button type="button" onClick={() => setSignedFile(null)} className="text-gray-400 hover:text-red-500">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
+            </div>
+            {!signedFile && (
+              <p className="text-xs text-gray-400 mt-2">Una vez que el cliente firme el documento, adjúntalo aquí y súbelo a la app para que esté disponible para todo el equipo.</p>
+            )}
+          </>
         )}
       </fieldset>
 

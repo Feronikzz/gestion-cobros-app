@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { eur } from '@/lib/utils';
 import type { Cliente, Procedimiento, Cobro } from '@/lib/supabase/types';
 import type { Documento, EstadoProcedimiento } from '@/lib/supabase/types';
-import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download, Activity, FileSignature, Printer } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download, Activity, FileSignature, Printer, ChevronUp, ChevronDown, CheckSquare, Square } from 'lucide-react';
 import { formatField } from '@/lib/utils/text';
 import { ProcedimientoForm } from '@/components/procedimiento-form';
 import { ActividadForm } from '@/components/actividad-form';
@@ -20,6 +20,7 @@ import { RecibiGenerator } from '@/components/recibi-generator';
 import { RecibiFormInline } from '@/components/recibi-form';
 import { ClienteFormV2 } from '@/components/cliente-form-v2';
 import { CarpetaLocalViewer } from '@/components/carpeta-local-viewer';
+import { FileDropZone } from '@/components/file-drop-zone';
 import { useActividades } from '@/lib/hooks/use-actividades';
 import { useRecibis } from '@/lib/hooks/use-recibis';
 import type { Actividad, Recibi, RecibiInsert, ClienteInsert, ClienteUpdate } from '@/lib/supabase/types';
@@ -52,6 +53,9 @@ export default function ClienteDetallePage() {
   const [showEditClienteModal, setShowEditClienteModal] = useState(false);
   const [editingCobro, setEditingCobro] = useState<Cobro | null>(null);
   const [docsIdentidad, setDocsIdentidad] = useState<{tipo:string;numero:string;fecha_expedicion:string;fecha_caducidad:string;es_principal:boolean}[]>([]);
+  const [expandedDocChecklist, setExpandedDocChecklist] = useState<string | null>(null);
+  const [uploadProcId, setUploadProcId] = useState<string | null>(null);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
 
   // Hooks CRM
   const { actividades, createActividad, updateActividad, deleteActividad, completeActividad, stats: actStats } = useActividades(id);
@@ -225,6 +229,19 @@ export default function ClienteDetallePage() {
     fetchData();
   };
 
+  // Toggle documento requerido en el checklist
+  const handleToggleDocRequerido = async (procedimientoId: string, docIndex: number) => {
+    if (!supabase) return;
+    const proc = procedimientos.find(p => p.id === procedimientoId);
+    if (!proc || !proc.documentos_requeridos) return;
+    
+    const newDocs = [...proc.documentos_requeridos];
+    newDocs[docIndex] = { ...newDocs[docIndex], adjuntado: !newDocs[docIndex].adjuntado };
+    
+    await supabase.from('procedimientos').update({ documentos_requeridos: newDocs }).eq('id', procedimientoId);
+    fetchData();
+  };
+
   const handleEditProc = (p: Procedimiento) => {
     setEditingProc(p);
     setProcForm({
@@ -376,6 +393,53 @@ export default function ClienteDetallePage() {
     }
   };
 
+  // Subir archivos a un procedimiento
+  const handleUploadFilesParaProcedimiento = async (procId: string, files: File[]) => {
+    if (!supabase || !id) return;
+    
+    setUploadingFiles(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('No autenticado');
+
+      for (const file of files) {
+        // 1. Subir archivo a Storage
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${user.id}/${procId}/${Date.now()}_${file.name}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('documentos')
+          .upload(filePath, file);
+        
+        if (uploadError) throw uploadError;
+        
+        // 2. Obtener URL pública
+        const { data: { publicUrl } } = supabase.storage
+          .from('documentos')
+          .getPublicUrl(filePath);
+        
+        // 3. Crear registro en la tabla documentos
+        await supabase.from('documentos').insert({
+          user_id: user.id,
+          cliente_id: id,
+          procedimiento_id: procId,
+          nombre: file.name,
+          tipo: fileExt?.toUpperCase() || 'OTRO',
+          archivo_url: publicUrl,
+          fecha_subida: new Date().toISOString(),
+        });
+      }
+      
+      setUploadProcId(null);
+      fetchData();
+    } catch (error) {
+      console.error('Error subiendo archivos:', error);
+      alert('Error al subir archivos. Por favor, inténtalo de nuevo.');
+    } finally {
+      setUploadingFiles(false);
+    }
+  };
+
   const docsForProc = (procId: string) => documentos.filter(d => d.procedimiento_id === procId);
 
   // Calcular pendiente por procedimiento
@@ -512,21 +576,47 @@ export default function ClienteDetallePage() {
                     {p.fecha_resolucion && <span>Resolución: {p.fecha_resolucion}</span>}
                     <span className={`badge ${estadoProcBadge[p.estado]}`}>{estadoProcLabel[p.estado]}</span>
                   </div>
-                  {/* Checklist de documentos */}
+                  {/* Checklist de documentos - Acordeón desplegable */}
                   {p.documentos_requeridos && p.documentos_requeridos.length > 0 && (() => {
                     const total = p.documentos_requeridos!.length;
                     const adjuntados = p.documentos_requeridos!.filter(d => d.adjuntado).length;
                     const completo = adjuntados === total;
+                    const isOpen = expandedDocChecklist === p.id;
                     return (
-                      <div className={`mt-2 p-2 rounded-lg border text-xs ${completo ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
-                        <div className="flex items-center gap-1.5 font-medium mb-1">
-                          <FileText className="w-3 h-3" />
-                          Documentación: <span className={completo ? 'text-green-700' : 'text-amber-700'}>{adjuntados}/{total}</span>
-                          {completo && <span className="text-green-600">✓ Completa</span>}
-                        </div>
-                        {!completo && (
-                          <div className="text-gray-500">
-                            Faltan: {p.documentos_requeridos!.filter(d => !d.adjuntado).map(d => d.nombre).join(', ')}
+                      <div className={`mt-2 rounded-lg border overflow-hidden ${completo ? 'border-green-200' : 'border-amber-200'}`}>
+                        {/* Cabecera del acordeón */}
+                        <button
+                          type="button"
+                          onClick={() => setExpandedDocChecklist(isOpen ? null : p.id)}
+                          className={`w-full flex items-center justify-between p-2 text-xs ${completo ? 'bg-green-50' : 'bg-amber-50'} hover:opacity-80 transition-opacity`}
+                        >
+                          <div className="flex items-center gap-1.5 font-medium">
+                            <FileText className="w-3 h-3" />
+                            Documentación: <span className={completo ? 'text-green-700' : 'text-amber-700'}>{adjuntados}/{total}</span>
+                            {completo && <span className="text-green-600">✓ Completa</span>}
+                          </div>
+                          {isOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        </button>
+                        {/* Contenido del acordeón */}
+                        {isOpen && (
+                          <div className="p-2 bg-white space-y-1">
+                            {p.documentos_requeridos!.map((doc, idx) => (
+                              <div key={idx} className="flex items-center gap-2 py-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleDocRequerido(p.id, idx)}
+                                  className="flex-shrink-0"
+                                >
+                                  {doc.adjuntado
+                                    ? <CheckSquare className="w-4 h-4 text-green-600" />
+                                    : <Square className="w-4 h-4 text-gray-300" />
+                                  }
+                                </button>
+                                <span className={`text-sm flex-1 ${doc.adjuntado ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                                  {doc.nombre}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -554,6 +644,25 @@ export default function ClienteDetallePage() {
                       ))}
                     </div>
                   )}
+                  
+                  {/* Botón y zona de subida de archivos */}
+                  <div className="mt-2">
+                    {uploadProcId === p.id ? (
+                      <FileDropZone
+                        onUpload={(files) => handleUploadFilesParaProcedimiento(p.id, files)}
+                        uploading={uploadingFiles}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setUploadProcId(p.id)}
+                        className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1 py-1"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        Arrastrar archivos aquí
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -833,7 +942,12 @@ export default function ClienteDetallePage() {
 
       {/* ── Modal: Designación de Representante ── */}
       <Modal isOpen={showDesignacionModal} onClose={() => setShowDesignacionModal(false)} title="Designación de Representante" size="wide">
-        <DesignacionRepresentante cliente={cliente || undefined} onClose={() => setShowDesignacionModal(false)} />
+        <DesignacionRepresentante 
+          cliente={cliente || undefined} 
+          clienteId={id}
+          onClose={() => setShowDesignacionModal(false)} 
+          onUploaded={() => fetchData()}
+        />
       </Modal>
 
       {/* ── Modal: Editar datos del cliente ── */}

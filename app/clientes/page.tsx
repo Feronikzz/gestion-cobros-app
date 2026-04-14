@@ -323,7 +323,7 @@ export default function ClientesPage() {
           <thead>
             <tr>
               <th>Cliente</th>
-              <th>NIF</th>
+              <th>Expedientes</th>
               <th>Contacto</th>
               <th>Fecha entrada</th>
               <th>Estado</th>
@@ -334,22 +334,39 @@ export default function ClientesPage() {
             {filteredClientes.length === 0 ? (
               <tr><td colSpan={6} className="empty-state">{searchQuery || estadoFilter ? 'Sin resultados' : 'No hay clientes registrados'}</td></tr>
             ) : (
-              filteredClientes.map((c) => (
-                <tr key={c.id}>
-                  <td className="font-medium">{[c.nombre, c.apellidos].filter(Boolean).join(' ')}</td>
-                  <td className="subtle-text">{c.nif || '—'}</td>
-                  <td className="subtle-text">{c.telefono || c.email || '—'}</td>
-                  <td>{c.fecha_entrada}</td>
-                  <td><span className={`badge ${estadoBadge(c.estado)}`}>{c.estado}</span></td>
-                  <td>
-                    <div className="action-buttons">
-                      <Link href={`/clientes/${c.id}`} className="action-btn action-view" title="Ver detalle"><Eye className="w-4 h-4" /></Link>
-                      <button onClick={() => { setEditingCliente(c); setIsModalOpen(true); }} className="action-btn action-edit" title="Editar"><Edit className="w-4 h-4" /></button>
-                      <button onClick={() => handleDelete(c)} className="action-btn action-delete" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+              filteredClientes.map((c) => {
+                const procsCliente = procedimientos.filter(p => p.cliente_id === c.id);
+                const procsActivos = procsCliente.filter(p =>
+                  !['cerrado', 'archivado'].includes(p.estado)
+                ).length;
+                return (
+                  <tr key={c.id}>
+                    <td className="font-medium">{[c.nombre, c.apellidos].filter(Boolean).join(' ')}</td>
+                    <td className="subtle-text">
+                      {procsCliente.length > 0 ? (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="text-blue-600 font-medium">{procsActivos}</span>
+                          <span className="text-gray-400">/</span>
+                          <span className="text-gray-500">{procsCliente.length}</span>
+                          <span className="text-xs text-gray-400 ml-1">activos</span>
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="subtle-text">{c.telefono || c.email || '—'}</td>
+                    <td>{c.fecha_entrada}</td>
+                    <td><span className={`badge ${estadoBadge(c.estado)}`}>{c.estado}</span></td>
+                    <td>
+                      <div className="action-buttons">
+                        <Link href={`/clientes/${c.id}`} className="action-btn action-view" title="Ver detalle"><Eye className="w-4 h-4" /></Link>
+                        <button onClick={() => { setEditingCliente(c); setIsModalOpen(true); }} className="action-btn action-edit" title="Editar"><Edit className="w-4 h-4" /></button>
+                        <button onClick={() => handleDelete(c)} className="action-btn action-delete" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

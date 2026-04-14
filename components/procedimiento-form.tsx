@@ -193,19 +193,42 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
                 placeholder="Buscar o escribir procedimiento..."
               />
             </div>
-            {showTituloDropdown && catalogSuggestions.length > 0 && (
+            {showTituloDropdown && (
               <div className="absolute z-50 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                {catalogSuggestions.map(p => (
-                  <button
-                    key={p.titulo}
-                    type="button"
-                    onClick={() => selectCatalogProc(p.titulo)}
-                    className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors flex items-center justify-between"
-                  >
-                    <span>{p.titulo}</span>
-                    <span className="text-xs text-gray-400">{CATEGORIA_LABELS[p.categoria]}</span>
-                  </button>
-                ))}
+                {catalogSuggestions.length > 0 ? (
+                  catalogSuggestions.map(p => (
+                    <button
+                      key={p.titulo}
+                      type="button"
+                      onClick={() => selectCatalogProc(p.titulo)}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 transition-colors flex items-center justify-between"
+                    >
+                      <span>{p.titulo}</span>
+                      <span className="text-xs text-gray-400">{CATEGORIA_LABELS[p.categoria]}</span>
+                    </button>
+                  ))
+                ) : tituloSearch.trim() ? (
+                  <div className="p-3">
+                    <p className="text-xs text-gray-500 mb-2">"{tituloSearch}" no está en el catálogo</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Añadir al catálogo local (sesión actual)
+                        const nuevo = {
+                          titulo: tituloSearch.trim(),
+                          categoria: (form.categoria || 'otro') as CategoriaProcedimiento,
+                          documentos_requeridos: []
+                        };
+                        CATALOGO_PROCEDIMIENTOS.push(nuevo);
+                        selectCatalogProc(nuevo.titulo);
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm bg-blue-50 text-blue-700 rounded hover:bg-blue-100 transition-colors flex items-center gap-2"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      Añadir "{tituloSearch}" al catálogo
+                    </button>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
