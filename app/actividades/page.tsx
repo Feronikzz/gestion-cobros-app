@@ -4,15 +4,21 @@ import { useState, useEffect } from 'react';
 import { LayoutShell } from '@/components/layout-shell';
 import { Modal } from '@/components/modal';
 import { ActividadForm } from '@/components/actividad-form';
+import { ActividadMasivaForm } from '@/components/actividad-masiva-form';
 import { ActividadTimeline } from '@/components/actividad-timeline';
 import { useActividades } from '@/lib/hooks/use-actividades';
+import { useClientes } from '@/lib/hooks/use-clientes';
+import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import { createClient } from '@/lib/supabase/client';
-import type { Actividad } from '@/lib/supabase/types';
-import { Plus, Activity, Clock, AlertTriangle, Calendar } from 'lucide-react';
+import type { Actividad, ActividadInsert } from '@/lib/supabase/types';
+import { Plus, Activity, Clock, AlertTriangle, Calendar, Users } from 'lucide-react';
 
 export default function ActividadesPage() {
-  const { actividades, loading, createActividad, updateActividad, deleteActividad, completeActividad, stats } = useActividades();
+  const { actividades, loading, createActividad, updateActividad, deleteActividad, completeActividad, stats, refetch } = useActividades();
+  const { clientes } = useClientes();
+  const { procedimientos } = useProcedimientos();
   const [showModal, setShowModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   const [editingActividad, setEditingActividad] = useState<Actividad | null>(null);
   const [clienteNombres, setClienteNombres] = useState<Record<string, string>>({});
 
@@ -38,9 +44,14 @@ export default function ActividadesPage() {
     >
       <div className="page-toolbar">
         <h2>Panel de Actividades</h2>
-        <button onClick={() => { setEditingActividad(null); setShowModal(true); }} className="btn btn-primary">
-          <Plus className="w-4 h-4" /> Nueva actividad
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowBulkModal(true)} className="btn btn-secondary flex items-center gap-1.5">
+            <Users className="w-4 h-4" /> Crear masiva
+          </button>
+          <button onClick={() => { setEditingActividad(null); setShowModal(true); }} className="btn btn-primary">
+            <Plus className="w-4 h-4" /> Nueva actividad
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -107,7 +118,7 @@ export default function ActividadesPage() {
       </div>
 
       {/* Modal */}
-      <Modal isOpen={showModal} onClose={() => { setShowModal(false); setEditingActividad(null); }} title={editingActividad ? 'Editar actividad' : 'Nueva actividad'}>
+      <Modal isOpen={showModal} onClose={() => { setShowModal(false); setEditingActividad(null); }} title={editingActividad ? 'Editar actividad' : 'Nueva actividad'} confirmClose>
         <ActividadForm
           actividad={editingActividad || undefined}
           onSubmit={async (data) => {
@@ -120,6 +131,22 @@ export default function ActividadesPage() {
             setEditingActividad(null);
           }}
           onCancel={() => { setShowModal(false); setEditingActividad(null); }}
+        />
+      </Modal>
+
+      {/* Modal masiva */}
+      <Modal isOpen={showBulkModal} onClose={() => setShowBulkModal(false)} title="Crear actividades masivas" size="wide" confirmClose>
+        <ActividadMasivaForm
+          clientes={clientes}
+          procedimientos={procedimientos}
+          onSubmit={async (data, clienteIds) => {
+            for (const cid of clienteIds) {
+              await createActividad({ ...data, cliente_id: cid });
+            }
+            await refetch();
+            setShowBulkModal(false);
+          }}
+          onCancel={() => setShowBulkModal(false)}
         />
       </Modal>
     </LayoutShell>

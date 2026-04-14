@@ -14,6 +14,7 @@ interface ProcedimientoFormProps {
 const estadoProcLabel: Record<EstadoProcedimiento, string> = {
   pendiente: 'Pendiente',
   pendiente_presentar: 'Pte. presentar',
+  en_proceso: 'En proceso',
   presentado: 'Presentado',
   pendiente_resolucion: 'Pte. resolución',
   pendiente_recurso: 'Pte. recurso',
@@ -24,7 +25,7 @@ const estadoProcLabel: Record<EstadoProcedimiento, string> = {
 
 // Campos que solo tienen sentido una vez presentado el procedimiento
 const CAMPOS_POST_PRESENTACION: EstadoProcedimiento[] = [
-  'presentado', 'pendiente_resolucion', 'pendiente_recurso', 'resuelto', 'cerrado', 'archivado'
+  'en_proceso', 'presentado', 'pendiente_resolucion', 'pendiente_recurso', 'resuelto', 'cerrado', 'archivado'
 ];
 
 export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel }: ProcedimientoFormProps) {

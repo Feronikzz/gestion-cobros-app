@@ -57,6 +57,7 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
     documento_tipo: cliente?.documento_tipo ?? '',
     documento_numero: cliente?.documento_numero ?? '',
     documento_caducidad: cliente?.documento_caducidad ?? '',
+    carpeta_local: cliente?.carpeta_local ?? '',
   });
 
   // ─── Documentos de identidad ───
@@ -145,6 +146,7 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
         documento_caducidad: docPrincipal?.fecha_caducidad || formData.documento_caducidad || null,
         estado: formData.estado as Cliente['estado'],
         notas: formData.notas ? formatField(formData.notas, 'general') : null,
+        carpeta_local: formData.carpeta_local || null,
       };
 
       const procData = addProc && procForm.titulo ? procForm : null;
@@ -320,6 +322,11 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
               <label className="form-label">Notas</label>
               <textarea value={formData.notas} onChange={e => set('notas', e.target.value)} className="form-input" rows={2} placeholder="Observaciones generales sobre el cliente..." />
             </div>
+            <div className="md:col-span-2">
+              <label className="form-label">Carpeta local</label>
+              <input type="text" value={formData.carpeta_local} onChange={e => set('carpeta_local', e.target.value)} className="form-input" placeholder="C:\Clientes\NombreCliente o \\servidor\carpeta" />
+              <p className="text-xs text-gray-400 mt-1">Ruta a la carpeta local del cliente. Se abrirá al hacer clic desde la ficha.</p>
+            </div>
           </div>
         )}
       </fieldset>
@@ -362,6 +369,7 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
                 <label className="form-label">Estado inicial</label>
                 <select value={procForm.estado} onChange={e => setProcForm({ ...procForm, estado: e.target.value as EstadoProcedimiento })} className="form-input">
                   <option value="pendiente_presentar">Pte. presentar</option>
+                  <option value="en_proceso">En proceso</option>
                   <option value="pendiente">Pendiente</option>
                 </select>
               </div>

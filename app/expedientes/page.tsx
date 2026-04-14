@@ -55,6 +55,7 @@ export default function ExpedientesPage() {
   const estadoLabels: Record<EstadoProcedimiento, string> = {
     pendiente: 'Pendiente',
     pendiente_presentar: 'Pte. presentar',
+    en_proceso: 'En proceso',
     presentado: 'Presentado',
     pendiente_resolucion: 'Pte. resolución',
     pendiente_recurso: 'Pte. recurso',
@@ -66,6 +67,7 @@ export default function ExpedientesPage() {
   const estadoBadges: Record<EstadoProcedimiento, string> = {
     pendiente: 'badge-orange',
     pendiente_presentar: 'badge-yellow',
+    en_proceso: 'badge-blue',
     presentado: 'badge-blue',
     pendiente_resolucion: 'badge-yellow',
     pendiente_recurso: 'badge-red',
@@ -154,6 +156,7 @@ export default function ExpedientesPage() {
               <option value="todos">Todos los estados</option>
               <option value="pendiente">Pendiente</option>
               <option value="pendiente_presentar">Pte. presentar</option>
+              <option value="en_proceso">En proceso</option>
               <option value="presentado">Presentado</option>
               <option value="pendiente_resolucion">Pte. resolución</option>
               <option value="pendiente_recurso">Pte. recurso</option>

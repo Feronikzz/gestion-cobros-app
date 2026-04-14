@@ -111,7 +111,7 @@ export function useExpedientes() {
     total: expedientes.length,
     pendientes: expedientes.filter(exp => exp.estado === 'pendiente').length,
     enProceso: expedientes.filter(exp => 
-      ['pendiente_presentar', 'presentado', 'pendiente_resolucion', 'pendiente_recurso'].includes(exp.estado)
+      ['pendiente_presentar', 'en_proceso', 'presentado', 'pendiente_resolucion', 'pendiente_recurso'].includes(exp.estado)
     ).length,
     resueltos: expedientes.filter(exp => exp.estado === 'resuelto').length,
     cerrados: expedientes.filter(exp => ['cerrado', 'archivado'].includes(exp.estado)).length,

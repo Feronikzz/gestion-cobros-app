@@ -11,7 +11,7 @@ import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import { useCobros } from '@/lib/hooks/use-cobros';
 import type { Cliente, ClienteInsert } from '@/lib/supabase/types';
 import Link from 'next/link';
-import { Eye, Edit, Trash2, UserPlus, Users, TrendingUp, Calendar, DollarSign, Search, ChevronDown, X, Phone, Mail, MapPin } from 'lucide-react';
+import { Eye, Edit, Trash2, UserPlus, Users, TrendingUp, Calendar, DollarSign, Search, ChevronDown, ChevronUp, X, Phone, Mail, MapPin, ArrowUpDown, FileText } from 'lucide-react';
 
 export default function ClientesPageEnhanced() {
   const { clientes, loading, error, createCliente, updateCliente, deleteCliente } = useClientes();
@@ -22,6 +22,27 @@ export default function ClientesPageEnhanced() {
   const [searchQuery, setSearchQuery] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('');
   const [showEstadoFilter, setShowEstadoFilter] = useState(false);
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
+  const [sortField, setSortField] = useState<'nombre' | 'fecha_entrada' | 'estado'>('nombre');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  // Map cliente_id -> primer procedimiento
+  const clienteExpediente = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const p of procedimientos) {
+      if (!map[p.cliente_id]) map[p.cliente_id] = p.titulo;
+    }
+    return map;
+  }, [procedimientos]);
+
+  const clienteProcCount = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const p of procedimientos) {
+      map[p.cliente_id] = (map[p.cliente_id] || 0) + 1;
+    }
+    return map;
+  }, [procedimientos]);
 
   // Funciones de estadísticas
   const calcularClientesActivos = () => {
@@ -50,25 +71,55 @@ export default function ClientesPageEnhanced() {
   const clearFilters = () => {
     setSearchQuery('');
     setEstadoFilter('');
+    setFechaDesde('');
+    setFechaHasta('');
     setShowEstadoFilter(false);
   };
 
+  const toggleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
   const filteredClientes = useMemo(() => {
-    return clientes.filter(cliente => {
+    const filtered = clientes.filter(cliente => {
       const matchesSearch = searchQuery === '' || 
         cliente.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
         cliente.apellidos?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         cliente.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         cliente.nif?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        cliente.telefono?.includes(searchQuery);
+        cliente.telefono?.includes(searchQuery) ||
+        clienteExpediente[cliente.id]?.toLowerCase().includes(searchQuery.toLowerCase());
       
       const matchesEstado = estadoFilter === '' || cliente.estado === estadoFilter;
       
-      return matchesSearch && matchesEstado;
+      const matchesFechaDesde = !fechaDesde || cliente.fecha_entrada >= fechaDesde;
+      const matchesFechaHasta = !fechaHasta || cliente.fecha_entrada <= fechaHasta;
+      
+      return matchesSearch && matchesEstado && matchesFechaDesde && matchesFechaHasta;
     });
-  }, [clientes, searchQuery, estadoFilter]);
 
-  const activeFiltersCount = useMemo(() => [searchQuery, estadoFilter].filter(Boolean).length, [searchQuery, estadoFilter]);
+    // Sort
+    filtered.sort((a, b) => {
+      let cmp = 0;
+      if (sortField === 'nombre') {
+        cmp = (a.nombre + (a.apellidos || '')).localeCompare(b.nombre + (b.apellidos || ''));
+      } else if (sortField === 'fecha_entrada') {
+        cmp = a.fecha_entrada.localeCompare(b.fecha_entrada);
+      } else if (sortField === 'estado') {
+        cmp = a.estado.localeCompare(b.estado);
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    return filtered;
+  }, [clientes, searchQuery, estadoFilter, fechaDesde, fechaHasta, sortField, sortDir, clienteExpediente]);
+
+  const activeFiltersCount = useMemo(() => [searchQuery, estadoFilter, fechaDesde, fechaHasta].filter(Boolean).length, [searchQuery, estadoFilter, fechaDesde, fechaHasta]);
 
   const handleSubmit = async (data: Omit<ClienteInsert, 'user_id'>) => {
     try {
@@ -204,15 +255,46 @@ export default function ClientesPageEnhanced() {
                     Activo
                   </button>
                   <button
-                    onClick={() => { setEstadoFilter('inactivo'); setShowEstadoFilter(false); }}
+                    onClick={() => { setEstadoFilter('pendiente'); setShowEstadoFilter(false); }}
                     className="w-full text-left px-4 py-2 hover:bg-gray-100"
                   >
-                    Inactivo
+                    Pendiente
+                  </button>
+                  <button
+                    onClick={() => { setEstadoFilter('pagado'); setShowEstadoFilter(false); }}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                  >
+                    Pagado
+                  </button>
+                  <button
+                    onClick={() => { setEstadoFilter('archivado'); setShowEstadoFilter(false); }}
+                    className="w-full text-left px-4 py-2 hover:bg-gray-100"
+                  >
+                    Archivado
                   </button>
                 </div>
               )}
             </div>
             
+            {/* Date filters */}
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={fechaDesde}
+                onChange={(e) => setFechaDesde(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                title="Desde fecha"
+              />
+              <span className="text-gray-400 text-sm">—</span>
+              <input
+                type="date"
+                value={fechaHasta}
+                onChange={(e) => setFechaHasta(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                title="Hasta fecha"
+              />
+            </div>
+
             {activeFiltersCount > 0 && (
               <button
                 onClick={clearFilters}
@@ -255,20 +337,20 @@ export default function ClientesPageEnhanced() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort('nombre')}>
+                      <span className="inline-flex items-center gap-1">Cliente {sortField === 'nombre' && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}</span>
+                    </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Cliente
+                      Expediente
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Contacto
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ubicación
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort('estado')}>
+                      <span className="inline-flex items-center gap-1">Estado {sortField === 'estado' && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}</span>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Estado
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Fecha Entrada
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort('fecha_entrada')}>
+                      <span className="inline-flex items-center gap-1">Fecha Entrada {sortField === 'fecha_entrada' && (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}</span>
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Acciones
@@ -285,28 +367,35 @@ export default function ClientesPageEnhanced() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {cliente.email && (
-                            <div className="flex items-center gap-1">
-                              <Mail className="w-3 h-3 text-gray-400" />
-                              {cliente.email}
+                        {clienteExpediente[cliente.id] ? (
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 flex items-center gap-1">
+                              <FileText className="w-3 h-3 text-gray-400" />
+                              {clienteExpediente[cliente.id]}
                             </div>
-                          )}
+                            {(clienteProcCount[cliente.id] || 0) > 1 && (
+                              <div className="text-xs text-gray-400">+{clienteProcCount[cliente.id]! - 1} más</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
                           {cliente.telefono && (
                             <div className="flex items-center gap-1">
                               <Phone className="w-3 h-3 text-gray-400" />
                               {cliente.telefono}
                             </div>
                           )}
+                          {cliente.email && (
+                            <div className="flex items-center gap-1">
+                              <Mail className="w-3 h-3 text-gray-400" />
+                              {cliente.email}
+                            </div>
+                          )}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {cliente.direccion && (
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-gray-400" />
-                            {cliente.direccion}
-                          </div>
-                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -355,7 +444,7 @@ export default function ClientesPageEnhanced() {
               <MobileCard
                 key={cliente.id}
                 title={[cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}
-                subtitle={cliente.nif || '—'}
+                subtitle={clienteExpediente[cliente.id] || cliente.nif || '—'}
                 actions={
                   <div className="flex items-center gap-2">
                     <Link

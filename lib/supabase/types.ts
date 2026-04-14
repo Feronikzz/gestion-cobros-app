@@ -3,6 +3,7 @@ export type EstadoCliente = 'activo' | 'pendiente' | 'pagado' | 'archivado';
 export type EstadoProcedimiento =
   | 'pendiente'
   | 'pendiente_presentar'
+  | 'en_proceso'
   | 'presentado'
   | 'pendiente_resolucion'
   | 'pendiente_recurso'
@@ -33,6 +34,7 @@ export interface Cliente {
   documento_caducidad: string | null;
   estado: EstadoCliente;
   notas: string | null;
+  carpeta_local: string | null;
   created_at: string;
 }
 

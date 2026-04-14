@@ -50,6 +50,7 @@ export function ClienteForm({ cliente, onSubmit, onCancel }: ClienteFormProps) {
         nacionalidad: null,
         documento_numero: null,
         fecha_nacimiento: null,
+        carpeta_local: null,
       });
     } catch (error) {
       console.error('Error:', error);

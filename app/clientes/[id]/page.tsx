@@ -113,6 +113,7 @@ export default function ClienteDetallePage() {
   const estadoProcLabel: Record<EstadoProcedimiento, string> = {
     pendiente: 'Pendiente',
     pendiente_presentar: 'Pte. presentar',
+    en_proceso: 'En proceso',
     presentado: 'Presentado',
     pendiente_resolucion: 'Pte. resolución',
     pendiente_recurso: 'Pte. recurso',
@@ -123,6 +124,7 @@ export default function ClienteDetallePage() {
   const estadoProcBadge: Record<EstadoProcedimiento, string> = {
     pendiente: 'badge-orange',
     pendiente_presentar: 'badge-yellow',
+    en_proceso: 'badge-blue',
     presentado: 'badge-blue',
     pendiente_resolucion: 'badge-yellow',
     pendiente_recurso: 'badge-red',
@@ -433,6 +435,20 @@ export default function ClienteDetallePage() {
           <div><span className="detail-label">Fecha entrada</span><span className="detail-value">{cliente.fecha_entrada}</span></div>
           <div><span className="detail-label">Estado</span><span className={`badge badge-${cliente.estado === 'activo' ? 'green' : cliente.estado === 'pendiente' ? 'yellow' : cliente.estado === 'pagado' ? 'blue' : 'gray'}`}>{cliente.estado}</span></div>
           {cliente.notas && <div className="col-span-full"><span className="detail-label">Notas</span><span className="detail-value">{cliente.notas}</span></div>}
+          {cliente.carpeta_local && (
+            <div className="col-span-full">
+              <span className="detail-label">Carpeta local</span>
+              <a
+                href={`file:///${cliente.carpeta_local.replace(/\\/g, '/')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="detail-value text-blue-600 hover:text-blue-800 underline cursor-pointer inline-flex items-center gap-1"
+                title="Abrir carpeta local"
+              >
+                📁 {cliente.carpeta_local}
+              </a>
+            </div>
+          )}
         </div>
       </div>
 
