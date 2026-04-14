@@ -10,7 +10,7 @@ import { useCobros } from '@/lib/hooks/use-cobros';
 import type { Cliente, ClienteInsert, EstadoProcedimiento } from '@/lib/supabase/types';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
-import { Eye, Edit, Trash2, UserPlus, Users, TrendingUp, Calendar, DollarSign, Search, ChevronDown, X } from 'lucide-react';
+import { Eye, Edit, Trash2, UserPlus, Users, TrendingUp, Calendar, DollarSign, Search, ChevronDown, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function ClientesPage() {
   const { clientes, loading, error, createCliente, updateCliente, deleteCliente } = useClientes();
@@ -21,6 +21,10 @@ export default function ClientesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('');
   const [showEstadoFilter, setShowEstadoFilter] = useState(false);
+
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   // Funciones de estadísticas
   const calcularClientesActivos = () => {
@@ -51,7 +55,13 @@ export default function ClientesPage() {
   const clearFilters = () => {
     setSearchQuery('');
     setEstadoFilter('');
+    setCurrentPage(1);
   };
+
+  // Reset página al cambiar filtros
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [searchQuery, estadoFilter]);
 
   const filteredClientes = useMemo(() => {
     return clientes.filter(c => {
@@ -67,6 +77,14 @@ export default function ClientesPage() {
       return matchesSearch && matchesEstado;
     });
   }, [clientes, searchQuery, estadoFilter]);
+
+  // Clientes paginados
+  const paginatedClientes = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredClientes.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredClientes, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredClientes.length / itemsPerPage) || 1;
 
   const handleSubmit = async (
     data: Omit<ClienteInsert, 'user_id'>,
@@ -317,6 +335,25 @@ export default function ClientesPage() {
         </div>
       )}
 
+      {/* Info de paginación */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-sm text-gray-600">
+          Mostrando <span className="font-medium">{Math.min((currentPage - 1) * itemsPerPage + 1, filteredClientes.length)}</span> - <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredClientes.length)}</span> de <span className="font-medium">{filteredClientes.length}</span> clientes
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-600">Por página:</label>
+          <select
+            value={itemsPerPage}
+            onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+            className="px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
+        </div>
+      </div>
+
       {/* Tabla de Clientes */}
       <div className="table-container">
         <table className="table">
@@ -334,7 +371,7 @@ export default function ClientesPage() {
             {filteredClientes.length === 0 ? (
               <tr><td colSpan={6} className="empty-state">{searchQuery || estadoFilter ? 'Sin resultados' : 'No hay clientes registrados'}</td></tr>
             ) : (
-              filteredClientes.map((c) => {
+              paginatedClientes.map((c) => {
                 const procsCliente = procedimientos.filter(p => p.cliente_id === c.id);
                 const procsActivos = procsCliente.filter(p =>
                   !['cerrado', 'archivado'].includes(p.estado)
@@ -371,6 +408,41 @@ export default function ClientesPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Controles de paginación */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+            <button
+              key={page}
+              onClick={() => setCurrentPage(page)}
+              className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                currentPage === page
+                  ? 'bg-blue-600 text-white'
+                  : 'border border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {page}
+            </button>
+          ))}
+          
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingCliente ? 'Editar Cliente' : 'Nuevo Cliente'}>
         <ClienteFormV2

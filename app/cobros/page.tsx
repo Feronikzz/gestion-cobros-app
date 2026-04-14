@@ -10,7 +10,7 @@ import { useClientes } from '@/lib/hooks/use-clientes';
 import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import type { Cobro } from '@/lib/supabase/types';
 import { eur } from '@/lib/utils';
-import { CheckCircle, AlertCircle, Plus, FileText, DollarSign, Edit3, Trash2, Search, Filter, ChevronDown, ChevronUp, X, Users, CreditCard, Calendar, TrendingUp, Eye } from 'lucide-react';
+import { CheckCircle, AlertCircle, Plus, FileText, DollarSign, Edit3, Trash2, Search, Filter, ChevronDown, ChevronUp, X, Users, CreditCard, Calendar, TrendingUp, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function CobrosPage() {
   const router = useRouter();
@@ -29,6 +29,10 @@ export default function CobrosPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [showMonthFilter, setShowMonthFilter] = useState(false);
   const [showMetodoFilter, setShowMetodoFilter] = useState(false);
+
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
 
   // Filtrado de cobros
   const filteredCobros = useMemo(() => {
@@ -56,6 +60,14 @@ export default function CobrosPage() {
       return searchMatch && clienteMatch && metodoMatch && tipoMatch && mesMatch;
     });
   }, [cobros, searchTerm, filterCliente, filterMetodo, filterTipo, filterMes]);
+
+  // Cobros paginados
+  const paginatedCobros = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredCobros.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredCobros, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredCobros.length / itemsPerPage) || 1;
 
   // Generar meses disponibles para el filtro
   const mesesDisponibles = useMemo(() => {
@@ -94,7 +106,13 @@ export default function CobrosPage() {
     setFilterMetodo('');
     setFilterTipo('');
     setFilterMes('');
+    setCurrentPage(1);
   };
+
+  // Reset página al cambiar filtros
+  useMemo(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterCliente, filterMetodo, filterTipo, filterMes]);
 
   const handleEdit = (cobro: Cobro) => {
     setEditingCobro(cobro);
@@ -445,6 +463,25 @@ export default function CobrosPage() {
         </div>
       )}
 
+      {/* Info de paginación */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-sm text-gray-600">
+          Mostrando <span className="font-medium">{Math.min((currentPage - 1) * itemsPerPage + 1, filteredCobros.length)}</span> - <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredCobros.length)}</span> de <span className="font-medium">{filteredCobros.length}</span> cobros
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-600">Por página:</label>
+          <select
+            value={itemsPerPage}
+            onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+            className="px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
+        </div>
+      </div>
+
       <div className="table-container">
         <table className="table">
           <thead>
@@ -467,7 +504,7 @@ export default function CobrosPage() {
                 </td>
               </tr>
             ) : (
-              filteredCobros.map((cobro) => (
+              paginatedCobros.map((cobro) => (
                 <tr key={cobro.id}>
                   <td>{cobro.fecha_cobro}</td>
                   <td>
@@ -553,6 +590,41 @@ export default function CobrosPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Controles de paginación */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+            <button
+              key={page}
+              onClick={() => setCurrentPage(page)}
+              className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                currentPage === page
+                  ? 'bg-blue-600 text-white'
+                  : 'border border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {page}
+            </button>
+          ))}
+          
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       <Modal
         isOpen={isModalOpen}
