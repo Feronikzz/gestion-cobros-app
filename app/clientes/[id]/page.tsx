@@ -1206,11 +1206,27 @@ export default function ClienteDetallePage() {
                     );
                   } else if (isPdf) {
                     return (
-                      <iframe 
-                        src={`https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(previewDoc.archivo_url)}`}
+                      <object
+                        data={previewDoc.archivo_url}
+                        type="application/pdf"
                         className="w-full h-full"
                         title={previewDoc.nombre}
-                      />
+                      >
+                        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                          <FileText className="w-16 h-16 text-gray-300 mb-4" />
+                          <p className="text-gray-600 mb-2">No se puede mostrar el PDF incrustado</p>
+                          <p className="text-sm text-gray-400 mb-4">{previewDoc.nombre}</p>
+                          <a
+                            href={previewDoc.archivo_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            <Eye className="w-4 h-4" />
+                            Abrir en nueva pestaña
+                          </a>
+                        </div>
+                      </object>
                     );
                   } else {
                     return (

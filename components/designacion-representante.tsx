@@ -7,8 +7,9 @@ import { createClient } from '@/lib/supabase/client';
 
 const STORAGE_KEY_REP = 'designacion_representante_perfil';
 const STORAGE_KEY_EMAILS = 'designacion_emails_sugeridos';
-const STORAGE_KEY_PDF = 'designacion_ultimo_pdf_b64';
-const STORAGE_KEY_PDF_NAME = 'designacion_ultimo_pdf_nombre';
+// PDF por cliente para evitar mezclas
+const getStorageKeyPdf = (clienteId?: string) => `designacion_ultimo_pdf_b64_${clienteId || 'global'}`;
+const getStorageKeyPdfName = (clienteId?: string) => `designacion_ultimo_pdf_nombre_${clienteId || 'global'}`;
 
 const EMAILS_DEFAULT = [
   'extranjeria@sepe.es',
@@ -49,6 +50,36 @@ function loadRepPerfil(): RepresentanteProfile | null {
   try { const r = localStorage.getItem(STORAGE_KEY_REP); return r ? JSON.parse(r) : null; } catch { return null; }
 }
 
+// Parsear fecha de nacimiento YYYY-MM-DD a DD, MM, AAAA
+function parseFechaNacimiento(fechaNacimiento?: string | null): { dd: string; mm: string; aaaa: string } {
+  if (!fechaNacimiento) return { dd: '', mm: '', aaaa: '' };
+  try {
+    const date = new Date(fechaNacimiento);
+    if (isNaN(date.getTime())) return { dd: '', mm: '', aaaa: '' };
+    return {
+      dd: String(date.getDate()).padStart(2, '0'),
+      mm: String(date.getMonth() + 1).padStart(2, '0'),
+      aaaa: String(date.getFullYear()),
+    };
+  } catch { return { dd: '', mm: '', aaaa: '' }; }
+}
+
+// Parsear dirección para separar calle, número y piso
+function parseDireccion(direccion?: string | null): { calle: string; numero: string; piso: string } {
+  if (!direccion) return { calle: '', numero: '', piso: '' };
+  // Regex para capturar: calle + número + piso/portal/letra opcional
+  // Ejemplos: "Calle Mayor 123", "Av. Libertad 45 3ºA", "C/Sol 1 2º"
+  const match = direccion.match(/^(.+?)\s+(\d+)(?:\s*,?\s*(.+))?$/);
+  if (match) {
+    return {
+      calle: match[1].trim(),
+      numero: match[2] || '',
+      piso: match[3] ? match[3].trim() : '',
+    };
+  }
+  return { calle: direccion, numero: '', piso: '' };
+}
+
 export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, onClose, onUploaded }: DesignacionRepresentanteProps) {
   const supabase = typeof window !== 'undefined' ? createClient() : null;
   const today = new Date();
@@ -58,14 +89,25 @@ export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, 
   const apellidos = cliente?.apellidos || '';
   const ap1 = apellidos.split(' ')[0] || '';
   const ap2 = apellidos.split(' ').slice(1).join(' ') || '';
+  
+  // Parsear fecha de nacimiento completa
+  const fechaNac = parseFechaNacimiento((cliente as any)?.fecha_nacimiento);
+  const anioNac = (cliente as any)?.anio_nacimiento;
+  // Priorizar fecha completa, fallback a año solamente
+  const fechaNacDD = fechaNac.dd || '';
+  const fechaNacMM = fechaNac.mm || '';
+  const fechaNacAAAA = fechaNac.aaaa || (anioNac ? String(anioNac) : '');
+  
+  // Parsear dirección desglosada
+  const dirParsed = parseDireccion((cliente as any)?.direccion);
 
   const [repdo, setRepdo] = useState({
     nombre: cliente?.nombre || '', apellido1: ap1, apellido2: ap2,
     nacionalidad: (cliente as any)?.nacionalidad || '', nif: cliente?.nif || '', pasaporte: '',
-    fecha_nac_dd: '', fecha_nac_mm: '', fecha_nac_aaaa: (cliente as any)?.anio_nacimiento?.toString() || '',
+    fecha_nac_dd: fechaNacDD, fecha_nac_mm: fechaNacMM, fecha_nac_aaaa: fechaNacAAAA,
     localidad_nacimiento: '', pais: (cliente as any)?.nacionalidad || '',
     nombre_padre: '', nombre_madre: '', estado_civil: '',
-    domicilio: (cliente as any)?.direccion || '', numero: '', piso: '',
+    domicilio: dirParsed.calle, numero: dirParsed.numero, piso: dirParsed.piso,
     localidad: (cliente as any)?.localidad || '', cp: (cliente as any)?.codigo_postal || '',
     provincia: (cliente as any)?.provincia || '', telefono: cliente?.telefono || '', email: cliente?.email || '',
   });
@@ -107,7 +149,10 @@ export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, 
     saveEmails(updated);
   };
 
-  // ── PDF generado guardado ──
+  // ── PDF generado guardado (por cliente) ──
+  const STORAGE_KEY_PDF = getStorageKeyPdf(clienteId || cliente?.id);
+  const STORAGE_KEY_PDF_NAME = getStorageKeyPdfName(clienteId || cliente?.id);
+  
   const [savedPdfB64, setSavedPdfB64] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem(STORAGE_KEY_PDF);
@@ -248,6 +293,15 @@ export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, 
     setSavedPdfB64(null);
     setSavedPdfName('');
   };
+  
+  // Cargar PDF guardado al cambiar de cliente
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const keyPdf = getStorageKeyPdf(clienteId || cliente?.id);
+    const keyName = getStorageKeyPdfName(clienteId || cliente?.id);
+    setSavedPdfB64(localStorage.getItem(keyPdf));
+    setSavedPdfName(localStorage.getItem(keyName) || 'designacion.pdf');
+  }, [clienteId, cliente?.id]);
 
   const inp = 'form-input';
   const lbl = 'form-label';
