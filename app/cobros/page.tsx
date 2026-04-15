@@ -26,9 +26,12 @@ export default function CobrosPage() {
   const [filterMetodo, setFilterMetodo] = useState('');
   const [filterTipo, setFilterTipo] = useState('');
   const [filterMes, setFilterMes] = useState('');
+  const [filterFechaDesde, setFilterFechaDesde] = useState('');
+  const [filterFechaHasta, setFilterFechaHasta] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showMonthFilter, setShowMonthFilter] = useState(false);
   const [showMetodoFilter, setShowMetodoFilter] = useState(false);
+  const [showDateFilter, setShowDateFilter] = useState(false);
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
@@ -57,9 +60,19 @@ export default function CobrosPage() {
       // Filtro por mes
       const mesMatch = !filterMes || cobro.fecha_cobro.startsWith(filterMes);
 
-      return searchMatch && clienteMatch && metodoMatch && tipoMatch && mesMatch;
+      // Filtro por rango de fechas (desde/hasta)
+      const fechaCobro = new Date(cobro.fecha_cobro);
+      const desdeMatch = !filterFechaDesde || fechaCobro >= new Date(filterFechaDesde);
+      const hastaMatch = !filterFechaHasta || fechaCobro <= new Date(filterFechaHasta + 'T23:59:59');
+
+      return searchMatch && clienteMatch && metodoMatch && tipoMatch && mesMatch && desdeMatch && hastaMatch;
     });
-  }, [cobros, searchTerm, filterCliente, filterMetodo, filterTipo, filterMes]);
+  }, [cobros, searchTerm, filterCliente, filterMetodo, filterTipo, filterMes, filterFechaDesde, filterFechaHasta]);
+
+  // Calcular total de cobros filtrados
+  const totalCobradoFiltrado = useMemo(() => {
+    return filteredCobros.reduce((total, cobro) => total + cobro.importe, 0);
+  }, [filteredCobros]);
 
   // Cobros paginados
   const paginatedCobros = useMemo(() => {
@@ -89,7 +102,7 @@ export default function CobrosPage() {
   }, [cobros]);
 
   // Contar filtros activos
-  const activeFiltersCount = [searchTerm, filterCliente, filterMetodo, filterTipo, filterMes].filter(Boolean).length;
+  const activeFiltersCount = [searchTerm, filterCliente, filterMetodo, filterTipo, filterMes, filterFechaDesde, filterFechaHasta].filter(Boolean).length;
 
   const handleCreate = () => {
     setEditingCobro(null);
@@ -106,13 +119,15 @@ export default function CobrosPage() {
     setFilterMetodo('');
     setFilterTipo('');
     setFilterMes('');
+    setFilterFechaDesde('');
+    setFilterFechaHasta('');
     setCurrentPage(1);
   };
 
   // Reset página al cambiar filtros
   useMemo(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterCliente, filterMetodo, filterTipo, filterMes]);
+  }, [searchTerm, filterCliente, filterMetodo, filterTipo, filterMes, filterFechaDesde, filterFechaHasta]);
 
   const handleEdit = (cobro: Cobro) => {
     setEditingCobro(cobro);
@@ -396,6 +411,76 @@ export default function CobrosPage() {
             )}
           </div>
 
+          {/* Filtro de Rango de Fechas */}
+          <div className="relative">
+            <button
+              onClick={() => setShowDateFilter(!showDateFilter)}
+              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 ${
+                (filterFechaDesde || filterFechaHasta)
+                  ? 'border-amber-500 bg-amber-50 text-amber-700'
+                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                <span>
+                  {(filterFechaDesde || filterFechaHasta) 
+                    ? `${filterFechaDesde || '...'} - ${filterFechaHasta || '...'}` 
+                    : 'Rango fechas'}
+                </span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${showDateFilter ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {showDateFilter && (
+              <div className="absolute top-full left-0 mt-2 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                <div className="p-4 space-y-3">
+                  <div className="text-xs font-medium text-gray-500">Rango de fechas</div>
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">Desde</label>
+                    <input
+                      type="date"
+                      value={filterFechaDesde}
+                      onChange={(e) => {
+                        setFilterFechaDesde(e.target.value);
+                      }}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600 mb-1 block">Hasta</label>
+                    <input
+                      type="date"
+                      value={filterFechaHasta}
+                      onChange={(e) => {
+                        setFilterFechaHasta(e.target.value);
+                      }}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={() => {
+                        setFilterFechaDesde('');
+                        setFilterFechaHasta('');
+                        setShowDateFilter(false);
+                      }}
+                      className="flex-1 px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                    >
+                      Limpiar
+                    </button>
+                    <button
+                      onClick={() => setShowDateFilter(false)}
+                      className="flex-1 px-3 py-2 text-sm bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors"
+                    >
+                      Aplicar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Filtro de Método de Pago Agrupado */}
           <div className="relative">
             <button
@@ -588,6 +673,27 @@ export default function CobrosPage() {
               ))
             )}
           </tbody>
+          
+          {/* Fila de totales */}
+          <tfoot className="bg-gray-50 border-t-2 border-gray-200">
+            <tr>
+              <td colSpan={3} className="py-3 px-4 text-right font-medium text-gray-700">
+                {filteredCobros.length > 0 && (
+                  <span className="text-sm">
+                    Total de {filteredCobros.length} cobro{filteredCobros.length !== 1 ? 's' : ''}:
+                  </span>
+                )}
+              </td>
+              <td className="py-3 px-4">
+                {filteredCobros.length > 0 && (
+                  <span className="text-lg font-bold text-green-600">
+                    {eur(totalCobradoFiltrado)}
+                  </span>
+                )}
+              </td>
+              <td colSpan={4}></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
 
