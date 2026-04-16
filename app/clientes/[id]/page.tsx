@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { eur } from '@/lib/utils';
 import type { Cliente, Procedimiento, Cobro } from '@/lib/supabase/types';
 import type { Documento, EstadoProcedimiento } from '@/lib/supabase/types';
-import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download, Activity, FileSignature, Printer, ChevronUp, ChevronDown, CheckSquare, Square, X, Eye, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download, Activity, FileSignature, Printer, ChevronUp, ChevronDown, CheckSquare, Square, X, Eye, AlertTriangle, Info, ExternalLink } from 'lucide-react';
 import { formatField } from '@/lib/utils/text';
 import { ProcedimientoForm } from '@/components/procedimiento-form';
 import { ActividadForm } from '@/components/actividad-form';
@@ -726,9 +726,31 @@ export default function ClienteDetallePage() {
                                   }
                                 </button>
                                 <div className="flex-1 min-w-0">
-                                  <span className={`text-sm ${doc.adjuntado ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                                    {doc.nombre}
-                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <span className={`text-sm ${doc.adjuntado ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                                      {doc.nombre}
+                                    </span>
+                                    {(doc.descripcion || doc.enlace) && (
+                                      <div className="relative group/info inline-block">
+                                        <Info className="w-3.5 h-3.5 text-blue-400 cursor-help" />
+                                        <div className="absolute left-0 bottom-full mb-1 hidden group-hover/info:block z-50 w-64 p-2 bg-white border border-gray-200 rounded-lg shadow-lg text-xs">
+                                          {doc.descripcion && (
+                                            <p className="text-gray-600 mb-1">{doc.descripcion}</p>
+                                          )}
+                                          {doc.enlace && (
+                                            <a
+                                              href={doc.enlace}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="inline-flex items-center gap-1 text-blue-600 hover:underline font-medium"
+                                            >
+                                              <ExternalLink className="w-3 h-3" /> Abrir enlace
+                                            </a>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                   {doc.requiere_revision && doc.nombre_anterior && (
                                     <div className="flex items-center gap-1 mt-0.5">
                                       <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" />

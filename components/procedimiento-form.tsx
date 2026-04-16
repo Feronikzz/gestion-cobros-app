@@ -13,7 +13,7 @@ import {
   type ProcedimientoCatalogo,
   CATEGORIA_LABELS
 } from '@/lib/catalogo-procedimientos';
-import { Search, CheckSquare, Square, Plus, X, FileText } from 'lucide-react';
+import { Search, CheckSquare, Square, Plus, X, FileText, Info, ExternalLink } from 'lucide-react';
 
 interface ProcedimientoFormProps {
   procedimiento?: Procedimiento;
@@ -440,7 +440,24 @@ export function ProcedimientoForm({ procedimiento, clienteId, onSubmit, onCancel
                     : <Square className="w-4 h-4 text-gray-300" />
                   }
                 </button>
-                <span className={`flex-1 text-sm ${doc.adjuntado ? 'line-through text-gray-400' : 'text-gray-800'}`}>{doc.nombre}</span>
+                <span className={`flex-1 text-sm ${doc.adjuntado ? 'line-through text-gray-400' : 'text-gray-800'}`}>
+                  {doc.nombre}
+                  {(doc.descripcion || doc.enlace) && (
+                    <span className="relative group/info inline-block ml-1 align-middle">
+                      <Info className="w-3.5 h-3.5 text-blue-400 cursor-help inline" />
+                      <span className="absolute left-0 bottom-full mb-1 hidden group-hover/info:block z-50 w-64 p-2 bg-white border border-gray-200 rounded-lg shadow-lg text-xs font-normal text-left not-italic">
+                        {doc.descripcion && (
+                          <span className="block text-gray-600 mb-1">{doc.descripcion}</span>
+                        )}
+                        {doc.enlace && (
+                          <a href={doc.enlace} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-blue-600 hover:underline font-medium">
+                            <ExternalLink className="w-3 h-3" /> Abrir enlace
+                          </a>
+                        )}
+                      </span>
+                    </span>
+                  )}
+                </span>
                 <button type="button" onClick={() => removeDoc(idx)} className="p-0.5 text-gray-300 hover:text-red-500 transition-colors" title="Eliminar">
                   <X className="w-3.5 h-3.5" />
                 </button>

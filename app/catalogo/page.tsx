@@ -36,7 +36,11 @@ import {
   RefreshCw,
   Loader2,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  Info,
+  ExternalLink,
+  GripVertical,
+  Pencil
 } from 'lucide-react';
 
 export default function CatalogoPage() {
@@ -62,6 +66,9 @@ export default function CatalogoPage() {
   const [nuevaCategoriaNombre, setNuevaCategoriaNombre] = useState('');
   const [nuevaCategoriaId, setNuevaCategoriaId] = useState('');
   
+  // Estado para edición expandida de documento
+  const [expandedDocIdx, setExpandedDocIdx] = useState<number | null>(null);
+
   // Propagación
   const [showPropagateModal, setShowPropagateModal] = useState(false);
   const [propagateTitle, setPropagateTitle] = useState('');
@@ -244,13 +251,21 @@ export default function CatalogoPage() {
     setFormDocs(prev => [...prev, { 
       nombre: nuevoDocInput.trim(), 
       adjuntado: false, 
-      notas: null 
+      notas: null,
+      descripcion: null,
+      enlace: null,
     }]);
     setNuevoDocInput('');
   };
 
   const removeDocFromForm = (idx: number) => {
     setFormDocs(prev => prev.filter((_, i) => i !== idx));
+    if (expandedDocIdx === idx) setExpandedDocIdx(null);
+    else if (expandedDocIdx !== null && expandedDocIdx > idx) setExpandedDocIdx(expandedDocIdx - 1);
+  };
+
+  const updateDocField = (idx: number, field: 'nombre' | 'descripcion' | 'enlace', value: string) => {
+    setFormDocs(prev => prev.map((d, i) => i === idx ? { ...d, [field]: value || null } : d));
   };
 
   const openEditModal = (proc: ProcedimientoCatalogo) => {
@@ -272,6 +287,7 @@ export default function CatalogoPage() {
     setFormCategoria('otro');
     setFormDocs([]);
     setNuevoDocInput('');
+    setExpandedDocIdx(null);
   };
 
   // Estadísticas
@@ -435,9 +451,13 @@ export default function CatalogoPage() {
                                 <span 
                                   key={idx}
                                   className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded"
+                                  title={doc.descripcion || undefined}
                                 >
                                   <FileText className="w-3 h-3" />
                                   {doc.nombre}
+                                  {(doc.descripcion || doc.enlace) && (
+                                    <Info className="w-3 h-3 text-blue-400" />
+                                  )}
                                 </span>
                               ))}
                             </div>
@@ -503,18 +523,82 @@ export default function CatalogoPage() {
           <div>
             <label className="form-label">Documentación requerida</label>
             <div className="space-y-2">
-              {formDocs.map((doc, idx) => (
-                <div key={idx} className="flex items-center gap-2 p-2 bg-gray-50 rounded">
-                  <CheckSquare className="w-4 h-4 text-gray-400" />
-                  <span className="flex-1 text-sm">{doc.nombre}</span>
-                  <button
-                    onClick={() => removeDocFromForm(idx)}
-                    className="text-gray-400 hover:text-red-500"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
+              {formDocs.map((doc, idx) => {
+                const isExpanded = expandedDocIdx === idx;
+                return (
+                  <div key={idx} className={`border rounded-lg transition-colors ${
+                    isExpanded ? 'border-blue-300 bg-blue-50/50' : 'border-gray-200 bg-gray-50'
+                  }`}>
+                    {/* Fila principal del doc */}
+                    <div className="flex items-center gap-2 p-2">
+                      <GripVertical className="w-4 h-4 text-gray-300 flex-shrink-0" />
+                      <input
+                        type="text"
+                        value={doc.nombre}
+                        onChange={(e) => updateDocField(idx, 'nombre', e.target.value)}
+                        className="flex-1 text-sm bg-transparent border-0 border-b border-transparent hover:border-gray-300 focus:border-blue-500 focus:ring-0 px-1 py-0.5 rounded"
+                        placeholder="Nombre del documento"
+                      />
+                      {(doc.descripcion || doc.enlace) && (
+                        <Info className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      )}
+                      <button
+                        onClick={() => setExpandedDocIdx(isExpanded ? null : idx)}
+                        className={`p-1 rounded transition-colors ${
+                          isExpanded ? 'text-blue-600 bg-blue-100' : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'
+                        }`}
+                        title="Descripción y enlace"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => removeDocFromForm(idx)}
+                        className="p-1 text-gray-400 hover:text-red-500 rounded hover:bg-red-50"
+                        title="Eliminar"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    {/* Panel expandido: descripción + enlace */}
+                    {isExpanded && (
+                      <div className="px-3 pb-3 pt-1 space-y-2 border-t border-blue-200">
+                        <div>
+                          <label className="text-xs font-medium text-gray-500">Descripción / Instrucciones</label>
+                          <textarea
+                            value={doc.descripcion || ''}
+                            onChange={(e) => updateDocField(idx, 'descripcion', e.target.value)}
+                            className="form-input w-full text-sm mt-1"
+                            rows={2}
+                            placeholder="Ej: Formulario oficial para solicitud de regularización..."
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-500 flex items-center gap-1">
+                            <ExternalLink className="w-3 h-3" /> Enlace externo
+                          </label>
+                          <input
+                            type="url"
+                            value={doc.enlace || ''}
+                            onChange={(e) => updateDocField(idx, 'enlace', e.target.value)}
+                            className="form-input w-full text-sm mt-1"
+                            placeholder="https://ejemplo.com/formulario.pdf"
+                          />
+                          {doc.enlace && (
+                            <a
+                              href={doc.enlace}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline mt-1"
+                            >
+                              <ExternalLink className="w-3 h-3" /> Abrir enlace
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
               <div className="flex gap-2">
                 <input
                   type="text"

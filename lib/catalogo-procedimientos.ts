@@ -148,6 +148,8 @@ export async function getCustomCatalogo(): Promise<ProcedimientoCatalogo[]> {
       nombre: doc.nombre,
       adjuntado: false,
       notas: null,
+      descripcion: doc.descripcion || null,
+      enlace: doc.enlace || null,
     });
   });
   
@@ -206,6 +208,8 @@ export async function addProcedimientoCatalogo(proc: ProcedimientoCatalogo): Pro
           procedimiento_id: newProc.id,
           nombre: doc.nombre,
           obligatorio: true,
+          descripcion: doc.descripcion || null,
+          enlace: doc.enlace || null,
         }))
       );
     
@@ -269,6 +273,8 @@ export async function updateProcedimientoCatalogo(
           procedimiento_id: existing.id,
           nombre: doc.nombre,
           obligatorio: true,
+          descripcion: doc.descripcion || null,
+          enlace: doc.enlace || null,
         }))
       );
   }
@@ -700,13 +706,15 @@ export async function propagateDocsToExistingProcedimientos(
       // Construir nueva lista
       const mergedDocs: DocumentoRequerido[] = [];
       
-      // 1. Docs sin cambio de nombre: preservar estado completo
+      // 1. Docs sin cambio de nombre: preservar estado completo, actualizar descripcion/enlace del catálogo
       for (const doc of unchanged) {
         const existing = currentByName.get(doc.nombre);
         mergedDocs.push({
           nombre: doc.nombre,
           adjuntado: existing?.adjuntado ?? false,
           notas: existing?.notas ?? null,
+          descripcion: doc.descripcion ?? existing?.descripcion ?? null,
+          enlace: doc.enlace ?? existing?.enlace ?? null,
           // Limpiar marca de revisión si existía de una propagación anterior
           nombre_anterior: null,
           requiere_revision: false,
@@ -716,10 +724,13 @@ export async function propagateDocsToExistingProcedimientos(
       // 2. Docs renombrados: preservar adjuntado + marcar para revisión
       for (const [oldName, newName] of renames) {
         const existing = currentByName.get(oldName);
+        const newCatalogDoc = newCatalogDocs.find(d => d.nombre === newName);
         mergedDocs.push({
           nombre: newName,
           adjuntado: existing?.adjuntado ?? false, // PRESERVAR estado adjuntado
           notas: existing?.notas ?? null,
+          descripcion: newCatalogDoc?.descripcion ?? existing?.descripcion ?? null,
+          enlace: newCatalogDoc?.enlace ?? existing?.enlace ?? null,
           nombre_anterior: oldName,
           requiere_revision: true,
         });
@@ -731,6 +742,8 @@ export async function propagateDocsToExistingProcedimientos(
           nombre: doc.nombre,
           adjuntado: false,
           notas: null,
+          descripcion: doc.descripcion ?? null,
+          enlace: doc.enlace ?? null,
           nombre_anterior: null,
           requiere_revision: false,
         });

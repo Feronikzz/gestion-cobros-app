@@ -101,6 +101,8 @@ export interface DocumentoRequerido {
   notas: string | null;
   nombre_anterior?: string | null;    // Si se renombró desde el catálogo, guarda el nombre viejo
   requiere_revision?: boolean;        // true si fue modificado por propagación y necesita revisión
+  descripcion?: string | null;        // Descripción o instrucciones del documento
+  enlace?: string | null;             // URL externa (página de descarga, formulario oficial, etc.)
 }
 
 // ─── Procedimiento / Expediente ───────────────────────────
