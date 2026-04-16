@@ -626,6 +626,7 @@ export default function CatalogoPage() {
                 <ul className="list-disc pl-5 space-y-1">
                   <li>Se <strong>añadirán</strong> los nuevos documentos del catálogo</li>
                   <li>Se <strong>eliminarán</strong> los documentos que ya no estén en el catálogo</li>
+                  <li>Los documentos <strong>renombrados</strong> se actualizan preservando el estado de adjuntado y se marcan con <strong>⚠ Revisar</strong> (mostrando nombre anterior y nuevo)</li>
                   <li>Los documentos <strong>añadidos manualmente</strong> a cada expediente se mantendrán intactos</li>
                   <li>El estado de <strong>adjuntado</strong> de cada documento existente se preservará</li>
                 </ul>

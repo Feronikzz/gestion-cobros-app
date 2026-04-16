@@ -99,6 +99,8 @@ export interface DocumentoRequerido {
   nombre: string;
   adjuntado: boolean;
   notas: string | null;
+  nombre_anterior?: string | null;    // Si se renombró desde el catálogo, guarda el nombre viejo
+  requiere_revision?: boolean;        // true si fue modificado por propagación y necesita revisión
 }
 
 // ─── Procedimiento / Expediente ───────────────────────────

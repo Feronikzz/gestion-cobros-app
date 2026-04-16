@@ -602,12 +602,18 @@ export interface PropagationResult {
  * que tengan el mismo título, SIN eliminar docs añadidos manualmente.
  * 
  * Lógica:
- * - Se obtienen los docs actuales del catálogo para el título dado.
+ * - Se comparan docs del catálogo ANTERIOR con el NUEVO para detectar:
+ *   a) Docs sin cambios (mismo nombre en ambas listas)
+ *   b) Docs renombrados (estaban en el viejo, no en el nuevo, detectados por posición)
+ *   c) Docs nuevos (solo en la nueva lista)
+ *   d) Docs eliminados (solo en la vieja lista, sin equivalente en la nueva)
+ * 
  * - Para cada procedimiento con ese título:
- *   1. Los docs que coinciden por nombre con el catálogo ANTERIOR se consideran "del catálogo".
- *   2. Los docs que NO estaban en el catálogo anterior se consideran "manuales" y se preservan.
- *   3. Se combinan: docs nuevos del catálogo + docs manuales preservados.
- *   4. Se respeta el estado `adjuntado` de cada doc existente.
+ *   1. Los docs que NO estaban en el catálogo anterior se consideran "manuales" → se preservan intactos.
+ *   2. Los docs sin cambios → se mantienen con su estado adjuntado/notas.
+ *   3. Los docs renombrados → se actualiza el nombre, se PRESERVA adjuntado, se marca requiere_revision + nombre_anterior.
+ *   4. Los docs nuevos → se añaden como no adjuntados.
+ *   5. Los docs eliminados del catálogo → se eliminan del expediente (solo los del catálogo, no los manuales).
  */
 export async function propagateDocsToExistingProcedimientos(
   titulo: string,
@@ -634,30 +640,106 @@ export async function propagateDocsToExistingProcedimientos(
     return { updated: 0, skipped: 0, errors: 0, details: ['No hay procedimientos con este título'] };
   }
 
+  // ── Detectar cambios entre catálogo viejo y nuevo ──
+  const oldNames = new Set(oldCatalogDocs.map(d => d.nombre));
+  const newNames = new Set(newCatalogDocs.map(d => d.nombre));
+  
+  // Docs que existen en ambos (sin cambio de nombre)
+  const unchanged = newCatalogDocs.filter(d => oldNames.has(d.nombre));
+  
+  // Docs solo en nuevo (podrían ser nuevos o renombramientos)
+  const onlyInNew = newCatalogDocs.filter(d => !oldNames.has(d.nombre));
+  // Docs solo en viejo (podrían ser eliminados o renombramientos)
+  const onlyInOld = oldCatalogDocs.filter(d => !newNames.has(d.nombre));
+  
+  // Detectar renombramientos por posición: si el viejo pos[i] desapareció y nuevo pos[i] es nuevo
+  const renames: Map<string, string> = new Map(); // oldName -> newName
+  const trulyNew: DocumentoRequerido[] = [];
+  const trulyRemoved: Set<string> = new Set();
+  
+  // Mapear posiciones originales
+  const oldPositions = new Map<string, number>();
+  oldCatalogDocs.forEach((d, i) => oldPositions.set(d.nombre, i));
+  const newPositions = new Map<string, number>();
+  newCatalogDocs.forEach((d, i) => newPositions.set(d.nombre, i));
+  
+  // Para cada doc solo en nuevo, buscar si hay un doc solo en viejo en la misma posición
+  const matchedOld = new Set<string>();
+  for (const newDoc of onlyInNew) {
+    const newPos = newPositions.get(newDoc.nombre)!;
+    // Buscar un doc viejo eliminado en la misma posición
+    const oldDocAtPos = onlyInOld.find(od => oldPositions.get(od.nombre) === newPos && !matchedOld.has(od.nombre));
+    if (oldDocAtPos) {
+      renames.set(oldDocAtPos.nombre, newDoc.nombre);
+      matchedOld.add(oldDocAtPos.nombre);
+    } else {
+      trulyNew.push(newDoc);
+    }
+  }
+  
+  // Docs viejos no matcheados = realmente eliminados
+  for (const oldDoc of onlyInOld) {
+    if (!matchedOld.has(oldDoc.nombre)) {
+      trulyRemoved.add(oldDoc.nombre);
+    }
+  }
+
   const result: PropagationResult = { updated: 0, skipped: 0, errors: 0, details: [] };
-  const oldCatalogNames = new Set(oldCatalogDocs.map(d => d.nombre));
-  const newCatalogNames = new Set(newCatalogDocs.map(d => d.nombre));
 
   for (const proc of procedimientos) {
     try {
       const currentDocs: DocumentoRequerido[] = proc.documentos_requeridos || [];
       
+      // Mapear docs actuales del expediente por nombre para acceso rápido
+      const currentByName = new Map<string, DocumentoRequerido>();
+      currentDocs.forEach(d => currentByName.set(d.nombre, d));
+      
       // Separar docs manuales (no estaban en el catálogo anterior) de los del catálogo
-      const docsManual = currentDocs.filter(d => !oldCatalogNames.has(d.nombre));
+      const docsManual = currentDocs.filter(d => !oldNames.has(d.nombre));
       
-      // De los docs del catálogo anterior que aún existen, preservar estado adjuntado
-      const adjuntadoMap = new Map<string, boolean>();
-      currentDocs.forEach(d => adjuntadoMap.set(d.nombre, d.adjuntado));
+      // Construir nueva lista
+      const mergedDocs: DocumentoRequerido[] = [];
       
-      // Construir nueva lista: docs del nuevo catálogo + docs manuales
-      const mergedDocs: DocumentoRequerido[] = [
-        ...newCatalogDocs.map(d => ({
-          nombre: d.nombre,
-          adjuntado: adjuntadoMap.get(d.nombre) || false, // preservar si ya estaba adjuntado
-          notas: currentDocs.find(cd => cd.nombre === d.nombre)?.notas || d.notas,
-        })),
-        ...docsManual, // docs manuales se mantienen intactos
-      ];
+      // 1. Docs sin cambio de nombre: preservar estado completo
+      for (const doc of unchanged) {
+        const existing = currentByName.get(doc.nombre);
+        mergedDocs.push({
+          nombre: doc.nombre,
+          adjuntado: existing?.adjuntado ?? false,
+          notas: existing?.notas ?? null,
+          // Limpiar marca de revisión si existía de una propagación anterior
+          nombre_anterior: null,
+          requiere_revision: false,
+        });
+      }
+      
+      // 2. Docs renombrados: preservar adjuntado + marcar para revisión
+      for (const [oldName, newName] of renames) {
+        const existing = currentByName.get(oldName);
+        mergedDocs.push({
+          nombre: newName,
+          adjuntado: existing?.adjuntado ?? false, // PRESERVAR estado adjuntado
+          notas: existing?.notas ?? null,
+          nombre_anterior: oldName,
+          requiere_revision: true,
+        });
+      }
+      
+      // 3. Docs totalmente nuevos: añadir sin adjuntar
+      for (const doc of trulyNew) {
+        mergedDocs.push({
+          nombre: doc.nombre,
+          adjuntado: false,
+          notas: null,
+          nombre_anterior: null,
+          requiere_revision: false,
+        });
+      }
+      
+      // 4. Docs manuales: mantener intactos al final
+      mergedDocs.push(...docsManual);
+      
+      // (Los docs en trulyRemoved simplemente no se incluyen → se eliminan)
 
       // Actualizar el procedimiento
       const { error: updateError } = await supabase

@@ -10,7 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { eur } from '@/lib/utils';
 import type { Cliente, Procedimiento, Cobro } from '@/lib/supabase/types';
 import type { Documento, EstadoProcedimiento } from '@/lib/supabase/types';
-import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download, Activity, FileSignature, Printer, ChevronUp, ChevronDown, CheckSquare, Square, X, Eye } from 'lucide-react';
+import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download, Activity, FileSignature, Printer, ChevronUp, ChevronDown, CheckSquare, Square, X, Eye, AlertTriangle } from 'lucide-react';
 import { formatField } from '@/lib/utils/text';
 import { ProcedimientoForm } from '@/components/procedimiento-form';
 import { ActividadForm } from '@/components/actividad-form';
@@ -298,6 +298,19 @@ export default function ClienteDetallePage() {
     if (!proc || !proc.documentos_requeridos) return;
     
     const newDocs = proc.documentos_requeridos.filter((_, i) => i !== docIndex);
+    
+    await supabase.from('procedimientos').update({ documentos_requeridos: newDocs }).eq('id', procedimientoId);
+    fetchData();
+  };
+
+  // Marcar revisión como completada (quitar indicador de renombramiento)
+  const handleDismissRevision = async (procedimientoId: string, docIndex: number) => {
+    if (!supabase) return;
+    const proc = procedimientos.find(p => p.id === procedimientoId);
+    if (!proc || !proc.documentos_requeridos) return;
+    
+    const newDocs = [...proc.documentos_requeridos];
+    newDocs[docIndex] = { ...newDocs[docIndex], requiere_revision: false, nombre_anterior: null };
     
     await supabase.from('procedimientos').update({ documentos_requeridos: newDocs }).eq('id', procedimientoId);
     fetchData();
@@ -701,7 +714,7 @@ export default function ClienteDetallePage() {
                         {isOpen && (
                           <div className="p-2 bg-white space-y-1">
                             {p.documentos_requeridos!.map((doc, idx) => (
-                              <div key={idx} className="flex items-center gap-2 py-1 group">
+                              <div key={idx} className={`flex items-center gap-2 py-1 group ${doc.requiere_revision ? 'bg-amber-50 rounded px-1 -mx-1' : ''}`}>
                                 <button
                                   type="button"
                                   onClick={() => handleToggleDocRequerido(p.id, idx)}
@@ -712,9 +725,27 @@ export default function ClienteDetallePage() {
                                     : <Square className="w-4 h-4 text-gray-300" />
                                   }
                                 </button>
-                                <span className={`text-sm flex-1 ${doc.adjuntado ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                                  {doc.nombre}
-                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <span className={`text-sm ${doc.adjuntado ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+                                    {doc.nombre}
+                                  </span>
+                                  {doc.requiere_revision && doc.nombre_anterior && (
+                                    <div className="flex items-center gap-1 mt-0.5">
+                                      <AlertTriangle className="w-3 h-3 text-amber-500 flex-shrink-0" />
+                                      <span className="text-xs text-amber-600">
+                                        Antes: <span className="line-through">{doc.nombre_anterior}</span> — Revisar
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDismissRevision(p.id, idx)}
+                                        className="text-xs text-amber-500 hover:text-green-600 ml-1 underline"
+                                        title="Marcar como revisado"
+                                      >
+                                        OK
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
                                 <button
                                   type="button"
                                   onClick={() => handleRemoveDocRequerido(p.id, idx)}
