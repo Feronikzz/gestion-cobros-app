@@ -587,3 +587,113 @@ export async function getAllCategoriaLabels(): Promise<Record<string, string>> {
   const customCats = await getCategoriasCustom();
   return { ...CATEGORIA_LABELS, ...customCats };
 }
+
+// ─── Propagar cambios de documentos del catálogo a procedimientos existentes ───
+
+export interface PropagationResult {
+  updated: number;
+  skipped: number;
+  errors: number;
+  details: string[];
+}
+
+/**
+ * Propaga los documentos requeridos del catálogo a todos los procedimientos existentes
+ * que tengan el mismo título, SIN eliminar docs añadidos manualmente.
+ * 
+ * Lógica:
+ * - Se obtienen los docs actuales del catálogo para el título dado.
+ * - Para cada procedimiento con ese título:
+ *   1. Los docs que coinciden por nombre con el catálogo ANTERIOR se consideran "del catálogo".
+ *   2. Los docs que NO estaban en el catálogo anterior se consideran "manuales" y se preservan.
+ *   3. Se combinan: docs nuevos del catálogo + docs manuales preservados.
+ *   4. Se respeta el estado `adjuntado` de cada doc existente.
+ */
+export async function propagateDocsToExistingProcedimientos(
+  titulo: string,
+  newCatalogDocs: DocumentoRequerido[],
+  oldCatalogDocs: DocumentoRequerido[]
+): Promise<PropagationResult> {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) return { updated: 0, skipped: 0, errors: 0, details: ['Usuario no autenticado'] };
+
+  // Buscar todos los procedimientos del usuario con ese título
+  const { data: procedimientos, error } = await supabase
+    .from('procedimientos')
+    .select('id, titulo, documentos_requeridos')
+    .eq('user_id', user.id)
+    .eq('titulo', titulo);
+
+  if (error) {
+    return { updated: 0, skipped: 0, errors: 1, details: [`Error buscando procedimientos: ${error.message}`] };
+  }
+
+  if (!procedimientos || procedimientos.length === 0) {
+    return { updated: 0, skipped: 0, errors: 0, details: ['No hay procedimientos con este título'] };
+  }
+
+  const result: PropagationResult = { updated: 0, skipped: 0, errors: 0, details: [] };
+  const oldCatalogNames = new Set(oldCatalogDocs.map(d => d.nombre));
+  const newCatalogNames = new Set(newCatalogDocs.map(d => d.nombre));
+
+  for (const proc of procedimientos) {
+    try {
+      const currentDocs: DocumentoRequerido[] = proc.documentos_requeridos || [];
+      
+      // Separar docs manuales (no estaban en el catálogo anterior) de los del catálogo
+      const docsManual = currentDocs.filter(d => !oldCatalogNames.has(d.nombre));
+      
+      // De los docs del catálogo anterior que aún existen, preservar estado adjuntado
+      const adjuntadoMap = new Map<string, boolean>();
+      currentDocs.forEach(d => adjuntadoMap.set(d.nombre, d.adjuntado));
+      
+      // Construir nueva lista: docs del nuevo catálogo + docs manuales
+      const mergedDocs: DocumentoRequerido[] = [
+        ...newCatalogDocs.map(d => ({
+          nombre: d.nombre,
+          adjuntado: adjuntadoMap.get(d.nombre) || false, // preservar si ya estaba adjuntado
+          notas: currentDocs.find(cd => cd.nombre === d.nombre)?.notas || d.notas,
+        })),
+        ...docsManual, // docs manuales se mantienen intactos
+      ];
+
+      // Actualizar el procedimiento
+      const { error: updateError } = await supabase
+        .from('procedimientos')
+        .update({ documentos_requeridos: mergedDocs })
+        .eq('id', proc.id);
+
+      if (updateError) {
+        result.errors++;
+        result.details.push(`Error en procedimiento ${proc.id}: ${updateError.message}`);
+      } else {
+        result.updated++;
+      }
+    } catch (err: any) {
+      result.errors++;
+      result.details.push(`Error inesperado: ${err.message}`);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Cuenta cuántos procedimientos existentes se verían afectados por una propagación.
+ */
+export async function countAffectedProcedimientos(titulo: string): Promise<number> {
+  const supabase = getSupabase();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return 0;
+
+  const { count, error } = await supabase
+    .from('procedimientos')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id)
+    .eq('titulo', titulo);
+
+  if (error) return 0;
+  return count || 0;
+}

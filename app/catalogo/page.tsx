@@ -14,7 +14,10 @@ import {
   deleteProcedimientoCatalogo,
   getAllCategoriaLabels,
   invalidateCache,
-  type ProcedimientoCatalogo
+  propagateDocsToExistingProcedimientos,
+  countAffectedProcedimientos,
+  type ProcedimientoCatalogo,
+  type PropagationResult
 } from '@/lib/catalogo-procedimientos';
 import type { DocumentoRequerido, CategoriaProcedimiento } from '@/lib/supabase/types';
 import { 
@@ -29,7 +32,11 @@ import {
   Search,
   Folder,
   Tag,
-  CheckSquare
+  CheckSquare,
+  RefreshCw,
+  Loader2,
+  AlertTriangle,
+  CheckCircle
 } from 'lucide-react';
 
 export default function CatalogoPage() {
@@ -54,6 +61,15 @@ export default function CatalogoPage() {
   const [nuevoDocInput, setNuevoDocInput] = useState('');
   const [nuevaCategoriaNombre, setNuevaCategoriaNombre] = useState('');
   const [nuevaCategoriaId, setNuevaCategoriaId] = useState('');
+  
+  // Propagación
+  const [showPropagateModal, setShowPropagateModal] = useState(false);
+  const [propagateTitle, setPropagateTitle] = useState('');
+  const [propagateNewDocs, setPropagateNewDocs] = useState<DocumentoRequerido[]>([]);
+  const [propagateOldDocs, setPropagateOldDocs] = useState<DocumentoRequerido[]>([]);
+  const [propagateCount, setPropagateCount] = useState(0);
+  const [propagating, setPropagating] = useState(false);
+  const [propagateResult, setPropagateResult] = useState<PropagationResult | null>(null);
 
   // Cargar datos al montar (async desde Supabase)
   useEffect(() => {
@@ -150,12 +166,44 @@ export default function CatalogoPage() {
       documentos_requeridos: formDocs,
     };
     
+    // Guardar docs anteriores antes de actualizar
+    const oldDocs = [...editingProc.documentos_requeridos];
+    const tituloParaPropagar = editingProc.titulo; // usar título original para buscar procedimientos
+    
     const success = await updateProcedimientoCatalogo(editingProc.titulo, actualizado);
     if (success) {
       await recargarCatalogo();
       resetForm();
       setEditingProc(null);
       setShowAddModal(false);
+      
+      // Comprobar si hay procedimientos afectados y ofrecer propagación
+      const count = await countAffectedProcedimientos(tituloParaPropagar);
+      if (count > 0) {
+        setPropagateTitle(tituloParaPropagar);
+        setPropagateNewDocs(formDocs);
+        setPropagateOldDocs(oldDocs);
+        setPropagateCount(count);
+        setPropagateResult(null);
+        setShowPropagateModal(true);
+      }
+    }
+  };
+  
+  const handlePropagate = async () => {
+    setPropagating(true);
+    setPropagateResult(null);
+    try {
+      const result = await propagateDocsToExistingProcedimientos(
+        propagateTitle,
+        propagateNewDocs,
+        propagateOldDocs
+      );
+      setPropagateResult(result);
+    } catch (err: any) {
+      setPropagateResult({ updated: 0, skipped: 0, errors: 1, details: [err.message] });
+    } finally {
+      setPropagating(false);
     }
   };
 
@@ -549,6 +597,100 @@ export default function CatalogoPage() {
               Crear Categoría
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* ─── Modal: Propagar cambios a procedimientos existentes ─── */}
+      <Modal 
+        isOpen={showPropagateModal} 
+        onClose={() => setShowPropagateModal(false)} 
+        title="Actualizar expedientes existentes"
+      >
+        <div className="space-y-4">
+          {!propagateResult ? (
+            <>
+              <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-amber-800">
+                    Se han encontrado <span className="text-lg">{propagateCount}</span> expediente{propagateCount !== 1 ? 's' : ''} con el título &quot;{propagateTitle}&quot;
+                  </p>
+                  <p className="text-sm text-amber-700 mt-1">
+                    ¿Quieres actualizar sus documentos requeridos con los nuevos del catálogo?
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800 space-y-2">
+                <p className="font-medium">¿Qué ocurrirá?</p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Se <strong>añadirán</strong> los nuevos documentos del catálogo</li>
+                  <li>Se <strong>eliminarán</strong> los documentos que ya no estén en el catálogo</li>
+                  <li>Los documentos <strong>añadidos manualmente</strong> a cada expediente se mantendrán intactos</li>
+                  <li>El estado de <strong>adjuntado</strong> de cada documento existente se preservará</li>
+                </ul>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setShowPropagateModal(false)}
+                  className="btn btn-secondary"
+                >
+                  No, solo catálogo
+                </button>
+                <button
+                  onClick={handlePropagate}
+                  disabled={propagating}
+                  className="btn btn-primary flex items-center gap-2"
+                >
+                  {propagating ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> Actualizando...</>
+                  ) : (
+                    <><RefreshCw className="w-4 h-4" /> Sí, actualizar {propagateCount} expediente{propagateCount !== 1 ? 's' : ''}</>
+                  )}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className={`flex items-start gap-3 p-4 rounded-lg border ${
+                propagateResult.errors > 0 
+                  ? 'bg-red-50 border-red-200' 
+                  : 'bg-green-50 border-green-200'
+              }`}>
+                {propagateResult.errors > 0 ? (
+                  <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" />
+                ) : (
+                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+                )}
+                <div>
+                  <p className={`font-medium ${propagateResult.errors > 0 ? 'text-red-800' : 'text-green-800'}`}>
+                    Resultado de la actualización
+                  </p>
+                  <div className="mt-2 text-sm space-y-1">
+                    <p className="text-green-700">✓ {propagateResult.updated} expediente{propagateResult.updated !== 1 ? 's' : ''} actualizado{propagateResult.updated !== 1 ? 's' : ''}</p>
+                    {propagateResult.errors > 0 && (
+                      <p className="text-red-700">✗ {propagateResult.errors} error{propagateResult.errors !== 1 ? 'es' : ''}</p>
+                    )}
+                  </div>
+                  {propagateResult.details.length > 0 && (
+                    <div className="mt-2 text-xs text-gray-600 bg-white/50 rounded p-2">
+                      {propagateResult.details.map((d, i) => <p key={i}>{d}</p>)}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  onClick={() => setShowPropagateModal(false)}
+                  className="btn btn-primary"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
     </LayoutShell>
