@@ -59,6 +59,7 @@ export default function ClienteDetallePage() {
   const [uploadProcId, setUploadProcId] = useState<string | null>(null);
   const [editingDocName, setEditingDocName] = useState<{docId: string; value: string} | null>(null);
   const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [openDocInfo, setOpenDocInfo] = useState<string | null>(null); // "procId-docIdx"
 
   // Previsualización de documentos
   const [previewDoc, setPreviewDoc] = useState<Documento | null>(null);
@@ -730,26 +731,46 @@ export default function ClienteDetallePage() {
                                     <span className={`text-sm ${doc.adjuntado ? 'line-through text-gray-400' : 'text-gray-700'}`}>
                                       {doc.nombre}
                                     </span>
-                                    {(doc.descripcion || doc.enlace) && (
-                                      <div className="relative group/info inline-block">
-                                        <Info className="w-3.5 h-3.5 text-blue-400 cursor-help" />
-                                        <div className="absolute left-0 bottom-full mb-1 hidden group-hover/info:block z-50 w-64 p-2 bg-white border border-gray-200 rounded-lg shadow-lg text-xs">
-                                          {doc.descripcion && (
-                                            <p className="text-gray-600 mb-1">{doc.descripcion}</p>
-                                          )}
-                                          {doc.enlace && (
-                                            <a
-                                              href={doc.enlace}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="inline-flex items-center gap-1 text-blue-600 hover:underline font-medium"
-                                            >
-                                              <ExternalLink className="w-3 h-3" /> Abrir enlace
-                                            </a>
+                                    {(doc.descripcion || doc.enlace) && (() => {
+                                      const infoKey = `${p.id}-${idx}`;
+                                      const isInfoOpen = openDocInfo === infoKey;
+                                      return (
+                                        <div className="relative inline-block">
+                                          <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); setOpenDocInfo(isInfoOpen ? null : infoKey); }}
+                                            className={`p-0.5 rounded ${isInfoOpen ? 'text-blue-600 bg-blue-100' : 'text-blue-400 hover:text-blue-600'}`}
+                                            title="Ver descripción y enlace"
+                                          >
+                                            <Info className="w-3.5 h-3.5" />
+                                          </button>
+                                          {isInfoOpen && (
+                                            <div className="absolute left-0 top-full mt-1 z-50 w-64 p-2.5 bg-white border border-gray-200 rounded-lg shadow-lg text-xs">
+                                              {doc.descripcion && (
+                                                <p className="text-gray-600 mb-2">{doc.descripcion}</p>
+                                              )}
+                                              {doc.enlace && (
+                                                <a
+                                                  href={doc.enlace}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="inline-flex items-center gap-1 text-blue-600 hover:underline font-medium"
+                                                >
+                                                  <ExternalLink className="w-3 h-3" /> Abrir enlace
+                                                </a>
+                                              )}
+                                              <button
+                                                type="button"
+                                                onClick={(e) => { e.stopPropagation(); setOpenDocInfo(null); }}
+                                                className="absolute top-1 right-1 text-gray-300 hover:text-gray-500"
+                                              >
+                                                <X className="w-3 h-3" />
+                                              </button>
+                                            </div>
                                           )}
                                         </div>
-                                      </div>
-                                    )}
+                                      );
+                                    })()}
                                   </div>
                                   {doc.requiere_revision && doc.nombre_anterior && (
                                     <div className="flex items-center gap-1 mt-0.5">
