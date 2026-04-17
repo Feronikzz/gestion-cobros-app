@@ -2,7 +2,11 @@
 import { createClient } from '@/lib/supabase/client';
 import type { AuditLogInsert, TipoEntidad, TipoAccion, AuditLog } from '@/lib/supabase/types';
 
-const supabase = createClient();
+let _supabase: ReturnType<typeof createClient> | null = null;
+function getSupabase() {
+  if (!_supabase && typeof window !== 'undefined') _supabase = createClient();
+  return _supabase!;
+}
 
 /**
  * Registra una acción en el historial de auditoría
@@ -20,7 +24,9 @@ export async function logAudit(
   }
 ): Promise<void> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    const sb = getSupabase();
+    if (!sb) return;
+    const { data: { user } } = await sb.auth.getUser();
     if (!user) return;
 
     const insert: AuditLogInsert = {
@@ -42,7 +48,7 @@ export async function logAudit(
       user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
     };
 
-    await supabase.from('audit_log').insert(insert);
+    await sb.from('audit_log').insert(insert);
   } catch (err) {
     console.error('Error logging audit:', err);
   }
@@ -239,10 +245,12 @@ export interface FiltrosAudit {
 }
 
 export async function getAuditLog(filtros: FiltrosAudit = {}): Promise<AuditLog[]> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data: { user } } = await sb.auth.getUser();
   if (!user) return [];
 
-  let query = supabase
+  let query = sb
     .from('audit_log')
     .select('*')
     .eq('user_id', user.id)
@@ -284,13 +292,15 @@ export async function getAuditLog(filtros: FiltrosAudit = {}): Promise<AuditLog[
  * Obtiene resumen de actividad por día
  */
 export async function getResumenPorDia(dias: number = 7): Promise<{fecha: string; count: number}[]> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data: { user } } = await sb.auth.getUser();
   if (!user) return [];
 
   const fechaDesde = new Date();
   fechaDesde.setDate(fechaDesde.getDate() - dias);
 
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from('audit_log')
     .select('created_at')
     .eq('user_id', user.id)
@@ -301,7 +311,7 @@ export async function getResumenPorDia(dias: number = 7): Promise<{fecha: string
 
   // Agrupar por día
   const grouped = new Map<string, number>();
-  data.forEach(item => {
+  data.forEach((item: { created_at: string }) => {
     const fecha = item.created_at.split('T')[0];
     grouped.set(fecha, (grouped.get(fecha) || 0) + 1);
   });

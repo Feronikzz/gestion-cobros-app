@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { LayoutShell } from '@/components/layout-shell';
 import { useExpedientes } from '@/lib/hooks/use-expedientes';
@@ -39,7 +39,13 @@ import {
   AlertTriangle,
   Loader2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  FileCheck,
+  FileX,
+  FolderOpen,
+  SlidersHorizontal
 } from 'lucide-react';
 
 export default function ExpedientesPage() {
@@ -50,6 +56,16 @@ export default function ExpedientesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('todos');
   const [pagadoFilter, setPagadoFilter] = useState('todos');
+  
+  // Filtros avanzados
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [categoriaFilter, setCategoriaFilter] = useState('');
+  const [tituloFilter, setTituloFilter] = useState('');
+  const [docsFilter, setDocsFilter] = useState<'todos' | 'completos' | 'incompletos' | 'sin_docs'>('todos');
+  const [docBusqueda, setDocBusqueda] = useState('');
+  
+  // Expandir documentos por expediente
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   
   // Estados para edición masiva
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -120,6 +136,45 @@ export default function ExpedientesPage() {
     return titulos.map(p => ({ value: p.titulo, label: p.titulo }));
   }, [catalogo, catalogoPorCategoria]);
 
+  // Toggle expandir fila
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      return newSet;
+    });
+  }, []);
+
+  // Títulos disponibles para el filtro de categoría seleccionada
+  const titulosParaFiltro = useMemo(() => {
+    if (!categoriaFilter) {
+      // Todos los títulos únicos
+      const set = new Set(expedientes.map(e => e.titulo));
+      return Array.from(set).sort();
+    }
+    const set = new Set(expedientes.filter(e => e.categoria === categoriaFilter).map(e => e.titulo));
+    return Array.from(set).sort();
+  }, [expedientes, categoriaFilter]);
+
+  // Categorías únicas presentes en los datos reales
+  const categoriasPresentes = useMemo(() => {
+    const set = new Set(expedientes.map(e => e.categoria).filter(Boolean));
+    return Array.from(set).sort() as string[];
+  }, [expedientes]);
+
+  // Contar filtros activos
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (estadoFilter !== 'todos') count++;
+    if (pagadoFilter !== 'todos') count++;
+    if (categoriaFilter) count++;
+    if (tituloFilter) count++;
+    if (docsFilter !== 'todos') count++;
+    if (docBusqueda) count++;
+    return count;
+  }, [estadoFilter, pagadoFilter, categoriaFilter, tituloFilter, docsFilter, docBusqueda]);
+
   // Aplicar filtros
   const filteredExpedientes = useMemo(() => {
     return expedientes.filter(expediente => {
@@ -138,9 +193,32 @@ export default function ExpedientesPage() {
         (pagadoFilter === 'pagados' && expediente.esta_pagado_totalmente) ||
         (pagadoFilter === 'pendientes' && !expediente.esta_pagado_totalmente);
 
-      return searchMatch && estadoMatch && pagadoMatch;
+      // Filtro de categoría
+      const categoriaMatch = !categoriaFilter || expediente.categoria === categoriaFilter;
+
+      // Filtro de título
+      const tituloMatch = !tituloFilter || expediente.titulo === tituloFilter;
+
+      // Filtro de documentos completados
+      let docsMatch = true;
+      const docs = expediente.documentos_requeridos || [];
+      const totalDocs = docs.length;
+      const docsAdj = docs.filter((d: any) => d.adjuntado).length;
+      
+      if (docsFilter === 'completos') docsMatch = totalDocs > 0 && docsAdj === totalDocs;
+      else if (docsFilter === 'incompletos') docsMatch = totalDocs > 0 && docsAdj < totalDocs;
+      else if (docsFilter === 'sin_docs') docsMatch = totalDocs === 0;
+
+      // Búsqueda de documento específico
+      let docBusquedaMatch = true;
+      if (docBusqueda) {
+        const search = docBusqueda.toLowerCase();
+        docBusquedaMatch = docs.some((d: any) => d.nombre?.toLowerCase().includes(search));
+      }
+
+      return searchMatch && estadoMatch && pagadoMatch && categoriaMatch && tituloMatch && docsMatch && docBusquedaMatch;
     });
-  }, [expedientes, searchTerm, estadoFilter, pagadoFilter]);
+  }, [expedientes, searchTerm, estadoFilter, pagadoFilter, categoriaFilter, tituloFilter, docsFilter, docBusqueda]);
 
   // Expedientes paginados
   const paginatedExpedientes = useMemo(() => {
@@ -153,7 +231,7 @@ export default function ExpedientesPage() {
   // Reset página al cambiar filtros
   useMemo(() => {
     setCurrentPage(1);
-  }, [searchTerm, estadoFilter, pagadoFilter]);
+  }, [searchTerm, estadoFilter, pagadoFilter, categoriaFilter, tituloFilter, docsFilter, docBusqueda]);
 
   // Estado labels y badges
   const estadoLabels: Record<EstadoProcedimiento, string> = {
@@ -374,8 +452,8 @@ export default function ExpedientesPage() {
           </div>
         </div>
 
-        {/* Filtros */}
-        <div className="flex flex-wrap items-center gap-4">
+        {/* Filtros rápidos */}
+        <div className="flex flex-wrap items-center gap-3">
           {/* Filtro de Estado */}
           <div className="relative">
             <select
@@ -419,33 +497,158 @@ export default function ExpedientesPage() {
             <DollarSign className="w-4 h-4 absolute right-3 top-3 text-gray-400 pointer-events-none" />
           </div>
 
+          {/* Botón filtros avanzados */}
+          <button
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 flex items-center gap-2 ${
+              showAdvancedFilters || activeFilterCount > 2
+                ? 'border-purple-500 bg-purple-50 text-purple-700'
+                : 'border-gray-300 text-gray-700 hover:border-gray-400'
+            }`}
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            Filtros avanzados
+            {activeFilterCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 text-xs font-bold bg-purple-600 text-white rounded-full">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+
           {/* Contador de filtros activos */}
-          {(estadoFilter !== 'todos' || pagadoFilter !== 'todos' || searchTerm) && (
+          {activeFilterCount > 0 && (
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <span>
                 {[
                   estadoFilter !== 'todos' && `Estado: ${estadoLabels[estadoFilter as EstadoProcedimiento]}`,
-                  pagadoFilter !== 'todos' && (pagadoFilter === 'pagados' ? 'Pagados' : 'Pendientes de pago'),
-                  searchTerm && 'Búsqueda activa'
+                  pagadoFilter !== 'todos' && (pagadoFilter === 'pagados' ? 'Pagados' : 'Pte. pago'),
+                  categoriaFilter && `Cat: ${categoriasLabels[categoriaFilter] || categoriaFilter}`,
+                  tituloFilter && `Título: ${tituloFilter}`,
+                  docsFilter !== 'todos' && `Docs: ${docsFilter}`,
+                  docBusqueda && `Doc: "${docBusqueda}"`,
                 ].filter(Boolean).join(' • ')}
               </span>
             </div>
           )}
 
           {/* Botón limpiar filtros */}
-          {(estadoFilter !== 'todos' || pagadoFilter !== 'todos' || searchTerm) && (
+          {activeFilterCount > 0 && (
             <button
               onClick={() => {
                 setSearchTerm('');
                 setEstadoFilter('todos');
                 setPagadoFilter('todos');
+                setCategoriaFilter('');
+                setTituloFilter('');
+                setDocsFilter('todos');
+                setDocBusqueda('');
               }}
               className="px-3 py-1 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
             >
-              Limpiar filtros
+              Limpiar todo
             </button>
           )}
         </div>
+
+        {/* Panel de filtros avanzados desplegable */}
+        {showAdvancedFilters && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Filtro Categoría */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                  <FolderOpen className="w-3.5 h-3.5 inline mr-1" />
+                  Categoría
+                </label>
+                <select
+                  value={categoriaFilter}
+                  onChange={(e) => { setCategoriaFilter(e.target.value); setTituloFilter(''); }}
+                  className={`w-full px-3 py-2 rounded-lg border-2 text-sm transition-all duration-200 appearance-none bg-white ${
+                    categoriaFilter ? 'border-purple-400 bg-purple-50 text-purple-700' : 'border-gray-200'
+                  }`}
+                >
+                  <option value="">Todas las categorías</option>
+                  {categoriasPresentes.map(cat => (
+                    <option key={cat} value={cat}>{categoriasLabels[cat] || cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtro Título */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                  <FileCheck className="w-3.5 h-3.5 inline mr-1" />
+                  Título de expediente
+                </label>
+                <select
+                  value={tituloFilter}
+                  onChange={(e) => setTituloFilter(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-lg border-2 text-sm transition-all duration-200 appearance-none bg-white ${
+                    tituloFilter ? 'border-purple-400 bg-purple-50 text-purple-700' : 'border-gray-200'
+                  }`}
+                >
+                  <option value="">Todos los títulos</option>
+                  {titulosParaFiltro.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Filtro Documentos completados */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                  <FileCheck className="w-3.5 h-3.5 inline mr-1" />
+                  Documentos requeridos
+                </label>
+                <select
+                  value={docsFilter}
+                  onChange={(e) => setDocsFilter(e.target.value as typeof docsFilter)}
+                  className={`w-full px-3 py-2 rounded-lg border-2 text-sm transition-all duration-200 appearance-none bg-white ${
+                    docsFilter !== 'todos' ? 'border-purple-400 bg-purple-50 text-purple-700' : 'border-gray-200'
+                  }`}
+                >
+                  <option value="todos">Todos</option>
+                  <option value="completos">✓ Documentación completa</option>
+                  <option value="incompletos">⚠ Documentación incompleta</option>
+                  <option value="sin_docs">— Sin documentos requeridos</option>
+                </select>
+              </div>
+
+              {/* Búsqueda de documento específico */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                  <Search className="w-3.5 h-3.5 inline mr-1" />
+                  Buscar documento
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Nombre del documento..."
+                    value={docBusqueda}
+                    onChange={(e) => setDocBusqueda(e.target.value)}
+                    className={`w-full px-3 py-2 rounded-lg border-2 text-sm transition-all duration-200 pr-8 ${
+                      docBusqueda ? 'border-purple-400 bg-purple-50 text-purple-700' : 'border-gray-200'
+                    }`}
+                  />
+                  {docBusqueda && (
+                    <button onClick={() => setDocBusqueda('')} className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Resumen de docs filtrados */}
+            {(docsFilter !== 'todos' || docBusqueda) && (
+              <div className="mt-3 flex items-center gap-2 text-sm">
+                <span className="text-gray-500">
+                  {filteredExpedientes.length} expediente{filteredExpedientes.length !== 1 ? 's' : ''} coinciden con los filtros de documentación
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ─── Barra de acciones masivas ── */}
@@ -664,6 +867,7 @@ export default function ExpedientesPage() {
               </th>
               <th>Cliente</th>
               <th>Expediente</th>
+              <th>Docs</th>
               <th>Fecha presentación</th>
               <th>Estado</th>
               <th>Presupuesto</th>
@@ -676,118 +880,184 @@ export default function ExpedientesPage() {
           <tbody>
             {filteredExpedientes.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center py-8 text-gray-500">
+                <td colSpan={11} className="text-center py-8 text-gray-500">
                   No se encontraron expedientes con los filtros seleccionados
                 </td>
               </tr>
             ) : (
               paginatedExpedientes.map((expediente) => {
                 const isSelected = selectedIds.has(expediente.id);
+                const isExpanded = expandedRows.has(expediente.id);
+                const docs = expediente.documentos_requeridos || [];
+                const totalDocs = docs.length;
+                const docsAdj = docs.filter((d: any) => d.adjuntado).length;
                 
                 return (
-                  <tr key={expediente.id} className={`hover:bg-gray-50 cursor-pointer ${isSelected ? 'bg-blue-50/50' : ''}`}>
-                    <td className="w-8" onClick={(e) => e.stopPropagation()}>
-                      <button 
-                        onClick={() => toggleSelect(expediente.id)}
-                        className="p-1 hover:bg-gray-100 rounded"
-                      >
-                        {isSelected ? (
-                          <CheckSquare className="w-4 h-4 text-blue-600" />
-                        ) : (
-                          <Square className="w-4 h-4 text-gray-400" />
-                        )}
-                      </button>
-                    </td>
-                    <td onClick={() => openExpedienteModal(expediente)}>
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-gray-400" />
-                        <div>
-                          <div className="font-medium">{expediente.cliente.nombre}</div>
-                          <div className="text-sm text-gray-500">{expediente.cliente.nif || '—'}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td onClick={() => openExpedienteModal(expediente)}>
-                      <div>
+                  <React.Fragment key={expediente.id}>
+                    <tr className={`hover:bg-gray-50 cursor-pointer ${isSelected ? 'bg-blue-50/50' : ''} ${isExpanded ? 'border-b-0' : ''}`}>
+                      <td className="w-8" onClick={(e) => e.stopPropagation()}>
+                        <button 
+                          onClick={() => toggleSelect(expediente.id)}
+                          className="p-1 hover:bg-gray-100 rounded"
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-4 h-4 text-blue-600" />
+                          ) : (
+                            <Square className="w-4 h-4 text-gray-400" />
+                          )}
+                        </button>
+                      </td>
+                      <td onClick={() => openExpedienteModal(expediente)}>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium">{expediente.titulo}</span>
-                          {expediente.categoria && <span className="badge badge-purple text-xs">{categoriasLabels[expediente.categoria] || expediente.categoria}</span>}
+                          <Users className="w-4 h-4 text-gray-400" />
+                          <div>
+                            <div className="font-medium">{expediente.cliente.nombre}</div>
+                            <div className="text-sm text-gray-500">{expediente.cliente.nif || '—'}</div>
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-500">{expediente.concepto}</div>
-                        {expediente.expediente_referencia && (
-                          <div className="text-xs text-gray-400">Ref: {expediente.expediente_referencia}</div>
+                      </td>
+                      <td onClick={() => openExpedienteModal(expediente)}>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{expediente.titulo}</span>
+                            {expediente.categoria && <span className="badge badge-purple text-xs">{categoriasLabels[expediente.categoria] || expediente.categoria}</span>}
+                          </div>
+                          <div className="text-sm text-gray-500">{expediente.concepto}</div>
+                          {expediente.expediente_referencia && (
+                            <div className="text-xs text-gray-400">Ref: {expediente.expediente_referencia}</div>
+                          )}
+                        </div>
+                      </td>
+                      {/* Columna de Documentos con botón expandir */}
+                      <td onClick={(e) => e.stopPropagation()}>
+                        {totalDocs > 0 ? (
+                          <button
+                            onClick={() => toggleExpand(expediente.id)}
+                            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
+                              docsAdj === totalDocs
+                                ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+                                : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
+                            }`}
+                            title={`${docsAdj}/${totalDocs} documentos adjuntados. Click para ver detalle.`}
+                          >
+                            {docsAdj === totalDocs 
+                              ? <FileCheck className="w-3.5 h-3.5" /> 
+                              : <FileX className="w-3.5 h-3.5" />
+                            }
+                            {docsAdj}/{totalDocs}
+                            {isExpanded 
+                              ? <ChevronUp className="w-3 h-3" /> 
+                              : <ChevronDown className="w-3 h-3" />
+                            }
+                          </button>
+                        ) : (
+                          <span className="text-xs text-gray-400">—</span>
                         )}
-                        {expediente.documentos_requeridos && expediente.documentos_requeridos.length > 0 && (() => {
-                          const total = expediente.documentos_requeridos!.length;
-                          const adj = expediente.documentos_requeridos!.filter((d: any) => d.adjuntado).length;
-                          return (
-                            <div className={`text-xs mt-0.5 ${adj === total ? 'text-green-600' : 'text-amber-600'}`}>
-                              Docs: {adj}/{total} {adj === total ? '✓' : ''}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </td>
-                    <td onClick={() => openExpedienteModal(expediente)}>
-                      {expediente.fecha_presentacion ? (
+                      </td>
+                      <td onClick={() => openExpedienteModal(expediente)}>
+                        {expediente.fecha_presentacion ? (
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4 text-gray-400" />
+                            {expediente.fecha_presentacion}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td onClick={() => openExpedienteModal(expediente)}>
+                        <span className={`badge ${estadoBadges[expediente.estado]}`}>
+                          {estadoLabels[expediente.estado]}
+                        </span>
+                      </td>
+                      <td className="text-right" onClick={() => openExpedienteModal(expediente)}>
+                        <span className="font-medium">{eur(expediente.presupuesto)}</span>
+                      </td>
+                      <td className="text-right" onClick={() => openExpedienteModal(expediente)}>
+                        <span className={expediente.total_cobrado > 0 ? 'text-green-600' : 'text-gray-500'}>
+                          {eur(expediente.total_cobrado)}
+                        </span>
+                      </td>
+                      <td className="text-right" onClick={() => openExpedienteModal(expediente)}>
+                        <span className={expediente.total_pendiente > 0 ? 'text-red-600' : 'text-green-600'}>
+                          {eur(expediente.total_pendiente)}
+                        </span>
+                      </td>
+                      <td className="text-center" onClick={() => openExpedienteModal(expediente)}>
+                        {expediente.esta_pagado_totalmente ? (
+                          <div className="flex items-center justify-center gap-1 text-green-600">
+                            <CheckCircle className="w-4 h-4" />
+                            <span className="text-sm">Sí</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1 text-red-600">
+                            <AlertCircle className="w-4 h-4" />
+                            <span className="text-sm">No</span>
+                          </div>
+                        )}
+                      </td>
+                      <td>
                         <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4 text-gray-400" />
-                          {expediente.fecha_presentacion}
+                          <button
+                            onClick={() => openExpedienteModal(expediente)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
+                            title="Editar expediente"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => router.push(`/clientes/${expediente.cliente.id}`)}
+                            className="p-1.5 text-gray-600 hover:bg-gray-50 rounded"
+                            title="Ver cliente"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
                         </div>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td onClick={() => openExpedienteModal(expediente)}>
-                      <span className={`badge ${estadoBadges[expediente.estado]}`}>
-                        {estadoLabels[expediente.estado]}
-                      </span>
-                    </td>
-                    <td className="text-right" onClick={() => openExpedienteModal(expediente)}>
-                      <span className="font-medium">{eur(expediente.presupuesto)}</span>
-                    </td>
-                    <td className="text-right" onClick={() => openExpedienteModal(expediente)}>
-                      <span className={expediente.total_cobrado > 0 ? 'text-green-600' : 'text-gray-500'}>
-                        {eur(expediente.total_cobrado)}
-                      </span>
-                    </td>
-                    <td className="text-right" onClick={() => openExpedienteModal(expediente)}>
-                      <span className={expediente.total_pendiente > 0 ? 'text-red-600' : 'text-green-600'}>
-                        {eur(expediente.total_pendiente)}
-                      </span>
-                    </td>
-                    <td className="text-center" onClick={() => openExpedienteModal(expediente)}>
-                      {expediente.esta_pagado_totalmente ? (
-                        <div className="flex items-center justify-center gap-1 text-green-600">
-                          <CheckCircle className="w-4 h-4" />
-                          <span className="text-sm">Sí</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center gap-1 text-red-600">
-                          <AlertCircle className="w-4 h-4" />
-                          <span className="text-sm">No</span>
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => openExpedienteModal(expediente)}
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
-                          title="Editar expediente"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => router.push(`/clientes/${expediente.cliente.id}`)}
-                          className="p-1.5 text-gray-600 hover:bg-gray-50 rounded"
-                          title="Ver cliente"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                      </td>
+                    </tr>
+                    {/* Fila expandida con documentos requeridos */}
+                    {isExpanded && totalDocs > 0 && (
+                      <tr className="bg-gray-50/80">
+                        <td colSpan={11} className="px-4 py-3">
+                          <div className="ml-8">
+                            <div className="flex items-center gap-2 mb-2">
+                              <FolderOpen className="w-4 h-4 text-gray-500" />
+                              <span className="text-sm font-semibold text-gray-700">
+                                Documentos requeridos ({docsAdj}/{totalDocs} completados)
+                              </span>
+                              {docsAdj === totalDocs && (
+                                <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded-full">Completo</span>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                              {docs.map((doc: any, idx: number) => (
+                                <div
+                                  key={idx}
+                                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm ${
+                                    doc.adjuntado
+                                      ? 'bg-green-50 border-green-200 text-green-800'
+                                      : 'bg-white border-gray-200 text-gray-700'
+                                  }`}
+                                >
+                                  {doc.adjuntado 
+                                    ? <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                                    : <AlertCircle className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                                  }
+                                  <span className={`truncate ${doc.adjuntado ? 'font-medium' : ''}`}>
+                                    {doc.nombre}
+                                  </span>
+                                  {doc.notas && (
+                                    <span className="text-xs text-gray-500 truncate ml-auto" title={doc.notas}>
+                                      ({doc.notas})
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })
             )}
