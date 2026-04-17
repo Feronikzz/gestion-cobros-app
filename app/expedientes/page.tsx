@@ -11,6 +11,8 @@ import {
   CATEGORIA_LABELS
 } from '@/lib/catalogo-procedimientos';
 import { eur } from '@/lib/utils';
+import { useHideSensitive } from '@/lib/hooks/use-hide-sensitive';
+import { SensitiveToggle } from '@/components/sensitive-toggle';
 import { createClient } from '@/lib/supabase/client';
 import type { EstadoProcedimiento, CategoriaProcedimiento, Procedimiento, Cliente } from '@/lib/supabase/types';
 
@@ -56,6 +58,7 @@ export default function ExpedientesPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('todos');
   const [pagadoFilter, setPagadoFilter] = useState('todos');
+  const { hidden: hideSensitive, toggle: toggleSensitive, mask } = useHideSensitive();
   
   // Filtros avanzados
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -398,6 +401,13 @@ export default function ExpedientesPage() {
     >
       {/* ─── Métricas ── */}
       <div className="dashboard-metrics">
+        <div className="metric-card metric-blue">
+          <FolderOpen className="metric-icon" />
+          <div>
+            <p className="metric-label">Total expedientes</p>
+            <p className="metric-value">{stats.total}</p>
+          </div>
+        </div>
         <div className="metric-card metric-orange">
           <Clock className="metric-icon" />
           <div>
@@ -406,26 +416,20 @@ export default function ExpedientesPage() {
           </div>
         </div>
         <div className="metric-card metric-green">
-          <TrendingUp className="metric-icon" />
+          <CheckCircle className="metric-icon" />
           <div>
-            <p className="metric-label">Cobrado total</p>
-            <p className="metric-value">{eur(stats.cobradoTotal)}</p>
+            <p className="metric-label">Cobrados completos</p>
+            <p className="metric-value">{stats.pagadosTotalmente}</p>
           </div>
         </div>
         <div className="metric-card metric-red">
           <AlertCircle className="metric-icon" />
           <div>
-            <p className="metric-label">Pendiente de pago</p>
-            <p className="metric-value">{eur(stats.pendienteTotal)}</p>
+            <p className="metric-label">Pendientes de pago</p>
+            <p className="metric-value">{stats.pendientesPago}</p>
           </div>
         </div>
-        <div className="metric-card metric-purple">
-          <DollarSign className="metric-icon" />
-          <div>
-            <p className="metric-label">Presupuesto total</p>
-            <p className="metric-value">{eur(stats.presupuestoTotal)}</p>
-          </div>
-        </div>
+        <SensitiveToggle hidden={hideSensitive} onToggle={toggleSensitive} className="absolute top-2 right-2" />
       </div>
 
       {/* ─── Búsqueda y Filtros ── */}
@@ -870,17 +874,14 @@ export default function ExpedientesPage() {
               <th>Docs</th>
               <th>Fecha presentación</th>
               <th>Estado</th>
-              <th>Presupuesto</th>
-              <th>Cobrado</th>
-              <th>Pendiente</th>
-              <th>Pago completo</th>
+              <th>Importes</th>
               <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {filteredExpedientes.length === 0 ? (
               <tr>
-                <td colSpan={11} className="text-center py-8 text-gray-500">
+                <td colSpan={8} className="text-center py-8 text-gray-500">
                   No se encontraron expedientes con los filtros seleccionados
                 </td>
               </tr>
@@ -969,29 +970,24 @@ export default function ExpedientesPage() {
                           {estadoLabels[expediente.estado]}
                         </span>
                       </td>
-                      <td className="text-right" onClick={() => openExpedienteModal(expediente)}>
-                        <span className="font-medium">{eur(expediente.presupuesto)}</span>
-                      </td>
-                      <td className="text-right" onClick={() => openExpedienteModal(expediente)}>
-                        <span className={expediente.total_cobrado > 0 ? 'text-green-600' : 'text-gray-500'}>
-                          {eur(expediente.total_cobrado)}
-                        </span>
-                      </td>
-                      <td className="text-right" onClick={() => openExpedienteModal(expediente)}>
-                        <span className={expediente.total_pendiente > 0 ? 'text-red-600' : 'text-green-600'}>
-                          {eur(expediente.total_pendiente)}
-                        </span>
-                      </td>
-                      <td className="text-center" onClick={() => openExpedienteModal(expediente)}>
-                        {expediente.esta_pagado_totalmente ? (
-                          <div className="flex items-center justify-center gap-1 text-green-600">
-                            <CheckCircle className="w-4 h-4" />
-                            <span className="text-sm">Sí</span>
-                          </div>
+                      {/* Columna combinada de importes */}
+                      <td onClick={() => openExpedienteModal(expediente)}>
+                        {hideSensitive ? (
+                          <span className="text-gray-400 text-sm">******</span>
                         ) : (
-                          <div className="flex items-center justify-center gap-1 text-red-600">
-                            <AlertCircle className="w-4 h-4" />
-                            <span className="text-sm">No</span>
+                          <div className="text-xs space-y-0.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-gray-500">Ppto:</span>
+                              <span className="font-medium text-gray-800">{eur(expediente.presupuesto)}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-gray-500">Cobrado:</span>
+                              <span className={expediente.total_cobrado > 0 ? 'font-medium text-green-600' : 'text-gray-400'}>{eur(expediente.total_cobrado)}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-gray-500">Pendiente:</span>
+                              <span className={expediente.total_pendiente > 0 ? 'font-medium text-red-600' : 'font-medium text-green-600'}>{eur(expediente.total_pendiente)}</span>
+                            </div>
                           </div>
                         )}
                       </td>
@@ -1017,7 +1013,7 @@ export default function ExpedientesPage() {
                     {/* Fila expandida con documentos requeridos */}
                     {isExpanded && totalDocs > 0 && (
                       <tr className="bg-gray-50/80">
-                        <td colSpan={11} className="px-4 py-3">
+                        <td colSpan={8} className="px-4 py-3">
                           <div className="ml-8">
                             <div className="flex items-center gap-2 mb-2">
                               <FolderOpen className="w-4 h-4 text-gray-500" />

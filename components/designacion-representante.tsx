@@ -101,12 +101,22 @@ export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, 
   // Parsear dirección desglosada
   const dirParsed = parseDireccion((cliente as any)?.direccion);
 
+  // Leer metadatos de designación del campo notas del cliente
+  const parseDesigMeta = (notas: string | null | undefined): { nombre_padre: string; nombre_madre: string; estado_civil: string; localidad_nacimiento: string } => {
+    const defaults = { nombre_padre: '', nombre_madre: '', estado_civil: '', localidad_nacimiento: '' };
+    if (!notas) return defaults;
+    const match = notas.match(/\[DESIGNACION:(.+?)\]/);
+    if (!match) return defaults;
+    try { return { ...defaults, ...JSON.parse(match[1]) }; } catch { return defaults; }
+  };
+  const desigMeta = parseDesigMeta(cliente?.notas);
+
   const [repdo, setRepdo] = useState({
     nombre: cliente?.nombre || '', apellido1: ap1, apellido2: ap2,
     nacionalidad: (cliente as any)?.nacionalidad || '', nif: cliente?.nif || '', pasaporte: '',
     fecha_nac_dd: fechaNacDD, fecha_nac_mm: fechaNacMM, fecha_nac_aaaa: fechaNacAAAA,
-    localidad_nacimiento: '', pais: (cliente as any)?.nacionalidad || '',
-    nombre_padre: '', nombre_madre: '', estado_civil: '',
+    localidad_nacimiento: desigMeta.localidad_nacimiento, pais: (cliente as any)?.nacionalidad || '',
+    nombre_padre: desigMeta.nombre_padre, nombre_madre: desigMeta.nombre_madre, estado_civil: desigMeta.estado_civil,
     domicilio: dirParsed.calle, numero: dirParsed.numero, piso: dirParsed.piso,
     localidad: (cliente as any)?.localidad || '', cp: (cliente as any)?.codigo_postal || '',
     provincia: (cliente as any)?.provincia || '', telefono: cliente?.telefono || '', email: cliente?.email || '',

@@ -4,10 +4,13 @@ import { useState, useMemo } from 'react';
 import { LayoutShell } from '@/components/layout-shell';
 import { useCierreMensual } from '@/lib/hooks/use-cierre-mensual';
 import { eur } from '@/lib/utils';
+import { useHideSensitive } from '@/lib/hooks/use-hide-sensitive';
+import { SensitiveToggle } from '@/components/sensitive-toggle';
 import { Lock, Unlock, TrendingUp, TrendingDown, DollarSign, Calendar } from 'lucide-react';
 
 export default function CierrePage() {
   const { cierres, summary, loading, error, createCierre } = useCierreMensual();
+  const { hidden: hideSensitive, toggle: toggleSensitive, mask } = useHideSensitive();
 
   const isMesCerrado = (mes: string) => cierres.some(c => c.mes === mes);
 
@@ -53,23 +56,24 @@ export default function CierrePage() {
           <TrendingUp className="metric-icon" />
           <div>
             <p className="metric-label">Total cobrado</p>
-            <p className="metric-value">{eur(totalCobrado)}</p>
+            <p className="metric-value">{mask(eur(totalCobrado))}</p>
           </div>
         </div>
         <div className="metric-card metric-red">
           <TrendingDown className="metric-icon" />
           <div>
             <p className="metric-label">Total repartido</p>
-            <p className="metric-value">{eur(totalRepartido)}</p>
+            <p className="metric-value">{mask(eur(totalRepartido))}</p>
           </div>
         </div>
         <div className="metric-card metric-blue">
           <DollarSign className="metric-icon" />
           <div>
             <p className="metric-label">Saldo actual</p>
-            <p className="metric-value">{eur(saldoActual)}</p>
+            <p className="metric-value">{mask(eur(saldoActual))}</p>
           </div>
         </div>
+        <SensitiveToggle hidden={hideSensitive} onToggle={toggleSensitive} className="absolute top-2 right-2" />
       </div>
 
       {/* ── Info sin actividad ── */}

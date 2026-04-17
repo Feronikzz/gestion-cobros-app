@@ -8,6 +8,8 @@ import { CobroForm } from '@/components/cobro-form';
 import { ClienteNotas } from '@/components/cliente-notas';
 import { createClient } from '@/lib/supabase/client';
 import { eur } from '@/lib/utils';
+import { useHideSensitive } from '@/lib/hooks/use-hide-sensitive';
+import { SensitiveToggle } from '@/components/sensitive-toggle';
 import type { Cliente, Procedimiento, Cobro } from '@/lib/supabase/types';
 import type { Documento, EstadoProcedimiento } from '@/lib/supabase/types';
 import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download, Activity, FileSignature, Printer, ChevronUp, ChevronDown, CheckSquare, Square, X, Eye, AlertTriangle, Info, ExternalLink } from 'lucide-react';
@@ -28,6 +30,7 @@ import type { Actividad, Recibi, RecibiInsert, ClienteInsert, ClienteUpdate } fr
 export default function ClienteDetallePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { hidden: hideSensitive, toggle: toggleSensitive, mask } = useHideSensitive();
   
   // Solo crear el cliente de Supabase en el cliente
   const supabase = typeof window !== 'undefined' ? createClient() : null;
@@ -637,17 +640,18 @@ export default function ClienteDetallePage() {
       {/* ── Resumen económico ── */}
       <div className="dashboard-metrics" style={{ marginTop: 'var(--space-xl)' }}>
         <div className="metric-card metric-amber">
-          <div><p className="metric-label">Presupuesto total</p><p className="metric-value">{eur(totalPresupuesto)}</p></div>
+          <div><p className="metric-label">Presupuesto total</p><p className="metric-value">{mask(eur(totalPresupuesto))}</p></div>
         </div>
         <div className="metric-card metric-green">
-          <div><p className="metric-label">Entradas pagadas</p><p className="metric-value">{eur(totalEntradas)}</p></div>
+          <div><p className="metric-label">Entradas pagadas</p><p className="metric-value">{mask(eur(totalEntradas))}</p></div>
         </div>
         <div className="metric-card metric-blue">
-          <div><p className="metric-label">Total cobrado</p><p className="metric-value">{eur(totalCobrado)}</p></div>
+          <div><p className="metric-label">Total cobrado</p><p className="metric-value">{mask(eur(totalCobrado))}</p></div>
         </div>
         <div className={`metric-card ${totalPendiente > 0 ? 'metric-red' : 'metric-green'}`}>
-          <div><p className="metric-label">Pendiente</p><p className="metric-value">{eur(totalPendiente)}</p></div>
+          <div><p className="metric-label">Pendiente</p><p className="metric-value">{mask(eur(totalPendiente))}</p></div>
         </div>
+        <SensitiveToggle hidden={hideSensitive} onToggle={toggleSensitive} className="absolute top-2 right-2" />
       </div>
 
       {/* ── Procedimientos / Expedientes ── */}

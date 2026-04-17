@@ -10,11 +10,14 @@ import { useClientes } from '@/lib/hooks/use-clientes';
 import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import type { Cobro } from '@/lib/supabase/types';
 import { eur } from '@/lib/utils';
+import { useHideSensitive } from '@/lib/hooks/use-hide-sensitive';
+import { SensitiveToggle } from '@/components/sensitive-toggle';
 import { CheckCircle, AlertCircle, Plus, FileText, DollarSign, Edit3, Trash2, Search, Filter, ChevronDown, ChevronUp, X, Users, CreditCard, Calendar, TrendingUp, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function CobrosPage() {
   const router = useRouter();
   const { cobros, loading, error, createCobro, updateCobro, deleteCobro } = useCobros();
+  const { hidden: hideSensitive, toggle: toggleSensitive, mask } = useHideSensitive();
   const { clientes } = useClientes();
   const { procedimientos } = useProcedimientos();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -282,14 +285,14 @@ export default function CobrosPage() {
           <DollarSign className="metric-icon" />
           <div>
             <p className="metric-label">Cobrado este mes</p>
-            <p className="metric-value">{eur(calcularCobradoMesActual())}</p>
+            <p className="metric-value">{mask(eur(calcularCobradoMesActual()))}</p>
           </div>
         </div>
         <div className="metric-card metric-amber">
           <FileText className="metric-icon" />
           <div>
             <p className="metric-label">Pendiente de cobro</p>
-            <p className="metric-value">{eur(calcularPendiente())}</p>
+            <p className="metric-value">{mask(eur(calcularPendiente()))}</p>
           </div>
         </div>
         <div className="metric-card metric-blue">
@@ -299,6 +302,7 @@ export default function CobrosPage() {
             <p className="metric-value">{cobros.length}</p>
           </div>
         </div>
+        <SensitiveToggle hidden={hideSensitive} onToggle={toggleSensitive} className="absolute top-2 right-2" />
       </div>
 
       {/* Búsqueda y Filtros */}

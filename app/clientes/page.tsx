@@ -10,7 +10,7 @@ import { useCobros } from '@/lib/hooks/use-cobros';
 import type { Cliente, ClienteInsert, EstadoProcedimiento } from '@/lib/supabase/types';
 import { createClient } from '@/lib/supabase/client';
 import Link from 'next/link';
-import { Eye, Edit, Trash2, UserPlus, Users, TrendingUp, Calendar, DollarSign, Search, ChevronDown, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Eye, Edit, Trash2, UserPlus, Users, TrendingUp, Calendar, Search, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, ArrowUpDown, Archive } from 'lucide-react';
 
 export default function ClientesPage() {
   const { clientes, loading, error, createCliente, updateCliente, deleteCliente } = useClientes();
@@ -22,6 +22,10 @@ export default function ClientesPage() {
   const [estadoFilter, setEstadoFilter] = useState('');
   const [showEstadoFilter, setShowEstadoFilter] = useState(false);
 
+  // Ordenación
+  const [sortField, setSortField] = useState<'apellidos' | 'nombre' | 'fecha_entrada'>('apellidos');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
@@ -31,12 +35,12 @@ export default function ClientesPage() {
     return clientes.filter(c => c.estado === 'activo').length;
   };
 
-  const calcularTotalPresupuesto = () => {
-    return procedimientos.reduce((total, p) => total + p.presupuesto, 0);
+  const calcularClientesPendientes = () => {
+    return clientes.filter(c => c.estado === 'pendiente').length;
   };
 
-  const calcularTotalCobrado = () => {
-    return cobros.reduce((total, c) => total + c.importe, 0);
+  const calcularClientesArchivados = () => {
+    return clientes.filter(c => c.estado === 'archivado').length;
   };
 
   const calcularClientesNuevosMes = () => {
@@ -63,8 +67,17 @@ export default function ClientesPage() {
     setCurrentPage(1);
   }, [searchQuery, estadoFilter]);
 
+  const toggleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
   const filteredClientes = useMemo(() => {
-    return clientes.filter(c => {
+    const filtered = clientes.filter(c => {
       const q = searchQuery.toLowerCase();
       const matchesSearch = !q ||
         c.nombre.toLowerCase().includes(q) ||
@@ -76,7 +89,26 @@ export default function ClientesPage() {
       const matchesEstado = !estadoFilter || c.estado === estadoFilter;
       return matchesSearch && matchesEstado;
     });
-  }, [clientes, searchQuery, estadoFilter]);
+
+    // Ordenar
+    filtered.sort((a, b) => {
+      let cmp = 0;
+      if (sortField === 'apellidos') {
+        const aVal = (a.apellidos || '').toLowerCase() + ' ' + a.nombre.toLowerCase();
+        const bVal = (b.apellidos || '').toLowerCase() + ' ' + b.nombre.toLowerCase();
+        cmp = aVal.localeCompare(bVal);
+      } else if (sortField === 'nombre') {
+        const aVal = a.nombre.toLowerCase() + ' ' + (a.apellidos || '').toLowerCase();
+        const bVal = b.nombre.toLowerCase() + ' ' + (b.apellidos || '').toLowerCase();
+        cmp = aVal.localeCompare(bVal);
+      } else if (sortField === 'fecha_entrada') {
+        cmp = a.fecha_entrada.localeCompare(b.fecha_entrada);
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    return filtered;
+  }, [clientes, searchQuery, estadoFilter, sortField, sortDir]);
 
   // Clientes paginados
   const paginatedClientes = useMemo(() => {
@@ -200,41 +232,41 @@ export default function ClientesPage() {
           </div>
         </div>
         
-        <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-green-100 text-sm font-medium mb-1">Total presupuestos</div>
-              <div className="text-2xl font-bold">{calcularTotalPresupuesto().toFixed(0)}€</div>
-              <div className="text-green-100 text-xs mt-1">Suma de todos los expedientes</div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <DollarSign className="w-6 h-6 text-white" />
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-purple-100 text-sm font-medium mb-1">Total cobrado</div>
-              <div className="text-2xl font-bold">{calcularTotalCobrado().toFixed(0)}€</div>
-              <div className="text-purple-100 text-xs mt-1">Suma de todos los cobros</div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-white" />
-            </div>
-          </div>
-        </div>
-        
         <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-amber-100 text-sm font-medium mb-1">Nuevos este mes</div>
-              <div className="text-2xl font-bold">{calcularClientesNuevosMes()}</div>
-              <div className="text-amber-100 text-xs mt-1">Clientes nuevos</div>
+              <div className="text-amber-100 text-sm font-medium mb-1">Pendientes</div>
+              <div className="text-2xl font-bold">{calcularClientesPendientes()}</div>
+              <div className="text-amber-100 text-xs mt-1">Clientes pendientes</div>
             </div>
             <div className="p-3 bg-white/20 rounded-lg">
               <Calendar className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-gradient-to-r from-gray-500 to-gray-600 rounded-xl p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-gray-200 text-sm font-medium mb-1">Archivados</div>
+              <div className="text-2xl font-bold">{calcularClientesArchivados()}</div>
+              <div className="text-gray-200 text-xs mt-1">Clientes archivados</div>
+            </div>
+            <div className="p-3 bg-white/20 rounded-lg">
+              <Archive className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-green-100 text-sm font-medium mb-1">Nuevos este mes</div>
+              <div className="text-2xl font-bold">{calcularClientesNuevosMes()}</div>
+              <div className="text-green-100 text-xs mt-1">Clientes nuevos</div>
+            </div>
+            <div className="p-3 bg-white/20 rounded-lg">
+              <TrendingUp className="w-6 h-6 text-white" />
             </div>
           </div>
         </div>
@@ -359,10 +391,27 @@ export default function ClientesPage() {
         <table className="table">
           <thead>
             <tr>
-              <th>Cliente</th>
+              <th>
+                <button onClick={() => toggleSort(sortField === 'apellidos' ? 'nombre' : 'apellidos')} className="flex items-center gap-1 hover:text-blue-600 transition-colors">
+                  Cliente
+                  {sortField === 'apellidos' || sortField === 'nombre' ? (
+                    sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                  <span className="text-xs font-normal text-gray-400 ml-0.5">
+                    {sortField === 'apellidos' ? '(apellido)' : sortField === 'nombre' ? '(nombre)' : ''}
+                  </span>
+                </button>
+              </th>
               <th>Expedientes</th>
               <th>Contacto</th>
-              <th>Fecha entrada</th>
+              <th>
+                <button onClick={() => toggleSort('fecha_entrada')} className="flex items-center gap-1 hover:text-blue-600 transition-colors">
+                  Fecha entrada
+                  {sortField === 'fecha_entrada' ? (
+                    sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                </button>
+              </th>
               <th>Estado</th>
               <th>Acciones</th>
             </tr>

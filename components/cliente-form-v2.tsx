@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { Cliente, ClienteInsert, EstadoProcedimiento } from '@/lib/supabase/types';
 import { formatField } from '@/lib/utils/text';
-import { User, FileText, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { User, FileText, Plus, Trash2, ChevronDown, ChevronUp, FileSignature } from 'lucide-react';
 
 // Documento de identidad en formulario (antes de guardar en BD)
 interface DocIdentidadForm {
@@ -37,6 +37,18 @@ const emptyDoc: DocIdentidadForm = { tipo: 'DNI', numero: '', fecha_expedicion: 
 const emptyProc: ProcedimientoForm = { titulo: '', concepto: '', presupuesto: 0, tiene_entrada: false, importe_entrada: 0, estado: 'pendiente_presentar' };
 
 export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowProcedimiento = true }: ClienteFormV2Props) {
+  // Extraer metadatos de designación del campo notas (si existen)
+  const parseDesignacionMeta = (notas: string | null): { nombre_padre: string; nombre_madre: string; estado_civil: string; localidad_nacimiento: string } => {
+    const defaults = { nombre_padre: '', nombre_madre: '', estado_civil: '', localidad_nacimiento: '' };
+    if (!notas) return defaults;
+    const match = notas.match(/\[DESIGNACION:(.+?)\]/);
+    if (!match) return defaults;
+    try { return { ...defaults, ...JSON.parse(match[1]) }; } catch { return defaults; }
+  };
+
+  const existingMeta = parseDesignacionMeta(cliente?.notas ?? null);
+  const existingNotasClean = (cliente?.notas ?? '').replace(/\[DESIGNACION:.+?\]\n?/, '').trim();
+
   // ─── Datos personales ───
   const [formData, setFormData] = useState({
     nombre: cliente?.nombre ?? '',
@@ -52,13 +64,24 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
     nacionalidad: cliente?.nacionalidad ?? '',
     fecha_entrada: cliente?.fecha_entrada ?? new Date().toISOString().split('T')[0],
     estado: cliente?.estado ?? ('activo' as Cliente['estado']),
-    notas: cliente?.notas ?? '',
+    notas: existingNotasClean,
     // Campos legacy de documento principal (se usarán del primer doc)
     documento_tipo: cliente?.documento_tipo ?? '',
     documento_numero: cliente?.documento_numero ?? '',
     documento_caducidad: cliente?.documento_caducidad ?? '',
     carpeta_local: cliente?.carpeta_local ?? '',
   });
+
+  // ─── Campos extra para designación de representante ───
+  const [designacionData, setDesignacionData] = useState({
+    nombre_padre: existingMeta.nombre_padre,
+    nombre_madre: existingMeta.nombre_madre,
+    estado_civil: existingMeta.estado_civil,
+    localidad_nacimiento: existingMeta.localidad_nacimiento,
+  });
+
+  const setDesig = (key: string, value: string) =>
+    setDesignacionData(prev => ({ ...prev, [key]: value }));
 
   // ─── Documentos de identidad ───
   const [documentos, setDocumentos] = useState<DocIdentidadForm[]>(
@@ -75,6 +98,7 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
   const [expandedSections, setExpandedSections] = useState({
     personal: true,
     contacto: true,
+    designacion: false,
     documentos: true,
     estado: true,
     procedimiento: false,
@@ -126,6 +150,11 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
       // Sincronizar doc principal con campos legacy del cliente
       const docPrincipal = documentos.find(d => d.es_principal) || documentos[0];
 
+      // Serializar datos de designación como metadato en notas
+      const hasDesigData = Object.values(designacionData).some(v => v.trim());
+      const desigPrefix = hasDesigData ? `[DESIGNACION:${JSON.stringify(designacionData)}]\n` : '';
+      const finalNotas = desigPrefix + (formData.notas || '');
+
       const clienteData: Omit<ClienteInsert, 'user_id'> = {
         nombre: formatField(formData.nombre, 'name'),
         apellidos: formData.apellidos ? formatField(formData.apellidos, 'name') : null,
@@ -145,7 +174,7 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
         documento_numero: docPrincipal?.numero || formData.documento_numero || null,
         documento_caducidad: docPrincipal?.fecha_caducidad || formData.documento_caducidad || null,
         estado: formData.estado as Cliente['estado'],
-        notas: formData.notas ? formatField(formData.notas, 'general') : null,
+        notas: finalNotas.trim() ? formatField(finalNotas.trim(), 'general') : null,
         carpeta_local: formData.carpeta_local || null,
       };
 
@@ -234,6 +263,39 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
               <label className="form-label">Provincia</label>
               <input type="text" value={formData.provincia} onChange={e => set('provincia', e.target.value)} className="form-input" placeholder="Madrid" />
             </div>
+          </div>
+        )}
+      </fieldset>
+
+      {/* ════════════════ DATOS PARA DESIGNACIÓN ════════════════ */}
+      <fieldset className="form-fieldset">
+        <SectionHeader title="Datos para designación de representante" icon={<FileSignature className="w-4 h-4 text-gray-500" />} section="designacion" />
+        {expandedSections.designacion && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+            <div>
+              <label className="form-label">Nombre del padre</label>
+              <input type="text" value={designacionData.nombre_padre} onChange={e => setDesig('nombre_padre', e.target.value)} className="form-input" placeholder="Nombre completo del padre" />
+            </div>
+            <div>
+              <label className="form-label">Nombre de la madre</label>
+              <input type="text" value={designacionData.nombre_madre} onChange={e => setDesig('nombre_madre', e.target.value)} className="form-input" placeholder="Nombre completo de la madre" />
+            </div>
+            <div>
+              <label className="form-label">Estado civil</label>
+              <select value={designacionData.estado_civil} onChange={e => setDesig('estado_civil', e.target.value)} className="form-input">
+                <option value="">—</option>
+                <option value="S">Soltero/a</option>
+                <option value="C">Casado/a</option>
+                <option value="V">Viudo/a</option>
+                <option value="D">Divorciado/a</option>
+                <option value="Sp">Separado/a</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Localidad de nacimiento</label>
+              <input type="text" value={designacionData.localidad_nacimiento} onChange={e => setDesig('localidad_nacimiento', e.target.value)} className="form-input" placeholder="Ciudad de nacimiento" />
+            </div>
+            <p className="md:col-span-2 text-xs text-gray-400">Estos datos se usarán para auto-rellenar la designación de representante.</p>
           </div>
         )}
       </fieldset>

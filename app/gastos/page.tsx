@@ -7,10 +7,13 @@ import { Modal } from '@/components/modal';
 import { useGastos } from '@/lib/hooks/use-gastos';
 import type { Gasto } from '@/lib/supabase/types';
 import { eur, monthLabel } from '@/lib/utils';
+import { useHideSensitive } from '@/lib/hooks/use-hide-sensitive';
+import { SensitiveToggle } from '@/components/sensitive-toggle';
 import { FileText, Download, Eye, Edit, Trash2, Receipt, TrendingUp, TrendingDown, Calendar, DollarSign, ShoppingCart, Building, Zap, Car, Phone, Mail, CreditCard, Search, Filter, ChevronDown, X, Copy, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function GastosPage() {
   const { gastos, loading, error, createGasto, updateGasto, deleteGasto, uploadFactura } = useGastos();
+  const { hidden: hideSensitive, toggle: toggleSensitive, mask } = useHideSensitive();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingGasto, setEditingGasto] = useState<Gasto | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -279,14 +282,14 @@ export default function GastosPage() {
           <TrendingDown className="metric-icon" />
           <div>
             <p className="metric-label">Gasto este mes</p>
-            <p className="metric-value">{eur(calcularGastoMesActual())}</p>
+            <p className="metric-value">{mask(eur(calcularGastoMesActual()))}</p>
           </div>
         </div>
         <div className="metric-card metric-blue">
           <Calendar className="metric-icon" />
           <div>
             <p className="metric-label">Media mensual</p>
-            <p className="metric-value">{eur(calcularGastoMensualMedio())}</p>
+            <p className="metric-value">{mask(eur(calcularGastoMensualMedio()))}</p>
           </div>
         </div>
         <div className="metric-card metric-purple">
@@ -296,6 +299,7 @@ export default function GastosPage() {
             <p className="metric-value" style={{ fontSize: '0.9rem' }}>{getCategoriaMasGastada().categoria || '—'}</p>
           </div>
         </div>
+        <SensitiveToggle hidden={hideSensitive} onToggle={toggleSensitive} className="absolute top-2 right-2" />
       </div>
 
       {/* ── Panel gastos recurrentes pendientes ── */}

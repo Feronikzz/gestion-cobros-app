@@ -7,6 +7,8 @@ import { useCobros } from '@/lib/hooks/use-cobros';
 import { useRepartos } from '@/lib/hooks/use-repartos';
 import { useCierreMensual } from '@/lib/hooks/use-cierre-mensual';
 import { eur } from '@/lib/utils';
+import { useHideSensitive } from '@/lib/hooks/use-hide-sensitive';
+import { SensitiveToggle } from '@/components/sensitive-toggle';
 import Link from 'next/link';
 import { Users, CreditCard, DollarSign, TrendingDown, ArrowRight } from 'lucide-react';
 
@@ -19,6 +21,7 @@ export default function DashboardPage() {
   const currentMonth = new Date().toISOString().slice(0, 7);
   const cur = summary.find(s => s.mes === currentMonth);
 
+  const { hidden: hideSensitive, toggle: toggleSensitive, mask } = useHideSensitive();
   const totalCobrado = useMemo(() => cobros.reduce((s, c) => s + c.importe, 0), [cobros]);
   const totalRepartido = useMemo(() => repartos.reduce((s, r) => s + r.importe, 0), [repartos]);
 
@@ -40,21 +43,21 @@ export default function DashboardPage() {
           <DollarSign className="metric-icon" />
           <div>
             <p className="metric-label">Cobrado este mes</p>
-            <p className="metric-value">{eur(cur?.cobradoMes || 0)}</p>
+            <p className="metric-value">{mask(eur(cur?.cobradoMes || 0))}</p>
           </div>
         </div>
         <div className="metric-card metric-red">
           <TrendingDown className="metric-icon" />
           <div>
             <p className="metric-label">Repartido este mes</p>
-            <p className="metric-value">{eur(cur?.repartidoMes || 0)}</p>
+            <p className="metric-value">{mask(eur(cur?.repartidoMes || 0))}</p>
           </div>
         </div>
         <div className="metric-card metric-blue">
           <CreditCard className="metric-icon" />
           <div>
             <p className="metric-label">Saldo disponible</p>
-            <p className="metric-value">{eur(cur?.totalDisponible || 0)}</p>
+            <p className="metric-value">{mask(eur(cur?.totalDisponible || 0))}</p>
           </div>
         </div>
         <div className="metric-card metric-amber">
@@ -64,17 +67,18 @@ export default function DashboardPage() {
             <p className="metric-value">{clientes.filter(c => c.estado === 'activo').length}</p>
           </div>
         </div>
+        <SensitiveToggle hidden={hideSensitive} onToggle={toggleSensitive} className="absolute top-2 right-2" />
       </div>
 
       {/* ── Resumen global ── */}
       <div className="dashboard-summary">
         <div className="summary-item">
           <span className="summary-label">Total cobrado histórico</span>
-          <span className="summary-value text-green-700">{eur(totalCobrado)}</span>
+          <span className="summary-value text-green-700">{mask(eur(totalCobrado))}</span>
         </div>
         <div className="summary-item">
           <span className="summary-label">Total repartido histórico</span>
-          <span className="summary-value text-red-700">{eur(totalRepartido)}</span>
+          <span className="summary-value text-red-700">{mask(eur(totalRepartido))}</span>
         </div>
         <div className="summary-item">
           <span className="summary-label">Total clientes</span>
@@ -126,7 +130,7 @@ export default function DashboardPage() {
                   <p className="activity-name">{c.clienteNombre}</p>
                   <p className="activity-date">{c.fecha_cobro} · {c.metodo_pago}</p>
                 </div>
-                <span className="activity-amount">{eur(c.importe)}</span>
+                <span className="activity-amount">{mask(eur(c.importe))}</span>
               </div>
             ))}
           </div>
