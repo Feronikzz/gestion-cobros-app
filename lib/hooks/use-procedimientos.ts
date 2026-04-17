@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { auditProcedimiento } from '@/lib/audit';
 import type { Procedimiento, ProcedimientoInsert, ProcedimientoUpdate } from '@/lib/supabase/types';
 
 export function useProcedimientos(clienteId?: string) {
@@ -42,11 +43,17 @@ export function useProcedimientos(clienteId?: string) {
       .single();
     if (error) throw error;
     setProcedimientos(prev => [data, ...prev]);
+    
+    // Auditoría
+    await auditProcedimiento.crear(data.id, data.titulo, '');
+    
     return data;
   };
 
   const updateProcedimiento = async (id: string, updates: ProcedimientoUpdate) => {
     if (!supabase) throw new Error('Supabase client no disponible');
+    
+    const procAnterior = procedimientos.find(p => p.id === id);
     
     const { data, error } = await supabase
       .from('procedimientos')
@@ -56,15 +63,39 @@ export function useProcedimientos(clienteId?: string) {
       .single();
     if (error) throw error;
     setProcedimientos(prev => prev.map(p => (p.id === id ? data : p)));
+    
+    // Auditoría: detectar cambios específicos
+    if (procAnterior) {
+      const campos = Object.keys(updates) as Array<keyof ProcedimientoUpdate>;
+      for (const campo of campos) {
+        const valorAnterior = procAnterior[campo as keyof Procedimiento];
+        const valorNuevo = updates[campo];
+        if (valorAnterior !== valorNuevo) {
+          await auditProcedimiento.actualizar(
+            id,
+            data.titulo,
+            String(campo),
+            valorAnterior,
+            valorNuevo
+          );
+        }
+      }
+    }
+    
     return data;
   };
 
   const deleteProcedimiento = async (id: string) => {
     if (!supabase) throw new Error('Supabase client no disponible');
     
+    const proc = procedimientos.find(p => p.id === id);
+    
     const { error } = await supabase.from('procedimientos').delete().eq('id', id);
     if (error) throw error;
     setProcedimientos(prev => prev.filter(p => p.id !== id));
+    
+    // Auditoría
+    await auditProcedimiento.eliminar(id, proc?.titulo || 'Expediente desconocido');
   };
 
   useEffect(() => {

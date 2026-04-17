@@ -289,16 +289,17 @@ export default function HistorialPage() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center gap-4">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium text-gray-600">Período:</span>
+              <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>Período:</span>
               {(['hoy', 'ayer', 'semana', 'mes'] as FiltroRapido[]).map((tipo) => (
                 <button
                   key={tipo}
                   onClick={() => setFiltroRapido(tipo)}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     filtroRapido === tipo
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      ? 'text-white'
+                      : 'hover:bg-gray-100'
                   }`}
+                  style={filtroRapido === tipo ? { background: 'var(--color-accent)' } : { background: 'var(--color-surface-elevated)', color: 'var(--color-text-primary)' }}
                 >
                   {tipo === 'hoy' && 'Hoy'}
                   {tipo === 'ayer' && 'Ayer'}
@@ -310,9 +311,10 @@ export default function HistorialPage() {
                 onClick={() => setFiltroRapido('personalizado')}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
                   filtroRapido === 'personalizado'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'text-white'
+                    : 'hover:bg-gray-100'
                 }`}
+                style={filtroRapido === 'personalizado' ? { background: 'var(--color-accent)' } : { background: 'var(--color-surface-elevated)', color: 'var(--color-text-primary)' }}
               >
                 <Calendar className="w-4 h-4" />
                 Día específico
@@ -321,16 +323,16 @@ export default function HistorialPage() {
             
             {filtroRapido === 'personalizado' && (
               <div className="flex items-center gap-2">
-                <label className="text-sm text-gray-600">Fecha:</label>
+                <label className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Fecha:</label>
                 <input
                   type="date"
                   value={fechaPersonalizada}
                   min={minFecha}
                   max={hoy}
                   onChange={(e) => setFechaPersonalizada(e.target.value)}
-                  className="form-input text-sm"
+                  className="form-input text-sm w-auto"
                 />
-                <span className="text-xs text-gray-400">(máx. 1 mes atrás)</span>
+                <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>(máx. 1 mes atrás)</span>
               </div>
             )}
           </div>
@@ -338,7 +340,7 @@ export default function HistorialPage() {
 
         {/* Filtros avanzados */}
         {showFilters && (
-          <div className="bg-blue-50 rounded-xl border border-blue-200 p-4 mb-6">
+          <div className="rounded-xl border p-4 mb-6" style={{ background: 'rgba(180,83,9,0.06)', borderColor: 'rgba(180,83,9,0.2)' }}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="form-label text-sm">Entidad</label>
@@ -379,7 +381,7 @@ export default function HistorialPage() {
               <div>
                 <label className="form-label text-sm">Buscar</label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--color-text-tertiary)' }} />
                   <input
                     type="text"
                     value={busqueda}
@@ -398,7 +400,8 @@ export default function HistorialPage() {
                     setAccionFilter('');
                     setBusqueda('');
                   }}
-                  className="text-sm text-blue-600 hover:underline"
+                  className="text-sm hover:underline"
+                  style={{ color: 'var(--color-accent)' }}
                 >
                   Limpiar filtros
                 </button>
@@ -409,19 +412,19 @@ export default function HistorialPage() {
 
         {/* Resumen estadístico */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="p-4 rounded-xl border" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 uppercase">Total eventos</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                <p className="text-xs uppercase" style={{ color: 'var(--color-text-secondary)' }}>Total eventos</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>{stats.total}</p>
               </div>
-              <Activity className="w-8 h-8 text-blue-500" />
+              <Activity className="w-8 h-8" style={{ color: 'var(--color-accent)' }} />
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="p-4 rounded-xl border" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 uppercase">Creados</p>
+                <p className="text-xs uppercase" style={{ color: 'var(--color-text-secondary)' }}>Creados</p>
                 <p className="text-2xl font-bold text-green-600">
                   {stats.porAccion.get('crear') || 0}
                 </p>
@@ -429,10 +432,10 @@ export default function HistorialPage() {
               <Plus className="w-8 h-8 text-green-500" />
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="p-4 rounded-xl border" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 uppercase">Actualizados</p>
+                <p className="text-xs uppercase" style={{ color: 'var(--color-text-secondary)' }}>Actualizados</p>
                 <p className="text-2xl font-bold text-blue-600">
                   {stats.porAccion.get('actualizar') || 0}
                 </p>
@@ -440,10 +443,10 @@ export default function HistorialPage() {
               <Pencil className="w-8 h-8 text-blue-500" />
             </div>
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <div className="p-4 rounded-xl border" style={{ background: 'var(--color-surface)', borderColor: 'var(--color-border)' }}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 uppercase">Eliminados</p>
+                <p className="text-xs uppercase" style={{ color: 'var(--color-text-secondary)' }}>Eliminados</p>
                 <p className="text-2xl font-bold text-red-600">
                   {stats.porAccion.get('eliminar') || 0}
                 </p>
@@ -454,62 +457,62 @@ export default function HistorialPage() {
         </div>
 
         {/* Tabla de logs */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="table-container">
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+            <table className="table">
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha y hora</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usuario</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acción</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entidad</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descripción</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"></th>
+                  <th>Fecha y hora</th>
+                  <th>Usuario</th>
+                  <th>Acción</th>
+                  <th>Entidad</th>
+                  <th>Descripción</th>
+                  <th></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody>
                 {filteredLogs.map((log, idx) => (
                   <tr 
-                    key={log.id} 
-                    className="hover:bg-blue-50/50 transition-colors cursor-pointer"
+                    key={log.id}
+                    className="cursor-pointer"
                     onClick={() => {
                       setSelectedLog(log);
                       setShowDetailModal(true);
                     }}
                   >
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                      {formatDate(log.created_at)}
+                    <td className="whitespace-nowrap">
+                      <span style={{ color: 'var(--color-text-secondary)' }}>{formatDate(log.created_at)}</span>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                    <td className="whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5 text-gray-400" />
-                        {log.user_email?.split('@')[0]}
+                        <User className="w-3.5 h-3.5" style={{ color: 'var(--color-text-tertiary)' }} />
+                        <span>{log.user_email?.split('@')[0]}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         {getActionIcon(log.accion)}
-                        <span className="text-sm text-gray-700 capitalize">{log.accion}</span>
+                        <span className="capitalize">{log.accion}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+                    <td className="whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         {getEntityIcon(log.entidad)}
-                        <span className="text-sm text-gray-700 capitalize">{log.entidad}</span>
+                        <span className="capitalize">{log.entidad}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-900">
+                    <td>
                       <div className="max-w-md truncate" title={log.descripcion || ''}>
                         {log.descripcion || '-'}
                       </div>
                       {log.entidad_nombre && (
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
                           {log.entidad_nombre}
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap text-right">
-                      <Eye className="w-4 h-4 text-gray-400 inline" />
+                    <td className="whitespace-nowrap text-right">
+                      <Eye className="w-4 h-4 inline" style={{ color: 'var(--color-text-tertiary)' }} />
                     </td>
                   </tr>
                 ))}
@@ -519,18 +522,18 @@ export default function HistorialPage() {
           
           {filteredLogs.length === 0 && !loading && (
             <div className="text-center py-12">
-              <Activity className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">No hay registros para el período seleccionado</p>
+              <Activity className="w-12 h-12 mx-auto mb-3" style={{ color: 'var(--color-text-tertiary)' }} />
+              <p style={{ color: 'var(--color-text-secondary)' }}>No hay registros para el período seleccionado</p>
               {filtroRapido === 'hoy' && (
-                <p className="text-sm text-gray-400 mt-1">Prueba seleccionando "Este mes" o "Esta semana"</p>
+                <p className="text-sm mt-1" style={{ color: 'var(--color-text-tertiary)' }}>Prueba seleccionando "Este mes" o "Esta semana"</p>
               )}
             </div>
           )}
           
           {loading && (
             <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="text-gray-500 mt-2">Cargando historial...</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 mx-auto" style={{ borderColor: 'var(--color-accent)' }}></div>
+              <p className="mt-2" style={{ color: 'var(--color-text-secondary)' }}>Cargando historial...</p>
             </div>
           )}
         </div>
@@ -538,16 +541,17 @@ export default function HistorialPage() {
         {/* Modal de detalle */}
         {showDetailModal && selectedLog && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-2xl">
+            <div className="rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-2xl" style={{ background: 'var(--color-surface)' }}>
               <div className="p-6">
                 <div className="flex justify-between items-start mb-4">
-                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <History className="w-5 h-5 text-blue-600" />
+                  <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
+                    <History className="w-5 h-5" style={{ color: 'var(--color-accent)' }} />
                     Detalle del evento
                   </h2>
                   <button
                     onClick={() => setShowDetailModal(false)}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="hover:opacity-70 transition-opacity"
+                    style={{ color: 'var(--color-text-tertiary)' }}
                   >
                     <X className="w-5 h-5" />
                   </button>
@@ -556,21 +560,21 @@ export default function HistorialPage() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="text-gray-500">Fecha:</span>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>Fecha:</span>
                       <p className="font-medium">{formatDate(selectedLog.created_at)}</p>
                     </div>
                     <div>
-                      <span className="text-gray-500">Usuario:</span>
+                      <span style={{ color: 'var(--color-text-secondary)' }}>Usuario:</span>
                       <p className="font-medium">{selectedLog.user_email}</p>
                     </div>
                   </div>
                   
                   <div className="flex gap-4">
-                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'var(--color-surface-elevated)' }}>
                       {getActionIcon(selectedLog.accion)}
                       <span className="text-sm font-medium capitalize">{selectedLog.accion}</span>
                     </div>
-                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: 'var(--color-surface-elevated)' }}>
                       {getEntityIcon(selectedLog.entidad)}
                       <span className="text-sm font-medium capitalize">{selectedLog.entidad}</span>
                     </div>
@@ -578,21 +582,21 @@ export default function HistorialPage() {
                   
                   {selectedLog.entidad_nombre && (
                     <div>
-                      <span className="text-gray-500 text-sm">Nombre:</span>
+                      <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Nombre:</span>
                       <p className="font-medium">{selectedLog.entidad_nombre}</p>
                     </div>
                   )}
                   
                   {selectedLog.descripcion && (
-                    <div className="bg-blue-50 p-3 rounded-lg">
-                      <span className="text-gray-500 text-sm">Descripción:</span>
-                      <p className="text-gray-900 mt-1">{selectedLog.descripcion}</p>
+                    <div className="p-3 rounded-lg" style={{ background: 'rgba(180,83,9,0.06)' }}>
+                      <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Descripción:</span>
+                      <p className="mt-1" style={{ color: 'var(--color-text-primary)' }}>{selectedLog.descripcion}</p>
                     </div>
                   )}
                   
                   {selectedLog.campo && (
                     <div>
-                      <span className="text-gray-500 text-sm">Campo modificado:</span>
+                      <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Campo modificado:</span>
                       <p className="font-medium">{selectedLog.campo}</p>
                     </div>
                   )}
@@ -600,15 +604,15 @@ export default function HistorialPage() {
                   {(selectedLog.valor_anterior || selectedLog.valor_nuevo) && (
                     <div className="grid grid-cols-2 gap-3">
                       {selectedLog.valor_anterior && (
-                        <div className="bg-red-50 p-3 rounded-lg">
-                          <span className="text-red-600 text-xs font-medium">Valor anterior</span>
-                          <p className="text-sm text-gray-900 mt-1 break-all">{selectedLog.valor_anterior}</p>
+                        <div className="p-3 rounded-lg bg-red-50 border border-red-100">
+                          <span className="text-xs font-medium text-red-600">Valor anterior</span>
+                          <p className="text-sm mt-1 break-all" style={{ color: 'var(--color-text-primary)' }}>{selectedLog.valor_anterior}</p>
                         </div>
                       )}
                       {selectedLog.valor_nuevo && (
-                        <div className="bg-green-50 p-3 rounded-lg">
-                          <span className="text-green-600 text-xs font-medium">Valor nuevo</span>
-                          <p className="text-sm text-gray-900 mt-1 break-all">{selectedLog.valor_nuevo}</p>
+                        <div className="p-3 rounded-lg bg-green-50 border border-green-100">
+                          <span className="text-xs font-medium text-green-600">Valor nuevo</span>
+                          <p className="text-sm mt-1 break-all" style={{ color: 'var(--color-text-primary)' }}>{selectedLog.valor_nuevo}</p>
                         </div>
                       )}
                     </div>
@@ -616,8 +620,8 @@ export default function HistorialPage() {
                   
                   {selectedLog.entidad_id && (
                     <div>
-                      <span className="text-gray-500 text-sm">ID:</span>
-                      <p className="font-mono text-xs text-gray-600">{selectedLog.entidad_id}</p>
+                      <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>ID:</span>
+                      <p className="font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>{selectedLog.entidad_id}</p>
                     </div>
                   )}
                 </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { auditFactura } from '@/lib/audit';
 import type { Factura, DatosEmisor } from '@/lib/supabase/types';
 
 export function useFacturas() {
@@ -65,13 +66,22 @@ export function useFacturas() {
     const { error: err } = await supabase.from('facturas').insert({ ...data, user_id: user.id });
     if (err) throw new Error(err.message);
     await fetchFacturas();
+    
+    // Auditoría
+    const importeTotal = data.lineas?.reduce((sum, l) => sum + (l.importe || 0), 0) || 0;
+    await auditFactura.crear(data.numero, data.numero, importeTotal);
   };
 
   const deleteFactura = async (id: string) => {
     if (!supabase) throw new Error('Supabase client no disponible');
     
+    const factura = facturas.find(f => f.id === id);
+    
     await supabase.from('facturas').delete().eq('id', id);
     await fetchFacturas();
+    
+    // Auditoría
+    await auditFactura.eliminar(id, factura?.numero || '');
   };
 
   return { facturas, emisor, loading, error, saveEmisor, createFactura, deleteFactura, refetch: fetchFacturas };

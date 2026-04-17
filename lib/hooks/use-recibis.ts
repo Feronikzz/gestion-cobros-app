@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { auditRecibi } from '@/lib/audit';
 import type { Recibi, RecibiInsert } from '@/lib/supabase/types';
 
 export function useRecibis(clienteId?: string) {
@@ -38,12 +39,19 @@ export function useRecibis(clienteId?: string) {
     const { error } = await supabase.from('recibis').insert({ ...data, user_id: user.id });
     if (error) throw error;
     await fetchRecibis();
+    
+    // Auditoría
+    await auditRecibi.crear('', data.numero, data.importe);
   };
 
   const deleteRecibi = async (id: string) => {
     if (!supabase) return;
+    const recibi = recibis.find(r => r.id === id);
     await supabase.from('recibis').delete().eq('id', id);
     await fetchRecibis();
+    
+    // Auditoría
+    await auditRecibi.eliminar(id, recibi?.numero || '');
   };
 
   return { recibis, loading, createRecibi, deleteRecibi, getNextNumero, refetch: fetchRecibis };

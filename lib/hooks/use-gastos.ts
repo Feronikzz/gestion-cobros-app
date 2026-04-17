@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { auditGasto } from '@/lib/audit';
 import type { Gasto } from '@/lib/supabase/types';
 
 export function useGastos() {
@@ -68,6 +69,10 @@ export function useGastos() {
       }
       
       setGastos(prev => [data, ...prev]);
+      
+      // Auditoría
+      await auditGasto.crear(data.id, data.importe_total, data.conceptos?.join(', ') || '');
+      
       return data;
     } catch (error) {
       console.error('Error completo al crear gasto:', error);
@@ -115,7 +120,12 @@ export function useGastos() {
 
       if (deleteError) throw deleteError;
 
+      const gasto = gastos.find(g => g.id === id);
+      
       setGastos(prev => prev.filter(g => g.id !== id));
+      
+      // Auditoría
+      await auditGasto.eliminar(id, gasto?.importe_total || 0, gasto?.conceptos?.join(', ') || '');
     } catch (err: any) {
       setError(err.message);
       console.error('Error deleting gasto:', err);

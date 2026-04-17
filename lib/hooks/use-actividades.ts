@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { logAudit } from '@/lib/audit';
 import type { Actividad, ActividadInsert, ActividadUpdate } from '@/lib/supabase/types';
 
 export function useActividades(clienteId?: string) {
@@ -44,6 +45,12 @@ export function useActividades(clienteId?: string) {
     const { error: err } = await supabase.from('actividades').insert({ ...data, user_id: user.id });
     if (err) throw err;
     await fetchActividades();
+    
+    // Auditoría
+    await logAudit('actividad', 'crear', {
+      descripcion: `Nueva actividad: ${data.titulo}`,
+      valor_nuevo: data
+    });
   };
 
   const updateActividad = async (id: string, data: ActividadUpdate) => {
@@ -55,19 +62,38 @@ export function useActividades(clienteId?: string) {
 
   const deleteActividad = async (id: string) => {
     if (!supabase) return;
+    const actividad = actividades.find(a => a.id === id);
     const { error: err } = await supabase.from('actividades').delete().eq('id', id);
     if (err) throw err;
     await fetchActividades();
+    
+    // Auditoría
+    await logAudit('actividad', 'eliminar', {
+      entidad_id: id,
+      entidad_nombre: actividad?.titulo,
+      descripcion: `Actividad eliminada: ${actividad?.titulo}`
+    });
   };
 
   const completeActividad = async (id: string, resultado?: string) => {
     if (!supabase) return;
+    const actividad = actividades.find(a => a.id === id);
     await supabase.from('actividades').update({
       estado: 'completada',
       fecha_completada: new Date().toISOString(),
       resultado: resultado || null,
     }).eq('id', id);
     await fetchActividades();
+    
+    // Auditoría
+    await logAudit('actividad', 'actualizar', {
+      entidad_id: id,
+      entidad_nombre: actividad?.titulo,
+      campo: 'estado',
+      valor_anterior: 'pendiente',
+      valor_nuevo: 'completada',
+      descripcion: `Actividad completada: ${actividad?.titulo}`
+    });
   };
 
   // Estadísticas

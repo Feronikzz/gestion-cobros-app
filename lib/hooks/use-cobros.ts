@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { auditCobro } from '@/lib/audit';
 import type { Cobro } from '@/lib/supabase/types';
 
 export function useCobros() {
@@ -49,6 +50,10 @@ export function useCobros() {
       if (error) throw error;
       
       setCobros(prev => [data, ...prev]);
+      
+      // Auditoría
+      await auditCobro.crear(data.id, data.importe, '');
+      
       return data;
     } catch (error: any) {
       throw new Error(error.message || 'Error al crear cobro');
@@ -79,6 +84,8 @@ export function useCobros() {
     if (!supabase) throw new Error('Supabase client no disponible');
     
     try {
+      const cobro = cobros.find(c => c.id === id);
+      
       const { error } = await supabase
         .from('cobros')
         .delete()
@@ -87,6 +94,9 @@ export function useCobros() {
       if (error) throw error;
       
       setCobros(prev => prev.filter(c => c.id !== id));
+      
+      // Auditoría
+      await auditCobro.eliminar(id, cobro?.importe || 0, '');
     } catch (error: any) {
       throw new Error(error.message || 'Error al eliminar cobro');
     }
