@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { LayoutShell } from '@/components/layout-shell';
-import { useAudit } from '@/lib/hooks/use-audit';
-import type { AuditFilter, AuditAction, EntityType } from '@/lib/supabase/audit-types';
+import { getAuditLog, type FiltrosAudit } from '@/lib/audit';
+import type { AuditLog, TipoEntidad, TipoAccion } from '@/lib/supabase/types';
 import { 
   History, 
   Filter, 
@@ -13,7 +13,6 @@ import {
   Calendar,
   User,
   Activity,
-  RotateCcw,
   Eye,
   AlertCircle,
   CheckCircle,
@@ -23,392 +22,494 @@ import {
   CreditCard,
   Receipt,
   TrendingUp,
-  Archive
+  Archive,
+  Plus,
+  Pencil,
+  Trash2,
+  FileUp,
+  FileMinus,
+  Send,
+  CheckSquare,
+  ChevronDown,
+  ChevronUp,
+  X
 } from 'lucide-react';
 
+type FiltroRapido = 'hoy' | 'ayer' | 'semana' | 'mes' | 'personalizado';
+
 export default function HistorialPage() {
-  const { logs, stats, loading, error, fetchLogs, restoreEvent, exportLogs } = useAudit();
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
-  const [filters, setFilters] = useState<AuditFilter>({});
+  // Filtro rápido de fecha (por defecto HOY)
+  const [filtroRapido, setFiltroRapido] = useState<FiltroRapido>('hoy');
+  const [fechaPersonalizada, setFechaPersonalizada] = useState<string>('');
+  
+  // Filtros adicionales
+  const [entidadFilter, setEntidadFilter] = useState<TipoEntidad | ''>('');
+  const [accionFilter, setAccionFilter] = useState<TipoAccion | ''>('');
+  const [busqueda, setBusqueda] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedLog, setSelectedLog] = useState<any>(null);
+  
+  // Modal de detalle
+  const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [isRestoring, setIsRestoring] = useState(false);
 
-  // Apply filters
-  const filteredLogs = useMemo(() => {
-    let filtered = logs;
+  // Calcular fechas según filtro rápido
+  const calcularFechas = (): { desde: string; hasta: string } => {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
     
-    if (filters.user_email) {
-      filtered = filtered.filter(log => log.user_email === filters.user_email);
+    switch (filtroRapido) {
+      case 'hoy': {
+        const finHoy = new Date(hoy);
+        finHoy.setHours(23, 59, 59, 999);
+        return { desde: hoy.toISOString(), hasta: finHoy.toISOString() };
+      }
+      case 'ayer': {
+        const ayer = new Date(hoy);
+        ayer.setDate(ayer.getDate() - 1);
+        const finAyer = new Date(ayer);
+        finAyer.setHours(23, 59, 59, 999);
+        return { desde: ayer.toISOString(), hasta: finAyer.toISOString() };
+      }
+      case 'semana': {
+        const inicioSemana = new Date(hoy);
+        inicioSemana.setDate(hoy.getDate() - hoy.getDay() + 1); // Lunes
+        const finSemana = new Date(inicioSemana);
+        finSemana.setDate(inicioSemana.getDate() + 6);
+        finSemana.setHours(23, 59, 59, 999);
+        return { desde: inicioSemana.toISOString(), hasta: finSemana.toISOString() };
+      }
+      case 'mes': {
+        const inicioMes = new Date(hoy);
+        inicioMes.setDate(1);
+        const finMes = new Date(hoy);
+        finMes.setHours(23, 59, 59, 999);
+        return { desde: inicioMes.toISOString(), hasta: finMes.toISOString() };
+      }
+      case 'personalizado': {
+        if (fechaPersonalizada) {
+          const fecha = new Date(fechaPersonalizada);
+          fecha.setHours(0, 0, 0, 0);
+          const finFecha = new Date(fecha);
+          finFecha.setHours(23, 59, 59, 999);
+          return { desde: fecha.toISOString(), hasta: finFecha.toISOString() };
+        }
+        // Por defecto últimos 30 días
+        const hace30 = new Date(hoy);
+        hace30.setDate(hace30.getDate() - 30);
+        return { desde: hace30.toISOString(), hasta: new Date().toISOString() };
+      }
+      default:
+        return { desde: hoy.toISOString(), hasta: new Date().toISOString() };
     }
-    if (filters.action) {
-      filtered = filtered.filter(log => log.action === filters.action);
-    }
-    if (filters.entity_type) {
-      filtered = filtered.filter(log => log.entity_type === filters.entity_type);
-    }
-    if (filters.search) {
-      filtered = filtered.filter(log => 
-        log.description?.toLowerCase().includes(filters.search!.toLowerCase()) ||
-        log.entity_id?.toLowerCase().includes(filters.search!.toLowerCase())
-      );
-    }
-    
-    return filtered;
-  }, [logs, filters]);
-
-  // Get unique values for filters
-  const uniqueUsers = useMemo(() => {
-    return [...new Set(logs.map(log => log.user_email).filter(Boolean))];
-  }, [logs]);
-
-  const handleFilterChange = (key: keyof AuditFilter, value: any) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  const handleRestore = async (logId: string) => {
-    if (!confirm('¿Estás seguro de que quieres restaurar este evento? Esta acción no se puede deshacer.')) {
-      return;
-    }
-
-    setIsRestoring(true);
+  // Cargar logs
+  const fetchLogs = async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      await restoreEvent(logId);
-      alert('Evento restaurado exitosamente');
+      const { desde, hasta } = calcularFechas();
+      const filtros: FiltrosAudit = {
+        fechaDesde: desde,
+        fechaHasta: hasta,
+        entidad: entidadFilter || undefined,
+        accion: accionFilter || undefined,
+        limit: 1000,
+      };
+      
+      const data = await getAuditLog(filtros);
+      setLogs(data);
     } catch (err: any) {
-      alert(`Error al restaurar: ${err.message}`);
+      setError(err.message || 'Error al cargar el historial');
     } finally {
-      setIsRestoring(false);
+      setLoading(false);
     }
   };
 
-  const handleExport = async () => {
-    try {
-      await exportLogs(filters);
-    } catch (err: any) {
-      alert(`Error al exportar: ${err.message}`);
-    }
-  };
+  useEffect(() => {
+    fetchLogs();
+  }, [filtroRapido, fechaPersonalizada, entidadFilter, accionFilter]);
 
-  const getActionIcon = (action: AuditAction) => {
-    switch (action) {
-      case 'create': return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'update': return <RefreshCw className="w-4 h-4 text-blue-500" />;
-      case 'delete': return <XCircle className="w-4 h-4 text-red-500" />;
-      case 'login': return <User className="w-4 h-4 text-purple-500" />;
-      case 'logout': return <Archive className="w-4 h-4 text-gray-500" />;
-      case 'view': return <Eye className="w-4 h-4 text-indigo-500" />;
-      case 'export': return <Download className="w-4 h-4 text-orange-500" />;
-      case 'restore': return <RotateCcw className="w-4 h-4 text-yellow-500" />;
+  // Filtrar por búsqueda de texto
+  const filteredLogs = useMemo(() => {
+    if (!busqueda) return logs;
+    const search = busqueda.toLowerCase();
+    return logs.filter(log => 
+      log.descripcion?.toLowerCase().includes(search) ||
+      log.entidad_nombre?.toLowerCase().includes(search) ||
+      log.entidad_id?.toLowerCase().includes(search)
+    );
+  }, [logs, busqueda]);
+
+  // Estadísticas
+  const stats = useMemo(() => {
+    const total = filteredLogs.length;
+    const porEntidad = new Map<string, number>();
+    const porAccion = new Map<string, number>();
+    
+    filteredLogs.forEach(log => {
+      porEntidad.set(log.entidad, (porEntidad.get(log.entidad) || 0) + 1);
+      porAccion.set(log.accion, (porAccion.get(log.accion) || 0) + 1);
+    });
+    
+    return { total, porEntidad, porAccion };
+  }, [filteredLogs]);
+
+  const getActionIcon = (accion: TipoAccion) => {
+    switch (accion) {
+      case 'crear': return <Plus className="w-4 h-4 text-green-500" />;
+      case 'actualizar': return <Pencil className="w-4 h-4 text-blue-500" />;
+      case 'eliminar': return <Trash2 className="w-4 h-4 text-red-500" />;
+      case 'adjuntar': return <FileUp className="w-4 h-4 text-purple-500" />;
+      case 'desadjuntar': return <FileMinus className="w-4 h-4 text-orange-500" />;
+      case 'presentar': return <Send className="w-4 h-4 text-indigo-500" />;
+      case 'resolver': return <CheckSquare className="w-4 h-4 text-teal-500" />;
+      case 'generar': return <FileText className="w-4 h-4 text-cyan-500" />;
+      case 'exportar': return <Download className="w-4 h-4 text-amber-500" />;
       default: return <Activity className="w-4 h-4 text-gray-500" />;
     }
   };
 
-  const getEntityIcon = (entityType: EntityType) => {
-    switch (entityType) {
+  const getEntityIcon = (entidad: TipoEntidad) => {
+    switch (entidad) {
       case 'cliente': return <Users className="w-4 h-4" />;
       case 'cobro': return <CreditCard className="w-4 h-4" />;
       case 'gasto': return <Receipt className="w-4 h-4" />;
       case 'procedimiento': return <FileText className="w-4 h-4" />;
-      case 'reparto': return <TrendingUp className="w-4 h-4" />;
-      case 'factura': return <FileText className="w-4 h-4" />;
+      case 'factura': return <Receipt className="w-4 h-4" />;
+      case 'documento': return <Archive className="w-4 h-4" />;
+      case 'recibi': return <CreditCard className="w-4 h-4" />;
+      case 'actividad': return <Activity className="w-4 h-4" />;
+      case 'catalogo': return <FileText className="w-4 h-4" />;
       default: return <Activity className="w-4 h-4" />;
     }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('es-ES', {
+    const date = new Date(dateString);
+    return date.toLocaleString('es-ES', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
-  if (loading) {
-    return (
-      <LayoutShell title="Cargando...">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        </div>
-      </LayoutShell>
-    );
-  }
+  const formatFechaLabel = (fechaISO: string) => {
+    const fecha = new Date(fechaISO);
+    return fecha.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
 
-  if (error) {
-    return (
-      <LayoutShell title="Error">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-red-600 flex items-center gap-2">
-            <AlertCircle className="w-5 h-5" />
-            {error}
-          </div>
-        </div>
-      </LayoutShell>
-    );
-  }
+  const handleExport = () => {
+    const dataToExport = filteredLogs.map(log => ({
+      Fecha: formatDate(log.created_at),
+      Usuario: log.user_email,
+      Acción: log.accion,
+      Entidad: log.entidad,
+      Nombre: log.entidad_nombre,
+      Descripción: log.descripcion,
+      'ID Entidad': log.entidad_id,
+    }));
+    
+    const csv = [
+      Object.keys(dataToExport[0] || {}).join(','),
+      ...dataToExport.map(row => Object.values(row).map(v => `"${v || ''}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `historial-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Calcular fecha máxima (hoy) y mínima (hace 1 mes)
+  const hoy = new Date().toISOString().split('T')[0];
+  const hace1Mes = new Date();
+  hace1Mes.setMonth(hace1Mes.getMonth() - 1);
+  const minFecha = hace1Mes.toISOString().split('T')[0];
 
   return (
-    <LayoutShell title="Historial de Auditoría">
-      <div className="historial-page">
+    <LayoutShell title="Historial de Actividad">
+      <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-              <History className="w-8 h-8 text-blue-600" />
-              Historial de Auditoría
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+              <History className="w-7 h-7 text-blue-600" />
+              Historial de Actividad
             </h1>
-            <p className="text-gray-600 mt-2">
-              Registro completo de todos los eventos y acciones del sistema
+            <p className="text-gray-600 text-sm mt-1">
+              Registro completo de todos los cambios realizados en la aplicación
             </p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="btn btn-secondary flex items-center gap-2"
             >
               <Filter className="w-4 h-4" />
               Filtros
+              {(entidadFilter || accionFilter) && (
+                <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+              )}
             </button>
             <button
               onClick={handleExport}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              disabled={filteredLogs.length === 0}
+              className="btn btn-secondary flex items-center gap-2 disabled:opacity-50"
             >
               <Download className="w-4 h-4" />
-              Exportar
+              Exportar CSV
             </button>
             <button
-              onClick={() => fetchLogs()}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              onClick={fetchLogs}
+              disabled={loading}
+              className="btn btn-primary flex items-center gap-2"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               Actualizar
             </button>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Eventos</p>
-                  <p className="text-2xl font-bold text-gray-900">{(stats.total_events || 0).toLocaleString()}</p>
-                </div>
-                <Activity className="w-8 h-8 text-blue-600" />
-              </div>
+        {/* Filtros de fecha rápidos */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium text-gray-600">Período:</span>
+              {(['hoy', 'ayer', 'semana', 'mes'] as FiltroRapido[]).map((tipo) => (
+                <button
+                  key={tipo}
+                  onClick={() => setFiltroRapido(tipo)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                    filtroRapido === tipo
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {tipo === 'hoy' && 'Hoy'}
+                  {tipo === 'ayer' && 'Ayer'}
+                  {tipo === 'semana' && 'Esta semana'}
+                  {tipo === 'mes' && 'Este mes'}
+                </button>
+              ))}
+              <button
+                onClick={() => setFiltroRapido('personalizado')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors flex items-center gap-1 ${
+                  filtroRapido === 'personalizado'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                Día específico
+              </button>
             </div>
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Hoy</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.events_today || 0}</p>
-                </div>
-                <Calendar className="w-8 h-8 text-green-600" />
+            
+            {filtroRapido === 'personalizado' && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">Fecha:</label>
+                <input
+                  type="date"
+                  value={fechaPersonalizada}
+                  min={minFecha}
+                  max={hoy}
+                  onChange={(e) => setFechaPersonalizada(e.target.value)}
+                  className="form-input text-sm"
+                />
+                <span className="text-xs text-gray-400">(máx. 1 mes atrás)</span>
               </div>
-            </div>
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Esta Semana</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.events_this_week || 0}</p>
-                </div>
-                <TrendingUp className="w-8 h-8 text-purple-600" />
-              </div>
-            </div>
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Restauraciones</p>
-                  <p className="text-2xl font-bold text-gray-900">{stats.recent_restores || 0}</p>
-                </div>
-                <RotateCcw className="w-8 h-8 text-orange-600" />
-              </div>
-            </div>
+            )}
           </div>
-        )}
+        </div>
 
-        {/* Filters Panel */}
+        {/* Filtros avanzados */}
         {showFilters && (
-          <div className="bg-white p-6 rounded-lg border border-gray-200 mb-6">
-            <h3 className="text-lg font-semibold mb-4">Filtros</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-blue-50 rounded-xl border border-blue-200 p-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Usuario</label>
+                <label className="form-label text-sm">Entidad</label>
                 <select
-                  value={filters.user_email || ''}
-                  onChange={(e) => handleFilterChange('user_email', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Todos los usuarios</option>
-                  {uniqueUsers.map(email => (
-                    <option key={email} value={email}>{email}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Acción</label>
-                <select
-                  value={filters.action || ''}
-                  onChange={(e) => handleFilterChange('action', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Todas las acciones</option>
-                  <option value="create">Crear</option>
-                  <option value="update">Actualizar</option>
-                  <option value="delete">Eliminar</option>
-                  <option value="login">Iniciar sesión</option>
-                  <option value="logout">Cerrar sesión</option>
-                  <option value="view">Ver</option>
-                  <option value="export">Exportar</option>
-                  <option value="restore">Restaurar</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Entidad</label>
-                <select
-                  value={filters.entity_type || ''}
-                  onChange={(e) => handleFilterChange('entity_type', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={entidadFilter}
+                  onChange={(e) => setEntidadFilter(e.target.value as TipoEntidad | '')}
+                  className="form-input w-full text-sm"
                 >
                   <option value="">Todas las entidades</option>
                   <option value="cliente">Cliente</option>
+                  <option value="procedimiento">Expediente/Procedimiento</option>
                   <option value="cobro">Cobro</option>
                   <option value="gasto">Gasto</option>
-                  <option value="procedimiento">Procedimiento</option>
-                  <option value="reparto">Reparto</option>
-                  <option value="factura">Factura</option>
                   <option value="documento">Documento</option>
-                  <option value="nota">Nota</option>
+                  <option value="factura">Factura</option>
+                  <option value="recibi">Recibí</option>
+                  <option value="actividad">Actividad</option>
+                  <option value="catalogo">Catálogo</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Buscar</label>
+                <label className="form-label text-sm">Acción</label>
+                <select
+                  value={accionFilter}
+                  onChange={(e) => setAccionFilter(e.target.value as TipoAccion | '')}
+                  className="form-input w-full text-sm"
+                >
+                  <option value="">Todas las acciones</option>
+                  <option value="crear">Crear</option>
+                  <option value="actualizar">Actualizar</option>
+                  <option value="eliminar">Eliminar</option>
+                  <option value="adjuntar">Adjuntar documento</option>
+                  <option value="desadjuntar">Desadjuntar documento</option>
+                  <option value="presentar">Presentar</option>
+                  <option value="resolver">Resolver</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label text-sm">Buscar</label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <input
                     type="text"
-                    value={filters.search || ''}
-                    onChange={(e) => handleFilterChange('search', e.target.value)}
-                    placeholder="Buscar en descripción o ID..."
-                    className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                    placeholder="Descripción, nombre o ID..."
+                    className="form-input w-full pl-9 text-sm"
                   />
                 </div>
               </div>
             </div>
-            <div className="flex gap-3 mt-4">
-              <button
-                onClick={() => setFilters({})}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-              >
-                Limpiar Filtros
-              </button>
-            </div>
+            {(entidadFilter || accionFilter || busqueda) && (
+              <div className="flex justify-end mt-3">
+                <button
+                  onClick={() => {
+                    setEntidadFilter('');
+                    setAccionFilter('');
+                    setBusqueda('');
+                  }}
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Logs Table */}
-        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        {/* Resumen estadístico */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase">Total eventos</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+              </div>
+              <Activity className="w-8 h-8 text-blue-500" />
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase">Creados</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {stats.porAccion.get('crear') || 0}
+                </p>
+              </div>
+              <Plus className="w-8 h-8 text-green-500" />
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase">Actualizados</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {stats.porAccion.get('actualizar') || 0}
+                </p>
+              </div>
+              <Pencil className="w-8 h-8 text-blue-500" />
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase">Eliminados</p>
+                <p className="text-2xl font-bold text-red-600">
+                  {stats.porAccion.get('eliminar') || 0}
+                </p>
+              </div>
+              <Trash2 className="w-8 h-8 text-red-500" />
+            </div>
+          </div>
+        </div>
+
+        {/* Tabla de logs */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Fecha
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Usuario
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acción
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Entidad
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Descripción
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Estado
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha y hora</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usuario</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acción</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entidad</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Descripción</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase"></th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+              <tbody className="divide-y divide-gray-200">
+                {filteredLogs.map((log, idx) => (
+                  <tr 
+                    key={log.id} 
+                    className="hover:bg-blue-50/50 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setSelectedLog(log);
+                      setShowDetailModal(true);
+                    }}
+                  >
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                       {formatDate(log.created_at)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-gray-400" />
-                        {log.user_email}
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-gray-400" />
+                        {log.user_email?.split('@')[0]}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex items-center gap-2">
-                        {getActionIcon(log.action)}
-                        <span className="capitalize">{log.action}</span>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        {getActionIcon(log.accion)}
+                        <span className="text-sm text-gray-700 capitalize">{log.accion}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex items-center gap-2">
-                        {getEntityIcon(log.entity_type)}
-                        <span className="capitalize">{log.entity_type}</span>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        {getEntityIcon(log.entidad)}
+                        <span className="text-sm text-gray-700 capitalize">{log.entidad}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
-                      <div className="truncate" title={log.description}>
-                        {log.description || '-'}
+                    <td className="px-4 py-3 text-sm text-gray-900">
+                      <div className="max-w-md truncate" title={log.descripcion || ''}>
+                        {log.descripcion || '-'}
                       </div>
-                      {log.entity_id && (
+                      {log.entidad_nombre && (
                         <div className="text-xs text-gray-500">
-                          ID: {log.entity_id}
+                          {log.entidad_nombre}
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {log.restored_at ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
-                          <RotateCcw className="w-3 h-3" />
-                          Restaurado
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
-                          <CheckCircle className="w-3 h-3" />
-                          Activo
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            setSelectedLog(log);
-                            setShowDetailModal(true);
-                          }}
-                          className="text-blue-600 hover:text-blue-800"
-                          title="Ver detalles"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        {log.action === 'delete' && !log.restored_at && (
-                          <button
-                            onClick={() => handleRestore(log.id)}
-                            disabled={isRestoring}
-                            className="text-green-600 hover:text-green-800 disabled:opacity-50"
-                            title="Restaurar"
-                          >
-                            <RotateCcw className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
+                    <td className="px-4 py-3 whitespace-nowrap text-right">
+                      <Eye className="w-4 h-4 text-gray-400 inline" />
                     </td>
                   </tr>
                 ))}
@@ -416,106 +517,107 @@ export default function HistorialPage() {
             </table>
           </div>
           
-          {filteredLogs.length === 0 && (
+          {filteredLogs.length === 0 && !loading && (
             <div className="text-center py-12">
-              <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-500">No se encontraron eventos con los filtros seleccionados</p>
+              <Activity className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">No hay registros para el período seleccionado</p>
+              {filtroRapido === 'hoy' && (
+                <p className="text-sm text-gray-400 mt-1">Prueba seleccionando "Este mes" o "Esta semana"</p>
+              )}
+            </div>
+          )}
+          
+          {loading && (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="text-gray-500 mt-2">Cargando historial...</p>
             </div>
           )}
         </div>
 
-        {/* Detail Modal */}
+        {/* Modal de detalle */}
         {showDetailModal && selectedLog && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl max-w-lg w-full max-h-[80vh] overflow-y-auto shadow-2xl">
               <div className="p-6">
                 <div className="flex justify-between items-start mb-4">
-                  <h2 className="text-xl font-bold text-gray-900">Detalles del Evento</h2>
+                  <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <History className="w-5 h-5 text-blue-600" />
+                    Detalle del evento
+                  </h2>
                   <button
                     onClick={() => setShowDetailModal(false)}
                     className="text-gray-400 hover:text-gray-600"
                   >
-                    <XCircle className="w-6 h-6" />
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
                 
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Fecha</label>
-                      <p className="text-gray-900">{formatDate(selectedLog.created_at)}</p>
+                      <span className="text-gray-500">Fecha:</span>
+                      <p className="font-medium">{formatDate(selectedLog.created_at)}</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Usuario</label>
-                      <p className="text-gray-900">{selectedLog.user_email}</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Acción</label>
-                      <div className="flex items-center gap-2">
-                        {getActionIcon(selectedLog.action)}
-                        <span className="capitalize">{selectedLog.action}</span>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Entidad</label>
-                      <div className="flex items-center gap-2">
-                        {getEntityIcon(selectedLog.entity_type)}
-                        <span className="capitalize">{selectedLog.entity_type}</span>
-                      </div>
+                      <span className="text-gray-500">Usuario:</span>
+                      <p className="font-medium">{selectedLog.user_email}</p>
                     </div>
                   </div>
                   
-                  {selectedLog.description && (
+                  <div className="flex gap-4">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
+                      {getActionIcon(selectedLog.accion)}
+                      <span className="text-sm font-medium capitalize">{selectedLog.accion}</span>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
+                      {getEntityIcon(selectedLog.entidad)}
+                      <span className="text-sm font-medium capitalize">{selectedLog.entidad}</span>
+                    </div>
+                  </div>
+                  
+                  {selectedLog.entidad_nombre && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Descripción</label>
-                      <p className="text-gray-900">{selectedLog.description}</p>
+                      <span className="text-gray-500 text-sm">Nombre:</span>
+                      <p className="font-medium">{selectedLog.entidad_nombre}</p>
                     </div>
                   )}
                   
-                  {selectedLog.entity_id && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">ID de Entidad</label>
-                      <p className="text-gray-900 font-mono">{selectedLog.entity_id}</p>
+                  {selectedLog.descripcion && (
+                    <div className="bg-blue-50 p-3 rounded-lg">
+                      <span className="text-gray-500 text-sm">Descripción:</span>
+                      <p className="text-gray-900 mt-1">{selectedLog.descripcion}</p>
                     </div>
                   )}
                   
-                  {selectedLog.old_values && (
+                  {selectedLog.campo && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Valores Anteriores</label>
-                      <pre className="bg-gray-100 p-3 rounded text-sm overflow-x-auto">
-                        {JSON.stringify(selectedLog.old_values, null, 2)}
-                      </pre>
+                      <span className="text-gray-500 text-sm">Campo modificado:</span>
+                      <p className="font-medium">{selectedLog.campo}</p>
                     </div>
                   )}
                   
-                  {selectedLog.new_values && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Valores Nuevos</label>
-                      <pre className="bg-gray-100 p-3 rounded text-sm overflow-x-auto">
-                        {JSON.stringify(selectedLog.new_values, null, 2)}
-                      </pre>
+                  {(selectedLog.valor_anterior || selectedLog.valor_nuevo) && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {selectedLog.valor_anterior && (
+                        <div className="bg-red-50 p-3 rounded-lg">
+                          <span className="text-red-600 text-xs font-medium">Valor anterior</span>
+                          <p className="text-sm text-gray-900 mt-1 break-all">{selectedLog.valor_anterior}</p>
+                        </div>
+                      )}
+                      {selectedLog.valor_nuevo && (
+                        <div className="bg-green-50 p-3 rounded-lg">
+                          <span className="text-green-600 text-xs font-medium">Valor nuevo</span>
+                          <p className="text-sm text-gray-900 mt-1 break-all">{selectedLog.valor_nuevo}</p>
+                        </div>
+                      )}
                     </div>
                   )}
                   
-                  {selectedLog.ip_address && (
+                  {selectedLog.entidad_id && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">IP Address</label>
-                      <p className="text-gray-900 font-mono">{selectedLog.ip_address}</p>
-                    </div>
-                  )}
-                  
-                  {selectedLog.user_agent && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">User Agent</label>
-                      <p className="text-gray-900 text-sm">{selectedLog.user_agent}</p>
-                    </div>
-                  )}
-                  
-                  {selectedLog.restored_at && (
-                    <div className="bg-yellow-50 p-4 rounded-lg">
-                      <p className="text-sm font-medium text-yellow-800">
-                        Este evento fue restaurado el {formatDate(selectedLog.restored_at)}
-                      </p>
+                      <span className="text-gray-500 text-sm">ID:</span>
+                      <p className="font-mono text-xs text-gray-600">{selectedLog.entidad_id}</p>
                     </div>
                   )}
                 </div>

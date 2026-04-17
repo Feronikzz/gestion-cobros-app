@@ -297,6 +297,30 @@ export interface Database {
       facturas: { Row: Factura; Insert: FacturaInsert; Update: Partial<Omit<Factura, 'id' | 'user_id' | 'created_at'>> };
       datos_emisor: { Row: DatosEmisor; Insert: DatosEmisorInsert; Update: Partial<Omit<DatosEmisor, 'id' | 'user_id' | 'created_at'>> };
       cierres_mensuales: { Row: CierreMensual; Insert: Omit<CierreMensual, 'id' | 'created_at'>; Update: Partial<Omit<CierreMensual, 'id' | 'user_id' | 'created_at'>> };
+      audit_log: { Row: AuditLog; Insert: AuditLogInsert; Update: never };
     };
   };
 }
+
+// ─── Audit Log (Historial de cambios) ─────────────────────────
+export type TipoEntidad = 'cliente' | 'procedimiento' | 'cobro' | 'gasto' | 'documento' | 'factura' | 'recibi' | 'actividad' | 'catalogo';
+export type TipoAccion = 'crear' | 'actualizar' | 'eliminar' | 'adjuntar' | 'desadjuntar' | 'presentar' | 'resolver' | 'generar' | 'exportar';
+
+export interface AuditLog {
+  id: string;
+  user_id: string;
+  user_email: string | null;
+  entidad: TipoEntidad;
+  entidad_id: string | null;
+  entidad_nombre: string | null;
+  accion: TipoAccion;
+  campo: string | null;
+  valor_anterior: string | null;
+  valor_nuevo: string | null;
+  descripcion: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
+export type AuditLogInsert = Omit<AuditLog, 'id' | 'created_at'>;
