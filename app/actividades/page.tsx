@@ -31,7 +31,7 @@ export default function ActividadesPage() {
   // Derivar nombres y contactos de clientes
   const clienteNombres = useMemo(() => {
     const map: Record<string, string> = {};
-    clientes.forEach(c => { map[c.id] = [c.nombre, c.apellidos].filter(Boolean).join(' '); });
+    clientes.forEach(c => { map[c.id] = [c.nombre, c.apellido1, c.apellido2].filter(Boolean).join(' ') || [c.nombre, c.apellidos].filter(Boolean).join(' '); });
     return map;
   }, [clientes]);
 
@@ -178,7 +178,7 @@ export default function ActividadesPage() {
       <Modal
         isOpen={showClienteModal}
         onClose={() => { setShowClienteModal(false); setViewingCliente(null); }}
-        title={viewingCliente ? `${[viewingCliente.nombre, viewingCliente.apellidos].filter(Boolean).join(' ')}` : 'Cliente'}
+        title={viewingCliente ? `${[viewingCliente.nombre, viewingCliente.apellido1, viewingCliente.apellido2].filter(Boolean).join(' ') || [viewingCliente.nombre, viewingCliente.apellidos].filter(Boolean).join(' ')}` : 'Cliente'}
         size="wide"
         confirmClose
       >

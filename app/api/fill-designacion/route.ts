@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFName, rgb, StandardFonts } from 'pdf-lib';
 import path from 'path';
 import fs from 'fs';
 
@@ -128,10 +128,25 @@ export async function POST(req: NextRequest) {
 
     // Texto40 = área de firma (se deja vacío para firmar a mano)
 
-    // ── CONSENTIMIENTO DEHú (no hay casilla específica, el PDF no la tiene como campo) ──
-    // Si en el futuro el PDF tiene una casilla, se activaría aquí
+    // ── CONSENTIMIENTO DEHú ──
+    // El PDF original no tiene casilla para DEHú, así que la creamos como anotación de texto
+    if (consentimiento_dehu) {
+      const page = pdfDoc.getPage(0);
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      // Dibujar marca "X" y texto de consentimiento en la zona entre solicitud (y~519) y representante (y~454)
+      page.drawText('[X] CONSIENTO que las comunicaciones y notificaciones se realicen mediante puesta a disposición en la Dirección Electrónica Habilitada Única (DEHú)', {
+        x: 35,
+        y: 497,
+        size: 8,
+        font,
+        color: rgb(0, 0, 0),
+        maxWidth: 500,
+      });
+    }
 
-    form.flatten();
+    // NO flatten: mantener campos editables para que el usuario pueda modificar el PDF descargado
+    // Marcar NeedAppearances para que los valores se muestren en todos los lectores
+    form.acroForm.dict.set(PDFName.of('NeedAppearances'), pdfDoc.context.obj(true));
 
     const filledPdfBytes = await pdfDoc.save();
     return new NextResponse(Buffer.from(filledPdfBytes), {

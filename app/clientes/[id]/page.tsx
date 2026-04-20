@@ -17,12 +17,12 @@ import { formatField } from '@/lib/utils/text';
 import { ProcedimientoForm } from '@/components/procedimiento-form';
 import { ActividadForm } from '@/components/actividad-form';
 import { ActividadTimeline } from '@/components/actividad-timeline';
-import { DesignacionRepresentante } from '@/components/designacion-representante';
 import { RecibiGenerator } from '@/components/recibi-generator';
 import { RecibiFormInline } from '@/components/recibi-form';
 import { ClienteFormV2 } from '@/components/cliente-form-v2';
 import { CarpetaLocalViewer } from '@/components/carpeta-local-viewer';
 import { FileDropZone } from '@/components/file-drop-zone';
+import { FileManager } from '@/components/file-manager';
 import { useActividades } from '@/lib/hooks/use-actividades';
 import { useRecibis } from '@/lib/hooks/use-recibis';
 import type { Actividad, Recibi, RecibiInsert, ClienteInsert, ClienteUpdate } from '@/lib/supabase/types';
@@ -50,7 +50,6 @@ export default function ClienteDetallePage() {
   const [editingProc, setEditingProc] = useState<Procedimiento | null>(null);
   const [showActividadModal, setShowActividadModal] = useState(false);
   const [showRecibiModal, setShowRecibiModal] = useState(false);
-  const [showDesignacionModal, setShowDesignacionModal] = useState(false);
   const [editingActividad, setEditingActividad] = useState<Actividad | null>(null);
   const [viewRecibi, setViewRecibi] = useState<Recibi | null>(null);
   const [showEditClienteModal, setShowEditClienteModal] = useState(false);
@@ -586,7 +585,7 @@ export default function ClienteDetallePage() {
 
   return (
     <LayoutShell 
-      title={[cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}
+      title={[cliente.nombre, cliente.apellido1, cliente.apellido2].filter(Boolean).join(' ') || [cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}
       description="Gestiona toda la información del cliente. Controla expedientes, cobros, documentos y notas de seguimiento."
     >
       {/* Navegación */}
@@ -601,12 +600,17 @@ export default function ClienteDetallePage() {
             <User className="w-5 h-5" />
             <h2>Datos del cliente</h2>
           </div>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowEditClienteModal(true)}>
-            <Edit className="w-4 h-4" /> Editar datos
-          </button>
+          <div className="flex gap-2">
+            <button className="btn btn-secondary btn-sm" onClick={() => setShowEditClienteModal(true)}>
+              <Edit className="w-4 h-4" /> Editar datos
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowEditClienteModal(true)}>
+              <FileSignature className="w-4 h-4" /> Designación
+            </button>
+          </div>
         </div>
         <div className="detail-grid">
-          <div><span className="detail-label">Nombre</span><span className="detail-value">{[cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}</span></div>
+          <div><span className="detail-label">Nombre</span><span className="detail-value">{[cliente.nombre, cliente.apellido1, cliente.apellido2].filter(Boolean).join(' ') || [cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}</span></div>
           <div><span className="detail-label">Fecha nacimiento</span><span className="detail-value">{cliente.fecha_nacimiento || (cliente.anio_nacimiento ? `Año ${cliente.anio_nacimiento}` : '—')}</span></div>
           {cliente.nacionalidad && <div><span className="detail-label">Nacionalidad</span><span className="detail-value">{cliente.nacionalidad}</span></div>}
           <div><span className="detail-label">Documento</span><span className="detail-value">{cliente.documento_tipo || '—'} {cliente.documento_numero || cliente.nif || ''} {cliente.documento_caducidad ? `(cad. ${cliente.documento_caducidad})` : ''}</span></div>
@@ -616,7 +620,10 @@ export default function ClienteDetallePage() {
           <div><span className="detail-label">Dirección</span><span className="detail-value">{[cliente.direccion, cliente.codigo_postal, cliente.localidad, cliente.provincia].filter(Boolean).join(', ') || '—'}</span></div>
           <div><span className="detail-label">Fecha entrada</span><span className="detail-value">{cliente.fecha_entrada}</span></div>
           <div><span className="detail-label">Estado</span><span className={`badge badge-${cliente.estado === 'activo' ? 'green' : cliente.estado === 'pendiente' ? 'yellow' : cliente.estado === 'pagado' ? 'blue' : 'gray'}`}>{cliente.estado}</span></div>
-          {cliente.notas && <div className="col-span-full"><span className="detail-label">Notas</span><span className="detail-value">{cliente.notas}</span></div>}
+          {cliente.notas && (() => {
+            const cleanNotas = (cliente.notas || '').replace(/\[DESIGNACION:.+?\]\n?/, '').trim();
+            return cleanNotas ? <div className="col-span-full"><span className="detail-label">Notas</span><span className="detail-value">{cleanNotas}</span></div> : null;
+          })()}
           {cliente.carpeta_local && (
             <div className="col-span-full">
               <span className="detail-label">Carpeta local</span>
@@ -1089,16 +1096,6 @@ export default function ClienteDetallePage() {
         )}
       </div>
 
-      {/* ── Designación de representante ── */}
-      <div className="section-block">
-        <div className="section-header">
-          <h3><FileSignature className="w-4 h-4 inline mr-1" /> Documentos legales</h3>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowDesignacionModal(true)}>
-            <FileSignature className="w-4 h-4" /> Designación de representante
-          </button>
-        </div>
-        <p className="text-sm text-gray-500">Genera documentos legales utilizando los datos del cliente.</p>
-      </div>
 
       {/* Sección de Notas */}
       <div className="section">
@@ -1106,6 +1103,20 @@ export default function ClienteDetallePage() {
       </div>
 
       </div>{/* cierre grid 2 columnas */}
+
+      {/* ── Gestor de archivos (Supabase Storage) ── */}
+      {cliente && (
+        <div className="section-block mt-6">
+          <div className="section-header mb-3">
+            <h3><Paperclip className="w-4 h-4 inline mr-1" /> Archivos del cliente (nube)</h3>
+          </div>
+          <FileManager
+            clienteId={cliente.id}
+            clienteNombre={[cliente.nombre, cliente.apellido1, cliente.apellido2].filter(Boolean).join(' ') || [cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}
+            procedimientos={procedimientos.map(p => ({ id: p.id, titulo: p.titulo }))}
+          />
+        </div>
+      )}
 
       {/* ══════ MODALES (fuera del grid) ══════ */}
 
@@ -1238,15 +1249,6 @@ export default function ClienteDetallePage() {
         )}
       </Modal>
 
-      {/* ── Modal: Designación de Representante ── */}
-      <Modal isOpen={showDesignacionModal} onClose={() => setShowDesignacionModal(false)} title="Designación de Representante" size="wide">
-        <DesignacionRepresentante 
-          cliente={cliente || undefined} 
-          clienteId={id}
-          onClose={() => setShowDesignacionModal(false)} 
-          onUploaded={() => fetchData()}
-        />
-      </Modal>
 
       {/* ── Modal: Previsualización de Documento ── */}
       <Modal isOpen={!!previewDoc} onClose={() => setPreviewDoc(null)} title={previewDoc?.nombre || 'Documento'} size="wide">

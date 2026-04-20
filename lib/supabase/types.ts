@@ -17,6 +17,8 @@ export interface Cliente {
   user_id: string;
   nombre: string;
   apellidos: string | null;
+  apellido1: string | null;
+  apellido2: string | null;
   nif: string | null;
   telefono: string | null;
   telefono2: string | null;
@@ -35,6 +37,13 @@ export interface Cliente {
   estado: EstadoCliente;
   notas: string | null;
   carpeta_local: string | null;
+  // Campos designación
+  nombre_padre: string | null;
+  nombre_madre: string | null;
+  estado_civil: string | null;
+  localidad_nacimiento: string | null;
+  pais_nacimiento: string | null;
+  pasaporte: string | null;
   created_at: string;
 }
 
@@ -133,11 +142,13 @@ export interface Procedimiento {
 export interface Documento {
   id: string;
   user_id: string;
-  procedimiento_id: string;
+  procedimiento_id: string | null;
+  cliente_id?: string | null;
   nombre: string;
-  tipo: string;            // justificante, notificacion, recurso, resolucion, otro
+  tipo: string;            // justificante, notificacion, recurso, resolucion, otro, DESIGNACION_NO_FIRMADA, DESIGNACION_FIRMADA, ESCANEADO
   archivo_url: string | null;
   notas: string | null;
+  carpeta: string | null;
   created_at: string;
 }
 

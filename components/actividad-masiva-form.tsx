@@ -72,6 +72,7 @@ export function ActividadMasivaForm({ clientes, procedimientos, onSubmit, onCanc
       // Text search
       const matchSearch = !searchTerm ||
         c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        [c.apellido1, c.apellido2].filter(Boolean).join(' ').toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.apellidos?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.nif?.toLowerCase().includes(searchTerm.toLowerCase());
 
@@ -209,7 +210,7 @@ export function ActividadMasivaForm({ clientes, procedimientos, onSubmit, onCanc
                 >
                   {isSelected ? <CheckSquare className="w-4 h-4 text-blue-600 flex-shrink-0" /> : <Square className="w-4 h-4 text-gray-300 flex-shrink-0" />}
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900 truncate">{[c.nombre, c.apellidos].filter(Boolean).join(' ')}</div>
+                    <div className="text-sm font-medium text-gray-900 truncate">{[c.nombre, c.apellido1, c.apellido2].filter(Boolean).join(' ') || [c.nombre, c.apellidos].filter(Boolean).join(' ')}</div>
                     {procs.length > 0 && (
                       <div className="text-xs text-gray-500 truncate flex items-center gap-1">
                         <FileText className="w-3 h-3" />

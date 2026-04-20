@@ -135,7 +135,7 @@ export function RecibiGenerator({ cliente, recibi }: RecibiGeneratorProps) {
 
   const fmt = (n: number) => n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fechaLarga = new Date(recibi.fecha + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-  const nombreCompleto = [cliente.nombre, cliente.apellidos].filter(Boolean).join(' ');
+  const nombreCompleto = [cliente.nombre, cliente.apellido1, cliente.apellido2].filter(Boolean).join(' ') || [cliente.nombre, cliente.apellidos].filter(Boolean).join(' ');
   const nombreEmisor = emisor.nombre || '—';
 
   const inp = 'form-input text-sm';

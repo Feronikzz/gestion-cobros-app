@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import type { Cliente } from '@/lib/supabase/types';
 import { Download, Save, User, FileText, RefreshCw, Upload, CheckCircle, X, Plus, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { usePerfilRepresentante } from '@/lib/hooks/use-perfil-representante';
 
 const STORAGE_KEY_REP = 'designacion_representante_perfil';
 const STORAGE_KEY_EMAILS = 'designacion_emails_sugeridos';
@@ -83,12 +84,11 @@ function parseDireccion(direccion?: string | null): { calle: string; numero: str
 export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, onClose, onUploaded }: DesignacionRepresentanteProps) {
   const supabase = typeof window !== 'undefined' ? createClient() : null;
   const today = new Date();
-  const saved = loadRepPerfil();
+  const { perfil: savedPerfil, savePerfil: savePerfilToDb, saving: savingPerfil } = usePerfilRepresentante();
 
   // ── Representado ──
-  const apellidos = cliente?.apellidos || '';
-  const ap1 = apellidos.split(' ')[0] || '';
-  const ap2 = apellidos.split(' ').slice(1).join(' ') || '';
+  const ap1 = cliente?.apellido1 || (cliente?.apellidos ? cliente.apellidos.split(' ')[0] : '') || '';
+  const ap2 = cliente?.apellido2 || (cliente?.apellidos ? cliente.apellidos.split(' ').slice(1).join(' ') : '') || '';
   
   // Parsear fecha de nacimiento completa
   const fechaNac = parseFechaNacimiento((cliente as any)?.fecha_nacimiento);
@@ -122,14 +122,27 @@ export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, 
     provincia: (cliente as any)?.provincia || '', telefono: cliente?.telefono || '', email: cliente?.email || '',
   });
 
-  // ── Representante ──
+  // ── Representante (from Supabase) ──
   const [repte, setRepte] = useState({
-    dni_nie: saved?.dni_nie || '', razon_social: saved?.razon_social || '',
-    nombre: saved?.nombre || '', apellido1: saved?.apellido1 || '', apellido2: saved?.apellido2 || '',
-    domicilio: saved?.domicilio || '', numero: saved?.numero || '', piso: saved?.piso || '',
-    localidad: saved?.localidad || '', cp: saved?.cp || '', provincia: saved?.provincia || '',
-    telefono: saved?.telefono || '', email: saved?.email || '',
+    dni_nie: '', razon_social: '',
+    nombre: '', apellido1: '', apellido2: '',
+    domicilio: '', numero: '', piso: '',
+    localidad: '', cp: '', provincia: '',
+    telefono: '', email: '',
   });
+
+  // Sync from Supabase profile when loaded
+  useEffect(() => {
+    if (savedPerfil.nombre || savedPerfil.dni_nie) {
+      setRepte({
+        dni_nie: savedPerfil.dni_nie, razon_social: savedPerfil.razon_social,
+        nombre: savedPerfil.nombre, apellido1: savedPerfil.apellido1, apellido2: savedPerfil.apellido2,
+        domicilio: savedPerfil.domicilio, numero: savedPerfil.numero, piso: savedPerfil.piso,
+        localidad: savedPerfil.localidad, cp: savedPerfil.cp, provincia: savedPerfil.provincia,
+        telefono: savedPerfil.telefono, email: savedPerfil.email,
+      });
+    }
+  }, [savedPerfil]);
 
   const [solicitud, setSolicitud] = useState('');
   const [lugar, setLugar] = useState('');
@@ -141,7 +154,7 @@ export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, 
   const [error, setError] = useState<string | null>(null);
 
   // ── Email suggestions ──
-  const [emailSuggestions, setEmailSuggestions] = useState<string[]>(loadEmails);
+  const [emailSuggestions, setEmailSuggestions] = useState<string[]>(() => savedPerfil.emails_sugeridos.length > 0 ? savedPerfil.emails_sugeridos : loadEmails());
   const [showEmailDD, setShowEmailDD] = useState(false);
   const [newEmail, setNewEmail] = useState('');
 
@@ -180,12 +193,13 @@ export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, 
   const setR = (k: string, v: string) => setRepdo(p => ({ ...p, [k]: v }));
   const setT = (k: string, v: string) => setRepte(p => ({ ...p, [k]: v }));
 
-  // Auto-guardar perfil representante en localStorage cuando cambie
+  // Auto-guardar perfil representante en Supabase cuando cambie
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY_REP, JSON.stringify(repte));
   }, [repte]);
 
-  const saveRepPerfil = () => {
+  const saveRepPerfil = async () => {
+    await savePerfilToDb({ ...savedPerfil, ...repte, emails_sugeridos: emailSuggestions });
     localStorage.setItem(STORAGE_KEY_REP, JSON.stringify(repte));
     setSavedMsg(true);
     setTimeout(() => setSavedMsg(false), 2000);
@@ -367,7 +381,7 @@ export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, 
           <div><label className={lbl}>C.P.</label><input className={inp} value={repdo.cp} onChange={e => setR('cp', e.target.value)} /></div>
           <div><label className={lbl}>Provincia</label><input className={inp} value={repdo.provincia} onChange={e => setR('provincia', e.target.value)} /></div>
           <div><label className={lbl}>Teléfono</label><input className={inp} value={repdo.telefono} onChange={e => setR('telefono', e.target.value)} /></div>
-          <div className="relative" onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setShowEmailDD(false); }}>
+          <div className="relative" onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setTimeout(() => setShowEmailDD(false), 150); }}>
             <label className={lbl}>E-mail</label>
             <div className="flex gap-1">
               <input
@@ -382,8 +396,8 @@ export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, 
               <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
                 {emailSuggestions.map(email => (
                   <div key={email} className="flex items-center justify-between px-3 py-1.5 hover:bg-gray-50 cursor-pointer group">
-                    <span className="text-sm text-gray-700 flex-1" onClick={() => { setR('email', email); setShowEmailDD(false); }}>{email}</span>
-                    <button type="button" onClick={() => removeEmailSuggestion(email)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-sm text-gray-700 flex-1" onMouseDown={(e) => { e.preventDefault(); setR('email', email); setShowEmailDD(false); }}>{email}</span>
+                    <button type="button" onMouseDown={(e) => { e.preventDefault(); removeEmailSuggestion(email); }} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
                       <X className="w-3 h-3" />
                     </button>
                   </div>
@@ -396,7 +410,7 @@ export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, 
                     onChange={e => setNewEmail(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') { addEmailSuggestion(newEmail); } }}
                   />
-                  <button type="button" onClick={() => addEmailSuggestion(newEmail)} className="text-gray-500 hover:text-gray-800">
+                  <button type="button" onMouseDown={(e) => { e.preventDefault(); addEmailSuggestion(newEmail); }} className="text-gray-500 hover:text-gray-800">
                     <Plus className="w-3.5 h-3.5" />
                   </button>
                 </div>

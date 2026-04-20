@@ -89,6 +89,7 @@ export default function ClientesPageEnhanced() {
     const filtered = clientes.filter(cliente => {
       const matchesSearch = searchQuery === '' || 
         cliente.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        [cliente.apellido1, cliente.apellido2].filter(Boolean).join(' ').toLowerCase().includes(searchQuery.toLowerCase()) ||
         cliente.apellidos?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         cliente.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         cliente.nif?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -107,7 +108,7 @@ export default function ClientesPageEnhanced() {
     filtered.sort((a, b) => {
       let cmp = 0;
       if (sortField === 'nombre') {
-        cmp = (a.nombre + (a.apellidos || '')).localeCompare(b.nombre + (b.apellidos || ''));
+        cmp = (a.nombre + (a.apellido1 || a.apellidos || '')).localeCompare(b.nombre + (b.apellido1 || b.apellidos || ''));
       } else if (sortField === 'fecha_entrada') {
         cmp = a.fecha_entrada.localeCompare(b.fecha_entrada);
       } else if (sortField === 'estado') {
@@ -362,7 +363,7 @@ export default function ClientesPageEnhanced() {
                     <tr key={cliente.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="text-sm font-medium text-gray-900">{[cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}</div>
+                          <div className="text-sm font-medium text-gray-900">{[cliente.nombre, cliente.apellido1, cliente.apellido2].filter(Boolean).join(' ') || [cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}</div>
                           <div className="text-sm text-gray-500">{cliente.nif || '—'}</div>
                         </div>
                       </td>
@@ -443,7 +444,7 @@ export default function ClientesPageEnhanced() {
             {filteredClientes.map((cliente) => (
               <MobileCard
                 key={cliente.id}
-                title={[cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}
+                title={[cliente.nombre, cliente.apellido1, cliente.apellido2].filter(Boolean).join(' ') || [cliente.nombre, cliente.apellidos].filter(Boolean).join(' ')}
                 subtitle={clienteExpediente[cliente.id] || cliente.nif || '—'}
                 actions={
                   <div className="flex items-center gap-2">

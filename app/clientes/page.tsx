@@ -79,9 +79,10 @@ export default function ClientesPage() {
   const filteredClientes = useMemo(() => {
     const filtered = clientes.filter(c => {
       const q = searchQuery.toLowerCase();
+      const fullApellidos = [c.apellido1, c.apellido2].filter(Boolean).join(' ') || c.apellidos || '';
       const matchesSearch = !q ||
         c.nombre.toLowerCase().includes(q) ||
-        c.apellidos?.toLowerCase().includes(q) ||
+        fullApellidos.toLowerCase().includes(q) ||
         c.nif?.toLowerCase().includes(q) ||
         c.email?.toLowerCase().includes(q) ||
         c.telefono?.toLowerCase().includes(q) ||
@@ -94,12 +95,12 @@ export default function ClientesPage() {
     filtered.sort((a, b) => {
       let cmp = 0;
       if (sortField === 'apellidos') {
-        const aVal = (a.apellidos || '').toLowerCase() + ' ' + a.nombre.toLowerCase();
-        const bVal = (b.apellidos || '').toLowerCase() + ' ' + b.nombre.toLowerCase();
+        const aVal = (a.apellido1 || a.apellidos || '').toLowerCase() + ' ' + a.nombre.toLowerCase();
+        const bVal = (b.apellido1 || b.apellidos || '').toLowerCase() + ' ' + b.nombre.toLowerCase();
         cmp = aVal.localeCompare(bVal);
       } else if (sortField === 'nombre') {
-        const aVal = a.nombre.toLowerCase() + ' ' + (a.apellidos || '').toLowerCase();
-        const bVal = b.nombre.toLowerCase() + ' ' + (b.apellidos || '').toLowerCase();
+        const aVal = a.nombre.toLowerCase() + ' ' + (a.apellido1 || a.apellidos || '').toLowerCase();
+        const bVal = b.nombre.toLowerCase() + ' ' + (b.apellido1 || b.apellidos || '').toLowerCase();
         cmp = aVal.localeCompare(bVal);
       } else if (sortField === 'fecha_entrada') {
         cmp = a.fecha_entrada.localeCompare(b.fecha_entrada);
@@ -427,7 +428,7 @@ export default function ClientesPage() {
                 ).length;
                 return (
                   <tr key={c.id}>
-                    <td className="font-medium">{[c.nombre, c.apellidos].filter(Boolean).join(' ')}</td>
+                    <td className="font-medium">{[c.nombre, c.apellido1, c.apellido2].filter(Boolean).join(' ') || [c.nombre, c.apellidos].filter(Boolean).join(' ')}</td>
                     <td className="subtle-text">
                       {procsCliente.length > 0 ? (
                         <span className="inline-flex items-center gap-1">
@@ -493,7 +494,7 @@ export default function ClientesPage() {
         </div>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingCliente ? 'Editar Cliente' : 'Nuevo Cliente'}>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingCliente ? 'Editar Cliente' : 'Nuevo Cliente'} size="wide" confirmClose>
         <ClienteFormV2
           cliente={editingCliente || undefined}
           onSubmit={handleSubmit}
