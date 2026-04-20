@@ -271,12 +271,22 @@ export interface FacturaLinea {
 }
 
 // ─── Helpers TS para Insert / Update ───────────────────────
-export type ClienteInsert = Omit<Cliente, 'id' | 'created_at'>;
+export type ClienteInsert = Omit<Cliente, 'id' | 'created_at' | 'apellido1' | 'apellido2' | 'nombre_padre' | 'nombre_madre' | 'estado_civil' | 'localidad_nacimiento' | 'pais_nacimiento' | 'pasaporte' | 'carpeta_local'> & {
+  apellido1?: string | null;
+  apellido2?: string | null;
+  nombre_padre?: string | null;
+  nombre_madre?: string | null;
+  estado_civil?: string | null;
+  localidad_nacimiento?: string | null;
+  pais_nacimiento?: string | null;
+  pasaporte?: string | null;
+  carpeta_local?: string | null;
+};
 export type ClienteUpdate = Partial<Omit<Cliente, 'id' | 'user_id' | 'created_at'>>;
 export type ProcedimientoInsert = Omit<Procedimiento, 'id' | 'created_at'>;
 export type ProcedimientoUpdate = Partial<Omit<Procedimiento, 'id' | 'user_id' | 'created_at'>>;
 export type CobroInsert = Omit<Cobro, 'id' | 'created_at'>;
-export type DocumentoInsert = Omit<Documento, 'id' | 'created_at'>;
+export type DocumentoInsert = Omit<Documento, 'id' | 'created_at' | 'carpeta'> & { carpeta?: string | null };
 export type FacturaInsert = Omit<Factura, 'id' | 'created_at'>;
 export type DatosEmisorInsert = Omit<DatosEmisor, 'id' | 'created_at'>;
 export type DocumentoIdentidadInsert = Omit<DocumentoIdentidad, 'id' | 'created_at'>;
