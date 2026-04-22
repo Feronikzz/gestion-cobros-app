@@ -12,20 +12,48 @@ export function Nav() {
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  const items = [
-    { href: '/dashboard', label: 'Inicio', icon: Home, description: 'Panel principal' },
-    { href: '/clientes', label: 'Clientes', icon: Users, description: 'Gestión de clientes' },
-    { href: '/expedientes', label: 'Expedientes', icon: FolderOpen, description: 'Expedientes y procedimientos' },
-    { href: '/catalogo', label: 'Catálogo', icon: BookOpen, description: 'Catálogo de servicios' },
-    { href: '/cobros', label: 'Cobros', icon: CreditCard, description: 'Registro de cobros' },
-    { href: '/gastos', label: 'Gastos', icon: FileText, description: 'Control de gastos' },
-    { href: '/finanzas', label: 'Finanzas', icon: TrendingUp, description: 'Resumen financiero' },
-    { href: '/repartos', label: 'Repartos', icon: PieChart, description: 'Gestión de repartos' },
-    { href: '/facturas', label: 'Facturas', icon: Receipt, description: 'Facturación' },
-    { href: '/cierre', label: 'Cierre', icon: Calendar, description: 'Cierre de período' },
-    { href: '/actividades', label: 'Actividades', icon: Activity, description: 'Seguimiento de tareas' },
-    { href: '/historial', label: 'Historial', icon: History, description: 'Historial de cambios' },
+  const menuCategories = [
+    {
+      title: null,
+      items: [
+        { href: '/dashboard', label: 'Inicio', icon: Home, description: 'Panel principal' }
+      ]
+    },
+    {
+      title: 'Gestión',
+      items: [
+        { href: '/clientes', label: 'Clientes', icon: Users, description: 'Gestión de clientes' },
+        { href: '/expedientes', label: 'Expedientes', icon: FolderOpen, description: 'Expedientes y procedimientos' },
+        { href: '/catalogo', label: 'Catálogo', icon: BookOpen, description: 'Catálogo de servicios' }
+      ]
+    },
+    {
+      title: 'Operaciones',
+      items: [
+        { href: '/cobros', label: 'Cobros', icon: CreditCard, description: 'Registro de cobros' },
+        { href: '/gastos', label: 'Gastos', icon: FileText, description: 'Control de gastos' },
+        { href: '/facturas', label: 'Facturas', icon: Receipt, description: 'Facturación' }
+      ]
+    },
+    {
+      title: 'Informes',
+      items: [
+        { href: '/finanzas', label: 'Finanzas', icon: TrendingUp, description: 'Resumen financiero' },
+        { href: '/repartos', label: 'Repartos', icon: PieChart, description: 'Gestión de repartos' },
+        { href: '/cierre', label: 'Cierre', icon: Calendar, description: 'Cierre de período' }
+      ]
+    },
+    {
+      title: 'Seguimiento',
+      items: [
+        { href: '/actividades', label: 'Actividades', icon: Activity, description: 'Seguimiento de tareas' },
+        { href: '/historial', label: 'Historial', icon: History, description: 'Historial de cambios' }
+      ]
+    }
   ];
+
+  // Flatten items for mobile navigation
+  const allItems = menuCategories.flatMap(category => category.items);
 
   // Handle keyboard navigation
   useEffect(() => {
@@ -71,23 +99,34 @@ export function Nav() {
       <nav className="nav-bar" role="navigation" aria-label="Navegación principal">
         {/* Desktop links */}
         <div className="nav-links" role="menubar">
-          {items.map(({ href, label, icon: Icon, description }) => {
-            const isActive = pathname === href || pathname.startsWith(href + '/');
-            return (
-              <Link 
-                key={href} 
-                href={href} 
-                className={`nav-link${isActive ? ' nav-link-active' : ''}`}
-                role="menuitem"
-                aria-current={isActive ? 'page' : undefined}
-                aria-label={`${label} - ${description}`}
-                title={description}
-              >
-                <Icon className="nav-icon" aria-hidden="true" /> 
-                <span>{label}</span>
-              </Link>
-            );
-          })}
+          {menuCategories.map((category, categoryIndex) => (
+            <div key={category.title || 'home'} className="nav-category">
+              {category.title && (
+                <div className="nav-category-title" role="separator">
+                  {category.title}
+                </div>
+              )}
+              <div className="nav-category-items">
+                {category.items.map(({ href, label, icon: Icon, description }) => {
+                  const isActive = pathname === href || pathname.startsWith(href + '/');
+                  return (
+                    <Link 
+                      key={href} 
+                      href={href} 
+                      className={`nav-link${isActive ? ' nav-link-active' : ''}`}
+                      role="menuitem"
+                      aria-current={isActive ? 'page' : undefined}
+                      aria-label={`${label} - ${description}`}
+                      title={description}
+                    >
+                      <Icon className="nav-icon" aria-hidden="true" /> 
+                      <span>{label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="nav-right">
@@ -129,25 +168,34 @@ export function Nav() {
               </button>
             </div>
             <nav className="mobile-nav-links" role="menubar" aria-orientation="vertical">
-              {items.map(({ href, label, icon: Icon, description }) => {
-                const isActive = pathname === href || pathname.startsWith(href + '/');
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    onClick={closeMobileMenu}
-                    className={`mobile-nav-link${isActive ? ' mobile-nav-link-active' : ''}`}
-                    role="menuitem"
-                    aria-current={isActive ? 'page' : undefined}
-                  >
-                    <Icon className="mobile-nav-icon" aria-hidden="true" />
-                    <div className="mobile-nav-content">
-                      <span className="mobile-nav-label">{label}</span>
-                      <span className="mobile-nav-description">{description}</span>
+              {menuCategories.map((category) => (
+                <div key={category.title || 'home'} className="mobile-nav-category">
+                  {category.title && (
+                    <div className="mobile-nav-category-title">
+                      {category.title}
                     </div>
-                  </Link>
-                );
-              })}
+                  )}
+                  {category.items.map(({ href, label, icon: Icon, description }) => {
+                    const isActive = pathname === href || pathname.startsWith(href + '/');
+                    return (
+                      <Link
+                        key={href}
+                        href={href}
+                        onClick={closeMobileMenu}
+                        className={`mobile-nav-link${isActive ? ' mobile-nav-link-active' : ''}`}
+                        role="menuitem"
+                        aria-current={isActive ? 'page' : undefined}
+                      >
+                        <Icon className="mobile-nav-icon" aria-hidden="true" />
+                        <div className="mobile-nav-content">
+                          <span className="mobile-nav-label">{label}</span>
+                          <span className="mobile-nav-description">{description}</span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              ))}
             </nav>
             <div className="mobile-nav-footer">
               <LogoutButton />

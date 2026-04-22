@@ -5,18 +5,13 @@ import { LayoutShell } from '@/components/layout-shell';
 import { ClienteFormV2 } from '@/components/cliente-form-v2';
 import { Modal } from '@/components/modal';
 import { useClientes } from '@/lib/hooks/use-clientes';
-import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
-import { useCobros } from '@/lib/hooks/use-cobros';
 import type { Cliente, ClienteInsert, EstadoProcedimiento } from '@/lib/supabase/types';
 import { createClient } from '@/lib/supabase/client';
-import { auditProcedimiento, auditCobro } from '@/lib/audit';
 import Link from 'next/link';
 import { Eye, Edit, Trash2, UserPlus, Users, TrendingUp, Calendar, Search, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, ArrowUpDown, Archive } from 'lucide-react';
 
 export default function ClientesPage() {
   const { clientes, loading, error, createCliente, updateCliente, deleteCliente } = useClientes();
-  const { procedimientos } = useProcedimientos();
-  const { cobros } = useCobros();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -128,48 +123,31 @@ export default function ClientesPage() {
     try {
       if (editingCliente) {
         await updateCliente(editingCliente.id, data);
-      } else {
-        const newCliente = await createCliente(data);
-        // Si se creó un procedimiento junto al cliente
-        if (proc && newCliente) {
+        
+        // Guardar documentos de identidad
+        if (docs.length > 0) {
           const supabase = createClient();
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
-            const clienteNombre = [data.nombre, (data as any).apellido1 || (data as any).apellidos].filter(Boolean).join(' ');
-            const { data: newProc } = await supabase.from('procedimientos').insert({
-              ...proc,
-              cliente_id: newCliente.id,
-              user_id: user.id,
-              nie_interesado: null,
-              nombre_interesado: null,
-              expediente_referencia: null,
-              fecha_presentacion: null,
-              fecha_resolucion: null,
-              notas: null,
-            }).select().single();
-            
-            // Auditoría: nuevo expediente
-            if (newProc) {
-              await auditProcedimiento.crear(newProc.id, newProc.titulo, clienteNombre);
-            }
-            
-            // Si tiene entrada, crear cobro automático
-            if (newProc && proc.tiene_entrada && proc.importe_entrada > 0) {
-              const { data: newCobro } = await supabase.from('cobros').insert({
+            // Eliminar docs existentes y reinsertar
+            await supabase.from('documentos_identidad').delete().eq('cliente_id', editingCliente.id);
+            await supabase.from('documentos_identidad').insert(
+              docs.filter(d => d.numero).map(d => ({
                 user_id: user.id,
-                cliente_id: newCliente.id,
-                procedimiento_id: newProc.id,
-                fecha_cobro: new Date().toISOString().slice(0, 10),
-                importe: proc.importe_entrada,
-                metodo_pago: 'efectivo',
-                notas: `Entrada del procedimiento: ${proc.titulo}`,
-                iva_tipo: 'iva_incluido',
-                iva_porcentaje: 21,
-              }).select().single();
-              if (newCobro) await auditCobro.crear(newCobro.id, proc.importe_entrada, clienteNombre, 'efectivo');
-            }
+                cliente_id: editingCliente.id,
+                tipo: d.tipo,
+                numero: d.numero,
+                fecha_expedicion: d.fecha_expedicion || null,
+                fecha_caducidad: d.fecha_caducidad || null,
+                es_principal: d.es_principal,
+                notas: null,
+              }))
+            );
           }
         }
+      } else {
+        const newCliente = await createCliente(data);
+        
         // Guardar documentos de identidad
         if (docs.length > 0 && newCliente) {
           const supabase = createClient();
@@ -412,7 +390,6 @@ export default function ClientesPage() {
                   </span>
                 </button>
               </th>
-              <th>Expedientes</th>
               <th>Contacto</th>
               <th>
                 <button onClick={() => toggleSort('fecha_entrada')} className="flex items-center gap-1 hover:text-blue-600 transition-colors">
@@ -428,28 +405,12 @@ export default function ClientesPage() {
           </thead>
           <tbody>
             {filteredClientes.length === 0 ? (
-              <tr><td colSpan={6} className="empty-state">{searchQuery || estadoFilter ? 'Sin resultados' : 'No hay clientes registrados'}</td></tr>
+              <tr><td colSpan={5} className="empty-state">{searchQuery || estadoFilter ? 'Sin resultados' : 'No hay clientes registrados'}</td></tr>
             ) : (
               paginatedClientes.map((c) => {
-                const procsCliente = procedimientos.filter(p => p.cliente_id === c.id);
-                const procsActivos = procsCliente.filter(p =>
-                  !['cerrado', 'archivado'].includes(p.estado)
-                ).length;
                 return (
                   <tr key={c.id}>
                     <td className="font-medium">{[c.nombre, c.apellido1, c.apellido2].filter(Boolean).join(' ') || [c.nombre, c.apellidos].filter(Boolean).join(' ')}</td>
-                    <td className="subtle-text">
-                      {procsCliente.length > 0 ? (
-                        <span className="inline-flex items-center gap-1">
-                          <span className="text-blue-600 font-medium">{procsActivos}</span>
-                          <span className="text-gray-400">/</span>
-                          <span className="text-gray-500">{procsCliente.length}</span>
-                          <span className="text-xs text-gray-400 ml-1">activos</span>
-                        </span>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
                     <td className="subtle-text">{c.telefono || c.email || '—'}</td>
                     <td>{c.fecha_entrada}</td>
                     <td><span className={`badge ${estadoBadge(c.estado)}`}>{c.estado}</span></td>
