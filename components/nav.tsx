@@ -3,32 +3,35 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Menu, Home, Users, CreditCard, PieChart, FileText, Calendar, Receipt, TrendingUp, FolderOpen, History, Activity, BookOpen, X } from 'lucide-react';
+import { Menu, Home, Users, CreditCard, PieChart, FileText, Calendar, Receipt, TrendingUp, FolderOpen, History, Activity, BookOpen, X, ChevronDown } from 'lucide-react';
 import { LogoutButton } from '@/components/logout-button';
 
 export function Nav() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const hamburgerRef = useRef<HTMLButtonElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
-  const menuCategories = [
+  const mainNavItems = [
+    { href: '/clientes', label: 'Clientes', icon: Users, description: 'Gestión de clientes', standalone: true },
+  ];
+
+  const dropdownMenus = [
     {
-      title: null,
-      items: [
-        { href: '/dashboard', label: 'Inicio', icon: Home, description: 'Panel principal' }
-      ]
-    },
-    {
+      id: 'gestion',
       title: 'Gestión',
+      icon: FolderOpen,
       items: [
-        { href: '/clientes', label: 'Clientes', icon: Users, description: 'Gestión de clientes' },
         { href: '/expedientes', label: 'Expedientes', icon: FolderOpen, description: 'Expedientes y procedimientos' },
         { href: '/catalogo', label: 'Catálogo', icon: BookOpen, description: 'Catálogo de servicios' }
       ]
     },
     {
+      id: 'operaciones',
       title: 'Operaciones',
+      icon: CreditCard,
       items: [
         { href: '/cobros', label: 'Cobros', icon: CreditCard, description: 'Registro de cobros' },
         { href: '/gastos', label: 'Gastos', icon: FileText, description: 'Control de gastos' },
@@ -36,7 +39,9 @@ export function Nav() {
       ]
     },
     {
+      id: 'informes',
       title: 'Informes',
+      icon: TrendingUp,
       items: [
         { href: '/finanzas', label: 'Finanzas', icon: TrendingUp, description: 'Resumen financiero' },
         { href: '/repartos', label: 'Repartos', icon: PieChart, description: 'Gestión de repartos' },
@@ -44,35 +49,59 @@ export function Nav() {
       ]
     },
     {
+      id: 'seguimiento',
       title: 'Seguimiento',
+      icon: Activity,
       items: [
         { href: '/actividades', label: 'Actividades', icon: Activity, description: 'Seguimiento de tareas' },
         { href: '/historial', label: 'Historial', icon: History, description: 'Historial de cambios' }
+      ]
+    },
+    {
+      id: 'dashboard',
+      title: null,
+      icon: Home,
+      items: [
+        { href: '/dashboard', label: 'Inicio', icon: Home, description: 'Panel principal' }
       ]
     }
   ];
 
   // Flatten items for mobile navigation
-  const allItems = menuCategories.flatMap(category => category.items);
+  const allItems = [
+    ...mainNavItems,
+    ...dropdownMenus.flatMap(menu => menu.items)
+  ];
 
-  // Handle keyboard navigation
+  // Handle keyboard navigation and dropdowns
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && mobileMenuOpen) {
-        setMobileMenuOpen(false);
-        hamburgerRef.current?.focus();
+      if (e.key === 'Escape') {
+        if (mobileMenuOpen) {
+          setMobileMenuOpen(false);
+          hamburgerRef.current?.focus();
+        } else if (activeDropdown) {
+          setActiveDropdown(null);
+        }
       }
     };
 
     const handleClickOutside = (e: MouseEvent) => {
+      // Handle mobile menu close
       if (mobileMenuOpen && mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node) && !hamburgerRef.current?.contains(e.target as Node)) {
         setMobileMenuOpen(false);
       }
+      
+      // Handle dropdown close
+      if (activeDropdown && dropdownRefs.current[activeDropdown] && !dropdownRefs.current[activeDropdown]?.contains(e.target as Node)) {
+        setActiveDropdown(null);
+      }
     };
 
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('mousedown', handleClickOutside);
+
     if (mobileMenuOpen) {
-      document.addEventListener('keydown', handleKeyDown);
-      document.addEventListener('mousedown', handleClickOutside);
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -83,7 +112,7 @@ export function Nav() {
       document.removeEventListener('mousedown', handleClickOutside);
       document.body.style.overflow = '';
     };
-  }, [mobileMenuOpen]);
+  }, [mobileMenuOpen, activeDropdown]);
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
@@ -94,39 +123,106 @@ export function Nav() {
     hamburgerRef.current?.focus();
   };
 
+  const toggleDropdown = (dropdownId: string) => {
+    setActiveDropdown(activeDropdown === dropdownId ? null : dropdownId);
+  };
+
   return (
     <>
       <nav className="nav-bar" role="navigation" aria-label="Navegación principal">
         {/* Desktop links */}
         <div className="nav-links" role="menubar">
-          {menuCategories.map((category, categoryIndex) => (
-            <div key={category.title || 'home'} className="nav-category">
-              {category.title && (
-                <div className="nav-category-title" role="separator">
-                  {category.title}
-                </div>
-              )}
-              <div className="nav-category-items">
-                {category.items.map(({ href, label, icon: Icon, description }) => {
-                  const isActive = pathname === href || pathname.startsWith(href + '/');
-                  return (
-                    <Link 
-                      key={href} 
-                      href={href} 
-                      className={`nav-link${isActive ? ' nav-link-active' : ''}`}
-                      role="menuitem"
-                      aria-current={isActive ? 'page' : undefined}
-                      aria-label={`${label} - ${description}`}
-                      title={description}
-                    >
-                      <Icon className="nav-icon" aria-hidden="true" /> 
-                      <span>{label}</span>
-                    </Link>
-                  );
-                })}
+          {/* Clientes - Always visible */}
+          {mainNavItems.map(({ href, label, icon: Icon, description }) => {
+            const isActive = pathname === href || pathname.startsWith(href + '/');
+            return (
+              <Link 
+                key={href} 
+                href={href} 
+                className={`nav-link nav-link-clientes${isActive ? ' nav-link-active' : ''}`}
+                role="menuitem"
+                aria-current={isActive ? 'page' : undefined}
+                aria-label={`${label} - ${description}`}
+                title={description}
+              >
+                <Icon className="nav-icon" aria-hidden="true" /> 
+                <span>{label}</span>
+              </Link>
+            );
+          })}
+          
+          {/* Dropdown menus */}
+          {dropdownMenus.filter(menu => menu.title).map((menu) => {
+            const isActive = menu.items.some(item => pathname === item.href || pathname.startsWith(item.href + '/'));
+            const isDropdownOpen = activeDropdown === menu.id;
+            
+            return (
+              <div
+                key={menu.id}
+                ref={(el) => { dropdownRefs.current[menu.id] = el; }}
+                className="nav-dropdown"
+              >
+                <button
+                  onClick={() => toggleDropdown(menu.id)}
+                  className={`nav-link nav-dropdown-trigger${isActive ? ' nav-link-active' : ''}${isDropdownOpen ? ' nav-dropdown-open' : ''}`}
+                  role="menuitem"
+                  aria-haspopup="true"
+                  aria-expanded={isDropdownOpen}
+                  aria-label={`${menu.title} - menú desplegable`}
+                >
+                  <menu.icon className="nav-icon" aria-hidden="true" />
+                  <span>{menu.title}</span>
+                  <ChevronDown className={`nav-dropdown-arrow${isDropdownOpen ? ' nav-dropdown-arrow-open' : ''}`} aria-hidden="true" />
+                </button>
+                
+                {isDropdownOpen && (
+                  <div className="nav-dropdown-menu" role="menu">
+                    {menu.items.map(({ href, label, icon: Icon, description }) => {
+                      const itemIsActive = pathname === href || pathname.startsWith(href + '/');
+                      return (
+                        <Link
+                          key={href}
+                          href={href}
+                          className={`nav-dropdown-item${itemIsActive ? ' nav-dropdown-item-active' : ''}`}
+                          role="menuitem"
+                          aria-current={itemIsActive ? 'page' : undefined}
+                          aria-label={`${label} - ${description}`}
+                          title={description}
+                        >
+                          <Icon className="nav-dropdown-item-icon" aria-hidden="true" />
+                          <div className="nav-dropdown-item-content">
+                            <span className="nav-dropdown-item-label">{label}</span>
+                            <span className="nav-dropdown-item-description">{description}</span>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
+          
+          {/* Dashboard - standalone */}
+          {dropdownMenus.filter(menu => !menu.title).map((menu) => 
+            menu.items.map(({ href, label, icon: Icon, description }) => {
+              const isActive = pathname === href || pathname.startsWith(href + '/');
+              return (
+                <Link 
+                  key={href} 
+                  href={href} 
+                  className={`nav-link${isActive ? ' nav-link-active' : ''}`}
+                  role="menuitem"
+                  aria-current={isActive ? 'page' : undefined}
+                  aria-label={`${label} - ${description}`}
+                  title={description}
+                >
+                  <Icon className="nav-icon" aria-hidden="true" /> 
+                  <span>{label}</span>
+                </Link>
+              );
+            })
+          )}
         </div>
 
         <div className="nav-right">
@@ -168,14 +264,57 @@ export function Nav() {
               </button>
             </div>
             <nav className="mobile-nav-links" role="menubar" aria-orientation="vertical">
-              {menuCategories.map((category) => (
-                <div key={category.title || 'home'} className="mobile-nav-category">
-                  {category.title && (
-                    <div className="mobile-nav-category-title">
-                      {category.title}
+              {/* Clientes first - always accessible */}
+              {mainNavItems.map(({ href, label, icon: Icon, description }) => {
+                const isActive = pathname === href || pathname.startsWith(href + '/');
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={closeMobileMenu}
+                    className={`mobile-nav-link mobile-nav-link-clientes${isActive ? ' mobile-nav-link-active' : ''}`}
+                    role="menuitem"
+                    aria-current={isActive ? 'page' : undefined}
+                  >
+                    <Icon className="mobile-nav-icon" aria-hidden="true" />
+                    <div className="mobile-nav-content">
+                      <span className="mobile-nav-label">{label}</span>
+                      <span className="mobile-nav-description">{description}</span>
                     </div>
-                  )}
-                  {category.items.map(({ href, label, icon: Icon, description }) => {
+                  </Link>
+                );
+              })}
+              
+              {/* Other menu items */}
+              {dropdownMenus.filter(menu => !menu.title).map((menu) => 
+                menu.items.map(({ href, label, icon: Icon, description }) => {
+                  const isActive = pathname === href || pathname.startsWith(href + '/');
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      onClick={closeMobileMenu}
+                      className={`mobile-nav-link${isActive ? ' mobile-nav-link-active' : ''}`}
+                      role="menuitem"
+                      aria-current={isActive ? 'page' : undefined}
+                    >
+                      <Icon className="mobile-nav-icon" aria-hidden="true" />
+                      <div className="mobile-nav-content">
+                        <span className="mobile-nav-label">{label}</span>
+                        <span className="mobile-nav-description">{description}</span>
+                      </div>
+                    </Link>
+                  );
+                })
+              )}
+              
+              {/* Dropdown categories in mobile */}
+              {dropdownMenus.filter(menu => menu.title).map((menu) => (
+                <div key={menu.id} className="mobile-nav-category">
+                  <div className="mobile-nav-category-title">
+                    {menu.title}
+                  </div>
+                  {menu.items.map(({ href, label, icon: Icon, description }) => {
                     const isActive = pathname === href || pathname.startsWith(href + '/');
                     return (
                       <Link
