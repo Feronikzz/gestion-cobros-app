@@ -5,13 +5,18 @@ import { LayoutShell } from '@/components/layout-shell';
 import { ClienteFormV2 } from '@/components/cliente-form-v2';
 import { Modal } from '@/components/modal';
 import { useClientes } from '@/lib/hooks/use-clientes';
+import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
+import { useCobros } from '@/lib/hooks/use-cobros';
 import type { Cliente, ClienteInsert, EstadoProcedimiento } from '@/lib/supabase/types';
 import { createClient } from '@/lib/supabase/client';
+import { auditProcedimiento, auditCobro } from '@/lib/audit';
 import Link from 'next/link';
 import { Eye, Edit, Trash2, UserPlus, Users, TrendingUp, Calendar, Search, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, ArrowUpDown, Archive } from 'lucide-react';
 
 export default function ClientesPage() {
   const { clientes, loading, error, createCliente, updateCliente, deleteCliente } = useClientes();
+  const { procedimientos } = useProcedimientos();
+  const { cobros } = useCobros();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,31 +128,48 @@ export default function ClientesPage() {
     try {
       if (editingCliente) {
         await updateCliente(editingCliente.id, data);
-        
-        // Guardar documentos de identidad
-        if (docs.length > 0) {
+      } else {
+        const newCliente = await createCliente(data);
+        // Si se creó un procedimiento junto al cliente
+        if (proc && newCliente) {
           const supabase = createClient();
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
-            // Eliminar docs existentes y reinsertar
-            await supabase.from('documentos_identidad').delete().eq('cliente_id', editingCliente.id);
-            await supabase.from('documentos_identidad').insert(
-              docs.filter(d => d.numero).map(d => ({
+            const clienteNombre = [data.nombre, (data as any).apellido1 || (data as any).apellidos].filter(Boolean).join(' ');
+            const { data: newProc } = await supabase.from('procedimientos').insert({
+              ...proc,
+              cliente_id: newCliente.id,
+              user_id: user.id,
+              nie_interesado: null,
+              nombre_interesado: null,
+              expediente_referencia: null,
+              fecha_presentacion: null,
+              fecha_resolucion: null,
+              notas: null,
+            }).select().single();
+            
+            // Auditoría: nuevo expediente
+            if (newProc) {
+              await auditProcedimiento.crear(newProc.id, newProc.titulo, clienteNombre);
+            }
+            
+            // Si tiene entrada, crear cobro automático
+            if (newProc && proc.tiene_entrada && proc.importe_entrada > 0) {
+              const { data: newCobro } = await supabase.from('cobros').insert({
                 user_id: user.id,
-                cliente_id: editingCliente.id,
-                tipo: d.tipo,
-                numero: d.numero,
-                fecha_expedicion: d.fecha_expedicion || null,
-                fecha_caducidad: d.fecha_caducidad || null,
-                es_principal: d.es_principal,
-                notas: null,
-              }))
-            );
+                cliente_id: newCliente.id,
+                procedimiento_id: newProc.id,
+                fecha_cobro: new Date().toISOString().slice(0, 10),
+                importe: proc.importe_entrada,
+                metodo_pago: 'efectivo',
+                notas: `Entrada del procedimiento: ${proc.titulo}`,
+                iva_tipo: 'iva_incluido',
+                iva_porcentaje: 21,
+              }).select().single();
+              if (newCobro) await auditCobro.crear(newCobro.id, proc.importe_entrada, clienteNombre, 'efectivo');
+            }
           }
         }
-      } else {
-        const newCliente = await createCliente(data);
-        
         // Guardar documentos de identidad
         if (docs.length > 0 && newCliente) {
           const supabase = createClient();
@@ -206,121 +228,129 @@ export default function ClientesPage() {
       </div>
 
       {/* Estadísticas de Clientes */}
-      <div className="stats-grid-mobile mb-6">
-        <div className="stat-card-mobile stat-card-blue">
-          <div className="stat-content-mobile">
-            <div className="stat-info-mobile">
-              <div className="stat-label-mobile">Clientes activos</div>
-              <div className="stat-number-mobile">{calcularClientesActivos()}</div>
-              <div className="stat-subtext-mobile">De {clientes.length} totales</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-blue-100 text-sm font-medium mb-1">Clientes activos</div>
+              <div className="text-2xl font-bold">{calcularClientesActivos()}</div>
+              <div className="text-blue-100 text-xs mt-1">De {clientes.length} totales</div>
             </div>
-            <div className="stat-icon-mobile stat-icon-blue">
-              <Users className="w-5 h-5" />
-            </div>
-          </div>
-        </div>
-        
-        <div className="stat-card-mobile stat-card-amber">
-          <div className="stat-content-mobile">
-            <div className="stat-info-mobile">
-              <div className="stat-label-mobile">Pendientes</div>
-              <div className="stat-number-mobile">{calcularClientesPendientes()}</div>
-              <div className="stat-subtext-mobile">Clientes pendientes</div>
-            </div>
-            <div className="stat-icon-mobile stat-icon-amber">
-              <Calendar className="w-5 h-5" />
+            <div className="p-3 bg-white/20 rounded-lg">
+              <Users className="w-6 h-6 text-white" />
             </div>
           </div>
         </div>
         
-        <div className="stat-card-mobile stat-card-gray">
-          <div className="stat-content-mobile">
-            <div className="stat-info-mobile">
-              <div className="stat-label-mobile">Archivados</div>
-              <div className="stat-number-mobile">{calcularClientesArchivados()}</div>
-              <div className="stat-subtext-mobile">Clientes archivados</div>
+        <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-amber-100 text-sm font-medium mb-1">Pendientes</div>
+              <div className="text-2xl font-bold">{calcularClientesPendientes()}</div>
+              <div className="text-amber-100 text-xs mt-1">Clientes pendientes</div>
             </div>
-            <div className="stat-icon-mobile stat-icon-gray">
-              <Archive className="w-5 h-5" />
+            <div className="p-3 bg-white/20 rounded-lg">
+              <Calendar className="w-6 h-6 text-white" />
             </div>
           </div>
         </div>
         
-        <div className="stat-card-mobile stat-card-green">
-          <div className="stat-content-mobile">
-            <div className="stat-info-mobile">
-              <div className="stat-label-mobile">Nuevos este mes</div>
-              <div className="stat-number-mobile">{calcularClientesNuevosMes()}</div>
-              <div className="stat-subtext-mobile">Clientes nuevos</div>
+        <div className="bg-gradient-to-r from-gray-500 to-gray-600 rounded-xl p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-gray-200 text-sm font-medium mb-1">Archivados</div>
+              <div className="text-2xl font-bold">{calcularClientesArchivados()}</div>
+              <div className="text-gray-200 text-xs mt-1">Clientes archivados</div>
             </div>
-            <div className="stat-icon-mobile stat-icon-green">
-              <TrendingUp className="w-5 h-5" />
+            <div className="p-3 bg-white/20 rounded-lg">
+              <Archive className="w-6 h-6 text-white" />
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-green-100 text-sm font-medium mb-1">Nuevos este mes</div>
+              <div className="text-2xl font-bold">{calcularClientesNuevosMes()}</div>
+              <div className="text-green-100 text-xs mt-1">Clientes nuevos</div>
+            </div>
+            <div className="p-3 bg-white/20 rounded-lg">
+              <TrendingUp className="w-6 h-6 text-white" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Búsqueda y Filtros */}
-      <div className="search-filters-mobile mb-6">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
         {/* Búsqueda Principal */}
-        <div className="search-container-mobile">
+        <div className="mb-4">
           <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+            <Search className="w-5 h-5 absolute left-4 top-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Buscar clientes..."
+              placeholder="Buscar clientes por nombre, NIF, email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="search-input-mobile"
+              className="w-full pl-12 pr-12 py-4 text-lg border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="search-clear-mobile"
+                className="absolute right-4 top-4 p-1 text-gray-400 hover:text-gray-600 transition-colors"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             )}
           </div>
         </div>
 
         {/* Filtros */}
-        <div className="filters-container-mobile">
+        <div className="flex flex-wrap items-center gap-4">
           {/* Filtro de Estado */}
-          <div className="filter-dropdown-mobile">
+          <div className="relative">
             <button
               onClick={() => setShowEstadoFilter(!showEstadoFilter)}
-              className={`filter-button-mobile ${
-                estadoFilter ? 'filter-button-active' : ''
+              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 ${
+                estadoFilter 
+                  ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
               }`}
             >
-              <Users className="w-3 h-3" />
-              <span>{estadoFilter || 'Estado'}</span>
-              <ChevronDown className={`w-3 h-3 transition-transform ${showEstadoFilter ? 'rotate-180' : ''}`} />
+              <div className="flex items-center gap-2">
+                <Users className="w-4 h-4" />
+                <span>{estadoFilter || 'Estado'}</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${showEstadoFilter ? 'rotate-180' : ''}`} />
+              </div>
             </button>
 
             {showEstadoFilter && (
-              <div className="filter-menu-mobile">
-                <div className="filter-menu-header">Seleccionar estado</div>
-                {[
-                  { value: 'activo', label: 'Activo' },
-                  { value: 'pendiente', label: 'Pendiente' },
-                  { value: 'pagado', label: 'Pagado' },
-                  { value: 'archivado', label: 'Archivado' }
-                ].map(estado => (
-                  <button
-                    key={estado.value}
-                    onClick={() => {
-                      setEstadoFilter(estadoFilter === estado.value ? '' : estado.value);
-                      setShowEstadoFilter(false);
-                    }}
-                    className={`filter-option-mobile ${
-                      estadoFilter === estado.value ? 'filter-option-active' : ''
-                    }`}
-                  >
-                    {estado.label}
-                  </button>
-                ))}
+              <div className="absolute top-full left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                <div className="p-3">
+                  <div className="text-xs font-medium text-gray-500 mb-2">Seleccionar estado</div>
+                  {[
+                    { value: 'activo', label: 'Activo' },
+                    { value: 'pendiente', label: 'Pendiente' },
+                    { value: 'pagado', label: 'Pagado' },
+                    { value: 'archivado', label: 'Archivado' }
+                  ].map(estado => (
+                    <button
+                      key={estado.value}
+                      onClick={() => {
+                        setEstadoFilter(estadoFilter === estado.value ? '' : estado.value);
+                        setShowEstadoFilter(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
+                        estadoFilter === estado.value 
+                          ? 'bg-blue-50 text-blue-700 font-medium' 
+                          : 'hover:bg-gray-50 text-gray-700'
+                      }`}
+                    >
+                      {estado.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -329,10 +359,12 @@ export default function ClientesPage() {
           {activeFiltersCount > 0 && (
             <button
               onClick={clearFilters}
-              className="clear-filters-mobile"
+              className="px-4 py-2 rounded-lg border-2 border-red-300 bg-red-50 text-red-700 font-medium hover:bg-red-100 transition-all duration-200"
             >
-              <X className="w-3 h-3" />
-              <span>Limpiar ({activeFiltersCount})</span>
+              <div className="flex items-center gap-2">
+                <X className="w-4 h-4" />
+                <span>Limpiar ({activeFiltersCount})</span>
+              </div>
             </button>
           )}
         </div>
@@ -346,16 +378,16 @@ export default function ClientesPage() {
       )}
 
       {/* Info de paginación */}
-      <div className="pagination-info-mobile mb-4">
-        <div className="pagination-text-mobile">
+      <div className="flex items-center justify-between mb-4">
+        <div className="text-sm text-gray-600">
           Mostrando <span className="font-medium">{Math.min((currentPage - 1) * itemsPerPage + 1, filteredClientes.length)}</span> - <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredClientes.length)}</span> de <span className="font-medium">{filteredClientes.length}</span> clientes
         </div>
-        <div className="pagination-controls-mobile">
-          <label className="pagination-label-mobile">Por página:</label>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-600">Por página:</label>
           <select
             value={itemsPerPage}
             onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
-            className="pagination-select-mobile"
+            className="px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
           >
             <option value={10}>10</option>
             <option value={20}>20</option>
@@ -365,115 +397,107 @@ export default function ClientesPage() {
       </div>
 
       {/* Tabla de Clientes */}
-      <div className="table-container table-container-mobile">
-        <div className="table-header-mobile">
-          <div className="table-sort-mobile">
-            <button onClick={() => toggleSort(sortField === 'apellidos' ? 'nombre' : 'apellidos')} className="table-sort-button-mobile">
-              <span>Cliente</span>
-              {sortField === 'apellidos' || sortField === 'nombre' ? (
-                sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
-              ) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
-            </button>
-          </div>
-          <div className="table-sort-mobile">
-            <button onClick={() => toggleSort('fecha_entrada')} className="table-sort-button-mobile">
-              <span>Fecha</span>
-              {sortField === 'fecha_entrada' ? (
-                sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
-              ) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
-            </button>
-          </div>
-        </div>
-        
-        <div className="table-body-mobile">
-          {filteredClientes.length === 0 ? (
-            <div className="empty-state-mobile">
-              {searchQuery || estadoFilter ? 'Sin resultados' : 'No hay clientes registrados'}
-            </div>
-          ) : (
-            paginatedClientes.map((c) => (
-              <div key={c.id} className="table-row-mobile">
-                <div className="table-row-header-mobile">
-                  <div className="table-row-name-mobile">
-                    {[c.nombre, c.apellido1, c.apellido2].filter(Boolean).join(' ') || [c.nombre, c.apellidos].filter(Boolean).join(' ')}
-                  </div>
-                  <div className="table-row-actions-mobile">
-                    <Link href={`/clientes/${c.id}`} className="action-btn-mobile action-view-mobile" title="Ver detalle">
-                      <Eye className="w-4 h-4" />
-                    </Link>
-                    <button onClick={() => { setEditingCliente(c); setIsModalOpen(true); }} className="action-btn-mobile action-edit-mobile" title="Editar">
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDelete(c)} className="action-btn-mobile action-delete-mobile" title="Eliminar">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="table-row-content-mobile">
-                  <div className="table-row-info-mobile">
-                    <div className="table-row-contact-mobile">
-                      {c.telefono || c.email || '—'}
-                    </div>
-                    <div className="table-row-date-mobile">
-                      {c.fecha_entrada}
-                    </div>
-                  </div>
-                  <div className="table-row-status-mobile">
-                    <span className={`badge ${estadoBadge(c.estado)}`}>{c.estado}</span>
-                  </div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+      <div className="table-container">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>
+                <button onClick={() => toggleSort(sortField === 'apellidos' ? 'nombre' : 'apellidos')} className="flex items-center gap-1 hover:text-blue-600 transition-colors">
+                  Cliente
+                  {sortField === 'apellidos' || sortField === 'nombre' ? (
+                    sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                  <span className="text-xs font-normal text-gray-400 ml-0.5">
+                    {sortField === 'apellidos' ? '(apellido)' : sortField === 'nombre' ? '(nombre)' : ''}
+                  </span>
+                </button>
+              </th>
+              <th>Expedientes</th>
+              <th>Contacto</th>
+              <th>
+                <button onClick={() => toggleSort('fecha_entrada')} className="flex items-center gap-1 hover:text-blue-600 transition-colors">
+                  Fecha entrada
+                  {sortField === 'fecha_entrada' ? (
+                    sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
+                  ) : <ArrowUpDown className="w-3 h-3 opacity-40" />}
+                </button>
+              </th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredClientes.length === 0 ? (
+              <tr><td colSpan={6} className="empty-state">{searchQuery || estadoFilter ? 'Sin resultados' : 'No hay clientes registrados'}</td></tr>
+            ) : (
+              paginatedClientes.map((c) => {
+                const procsCliente = procedimientos.filter(p => p.cliente_id === c.id);
+                const procsActivos = procsCliente.filter(p =>
+                  !['cerrado', 'archivado'].includes(p.estado)
+                ).length;
+                return (
+                  <tr key={c.id}>
+                    <td className="font-medium">{[c.nombre, c.apellido1, c.apellido2].filter(Boolean).join(' ') || [c.nombre, c.apellidos].filter(Boolean).join(' ')}</td>
+                    <td className="subtle-text">
+                      {procsCliente.length > 0 ? (
+                        <span className="inline-flex items-center gap-1">
+                          <span className="text-blue-600 font-medium">{procsActivos}</span>
+                          <span className="text-gray-400">/</span>
+                          <span className="text-gray-500">{procsCliente.length}</span>
+                          <span className="text-xs text-gray-400 ml-1">activos</span>
+                        </span>
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
+                    </td>
+                    <td className="subtle-text">{c.telefono || c.email || '—'}</td>
+                    <td>{c.fecha_entrada}</td>
+                    <td><span className={`badge ${estadoBadge(c.estado)}`}>{c.estado}</span></td>
+                    <td>
+                      <div className="action-buttons">
+                        <Link href={`/clientes/${c.id}`} className="action-btn action-view" title="Ver detalle"><Eye className="w-4 h-4" /></Link>
+                        <button onClick={() => { setEditingCliente(c); setIsModalOpen(true); }} className="action-btn action-edit" title="Editar"><Edit className="w-4 h-4" /></button>
+                        <button onClick={() => handleDelete(c)} className="action-btn action-delete" title="Eliminar"><Trash2 className="w-4 h-4" /></button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Controles de paginación */}
       {totalPages > 1 && (
-        <div className="pagination-controls-bottom-mobile">
+        <div className="flex items-center justify-center gap-2 mt-4">
           <button
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="pagination-nav-button-mobile"
+            className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ChevronLeft className="w-4 h-4" />
-            <span>Anterior</span>
           </button>
           
-          <div className="pagination-numbers-mobile">
-            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-              let pageNum;
-              if (totalPages <= 5) {
-                pageNum = i + 1;
-              } else if (currentPage <= 3) {
-                pageNum = i + 1;
-              } else if (currentPage >= totalPages - 2) {
-                pageNum = totalPages - 4 + i;
-              } else {
-                pageNum = currentPage - 2 + i;
-              }
-              
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`pagination-number-mobile ${
-                    currentPage === pageNum ? 'pagination-number-active' : ''
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-          </div>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+            <button
+              key={page}
+              onClick={() => setCurrentPage(page)}
+              className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                currentPage === page
+                  ? 'bg-blue-600 text-white'
+                  : 'border border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {page}
+            </button>
+          ))}
           
           <button
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
-            className="pagination-nav-button-mobile"
+            className="p-2 rounded-lg border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <span>Siguiente</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
