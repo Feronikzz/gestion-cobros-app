@@ -323,9 +323,23 @@ export default function HistorialPage() {
                 <p className="text-sm text-amber-600 mt-1">
                   {diagResult?.fix || 'Necesitas ejecutar el SQL de configuración en Supabase para activar el historial de cambios.'}
                 </p>
+                {diagResult?.error && (
+                  <p className="text-xs text-amber-500 mt-1 font-mono">Error: {diagResult.error} {diagResult.code ? `(${diagResult.code})` : ''}</p>
+                )}
+                {diagResult?.sqlFix && (
+                  <div className="mt-3 relative">
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(diagResult.sqlFix); setCopiedSQL(true); setTimeout(() => setCopiedSQL(false), 2000); }}
+                      className="absolute top-2 right-2 btn btn-sm bg-white/80 text-xs flex items-center gap-1"
+                    >
+                      <Copy className="w-3 h-3" /> {copiedSQL ? 'Copiado!' : 'Copiar'}
+                    </button>
+                    <pre className="bg-gray-900 text-green-400 text-xs p-3 rounded-lg overflow-x-auto max-h-48 whitespace-pre-wrap">{diagResult.sqlFix}</pre>
+                  </div>
+                )}
                 <div className="flex gap-2 mt-3">
                   <button onClick={() => setShowSetupSQL(true)} className="btn btn-sm bg-amber-600 text-white hover:bg-amber-700 flex items-center gap-1.5">
-                    <Database className="w-3.5 h-3.5" /> Ver SQL de configuración
+                    <Database className="w-3.5 h-3.5" /> Ver SQL completo
                   </button>
                   <button onClick={runDiagnostic} className="btn btn-sm btn-secondary flex items-center gap-1.5">
                     <Wrench className="w-3.5 h-3.5" /> Re-verificar
