@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { LayoutShell } from '@/components/layout-shell';
 import { getAuditLog, type FiltrosAudit } from '@/lib/audit';
 import type { AuditLog, TipoEntidad, TipoAccion } from '@/lib/supabase/types';
@@ -59,7 +59,10 @@ CREATE POLICY audit_log_select ON audit_log
   FOR SELECT USING (user_id = auth.uid());
 
 CREATE POLICY audit_log_insert ON audit_log
-  FOR INSERT WITH CHECK (true);`;
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY audit_log_delete ON audit_log
+  FOR DELETE USING (user_id = auth.uid());`;
 
 export default function HistorialPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
@@ -76,6 +79,7 @@ export default function HistorialPage() {
   const [diagResult, setDiagResult] = useState<any>(null);
   const [showSetupSQL, setShowSetupSQL] = useState(false);
   const [copiedSQL, setCopiedSQL] = useState(false);
+  const diagRanRef = useRef(false);
 
   const calcularFechas = useCallback((): { desde: string; hasta: string } => {
     const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
@@ -95,10 +99,16 @@ export default function HistorialPage() {
       const { desde, hasta } = calcularFechas();
       const data = await getAuditLog({ fechaDesde: desde, fechaHasta: hasta, entidad: entidadFilter || undefined, accion: accionFilter || undefined, limit: 1000 });
       setLogs(data);
-      if (data.length === 0 && diagStatus === 'idle') runDiagnostic();
+      if (data.length === 0 && !diagRanRef.current) {
+        diagRanRef.current = true;
+        runDiagnostic();
+      }
     } catch (err: any) {
       setError(err.message || 'Error al cargar el historial');
-      if (diagStatus === 'idle') runDiagnostic();
+      if (!diagRanRef.current) {
+        diagRanRef.current = true;
+        runDiagnostic();
+      }
     } finally { setLoading(false); }
   }, [calcularFechas, entidadFilter, accionFilter]);
 
@@ -110,11 +120,20 @@ export default function HistorialPage() {
       const res = await fetch('/api/audit-check');
       const data = await res.json();
       setDiagResult(data); setDiagStatus(data.ok ? 'ok' : 'error');
-      if (data.ok) setTimeout(() => fetchLogs(), 500);
     } catch { setDiagStatus('error'); setDiagResult({ ok: false, error: 'No se pudo conectar con el diagnóstico' }); }
   };
 
   const copySQL = () => { navigator.clipboard.writeText(SQL_MIGRATION); setCopiedSQL(true); setTimeout(() => setCopiedSQL(false), 2000); };
+
+  const cleanupDiagnosticRecords = async () => {
+    try {
+      const res = await fetch('/api/audit-check', { method: 'DELETE' });
+      const data = await res.json();
+      if (data.ok) {
+        fetchLogs();
+      }
+    } catch { /* ignore */ }
+  };
 
   const filteredLogs = useMemo(() => {
     if (!busqueda) return logs;
@@ -200,6 +219,9 @@ export default function HistorialPage() {
       <div className="page-toolbar">
         <h2>Historial de Actividad</h2>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button onClick={cleanupDiagnosticRecords} className="btn btn-secondary" title="Borrar registros de diagnóstico">
+            <Trash2 className="w-4 h-4" /> Limpiar tests
+          </button>
           <button onClick={handleExport} disabled={filteredLogs.length === 0} className="btn btn-secondary" style={{ opacity: filteredLogs.length === 0 ? 0.4 : 1 }}>
             <Download className="w-4 h-4" /> Exportar CSV
           </button>

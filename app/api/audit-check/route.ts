@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createClient as createAdminClient } from '@supabase/supabase-js';
 
 export async function GET() {
   try {
     const supabase = await createClient();
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-    
+
     if (!user) {
-      return NextResponse.json({ 
-        ok: false, 
-        step: 'auth',
+      return NextResponse.json({
+        ok: false, step: 'auth',
         error: userError?.message || 'No autenticado',
         fix: 'No se pudo obtener el usuario. Asegúrate de estar logueado.',
       });
@@ -19,82 +17,38 @@ export async function GET() {
     // 1. Intentar SELECT en audit_log
     const { data: selectData, error: selectError } = await supabase
       .from('audit_log')
-      .select('id')
+      .select('id', { count: 'exact', head: false })
+      .eq('user_id', user.id)
       .limit(1);
 
     if (selectError) {
-      // Intentar con service role para verificar si la tabla existe
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      let tableExists = false;
-      if (serviceKey) {
-        const admin = createAdminClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey);
-        const { error: adminErr } = await admin.from('audit_log').select('id').limit(1);
-        tableExists = !adminErr;
-      }
-
       return NextResponse.json({
-        ok: false,
-        step: 'select',
-        error: selectError.message,
-        hint: selectError.hint,
-        code: selectError.code,
-        tableExists,
-        userId: user.id,
-        fix: tableExists 
-          ? 'La tabla existe pero la política RLS de SELECT bloquea el acceso. Ejecuta el SQL de fix abajo.'
-          : 'La tabla audit_log NO existe. Créala con el SQL de configuración.',
+        ok: false, step: 'select',
+        error: selectError.message, hint: selectError.hint, code: selectError.code,
+        fix: 'La tabla audit_log no existe o la política RLS de SELECT bloquea el acceso. Ejecuta el SQL de configuración.',
         sqlFix: `-- Ejecuta esto en Supabase SQL Editor:
-DROP POLICY IF EXISTS audit_log_usuario ON audit_log;
-DROP POLICY IF EXISTS audit_log_select ON audit_log;
-DROP POLICY IF EXISTS audit_log_insert ON audit_log;
+DROP TABLE IF EXISTS audit_log CASCADE;
+
+CREATE TABLE audit_log (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  user_email TEXT, entidad TEXT NOT NULL, entidad_id TEXT,
+  entidad_nombre TEXT, accion TEXT NOT NULL, campo TEXT,
+  valor_anterior TEXT, valor_nuevo TEXT, descripcion TEXT,
+  ip_address TEXT, user_agent TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_audit_user ON audit_log(user_id);
+CREATE INDEX idx_audit_user_date ON audit_log(user_id, created_at);
+ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY audit_log_select ON audit_log FOR SELECT USING (user_id = auth.uid());
-CREATE POLICY audit_log_insert ON audit_log FOR INSERT WITH CHECK (user_id = auth.uid());`,
-      });
-    }
-
-    // 2. Intentar INSERT de prueba
-    const { data: insertData, error: insertError } = await supabase
-      .from('audit_log')
-      .insert({
-        user_id: user.id,
-        user_email: user.email,
-        entidad: 'cliente',
-        accion: 'crear',
-        descripcion: 'Test de diagnóstico - puedes borrar este registro',
-        entidad_nombre: 'Diagnóstico',
-        campo: null,
-        valor_anterior: null,
-        valor_nuevo: null,
-        ip_address: null,
-        user_agent: 'audit-check-api',
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      return NextResponse.json({
-        ok: false,
-        step: 'insert',
-        error: insertError.message,
-        hint: insertError.hint,
-        code: insertError.code,
-        userId: user.id,
-        fix: `La tabla existe y SELECT funciona, pero INSERT falla. Error: "${insertError.message}". Ejecuta el SQL de fix.`,
-        sqlFix: `-- Ejecuta esto en Supabase SQL Editor:
-DROP POLICY IF EXISTS audit_log_usuario ON audit_log;
-DROP POLICY IF EXISTS audit_log_select ON audit_log;
-DROP POLICY IF EXISTS audit_log_insert ON audit_log;
-
--- Política de lectura
-CREATE POLICY audit_log_select ON audit_log FOR SELECT USING (user_id = auth.uid());
-
--- Política de inserción (permisiva)  
 CREATE POLICY audit_log_insert ON audit_log FOR INSERT WITH CHECK (true);`,
       });
     }
 
-    // 3. Contar registros
+    // 2. Contar registros (SELECT funciona, no necesitamos INSERT de test)
     const { count } = await supabase
       .from('audit_log')
       .select('*', { count: 'exact', head: true })
@@ -103,11 +57,31 @@ CREATE POLICY audit_log_insert ON audit_log FOR INSERT WITH CHECK (true);`,
     return NextResponse.json({
       ok: true,
       message: 'La tabla audit_log funciona correctamente',
-      testRecordId: insertData.id,
-      totalRecords: count,
-      userId: user.id,
+      totalRecords: count || 0,
     });
   } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message, stack: err.stack?.split('\n').slice(0, 3) });
+    return NextResponse.json({ ok: false, error: err.message });
+  }
+}
+
+// DELETE: limpiar registros de diagnóstico
+export async function DELETE() {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ ok: false, error: 'No autenticado' });
+
+    const { data, error } = await supabase
+      .from('audit_log')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('user_agent', 'audit-check-api')
+      .select('id');
+
+    if (error) return NextResponse.json({ ok: false, error: error.message });
+
+    return NextResponse.json({ ok: true, deleted: data?.length || 0 });
+  } catch (err: any) {
+    return NextResponse.json({ ok: false, error: err.message });
   }
 }
