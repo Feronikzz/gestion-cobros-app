@@ -400,50 +400,76 @@ export default function ExpedientesPage() {
       description="Gestiona todos tus expedientes y procedimientos. Visualiza el estado de cada caso, seguimiento de pagos y acceso rápido a los detalles."
     >
       {/* ─── Métricas ── */}
-      <div className="dashboard-metrics">
-        <div className="metric-card metric-blue">
-          <FolderOpen className="metric-icon" />
-          <div>
-            <p className="metric-label">Total expedientes</p>
-            <p className="metric-value">{stats.total}</p>
+      <div className="stats-grid-mobile mb-6">
+        <div className="stat-card-mobile stat-card-blue">
+          <div className="stat-content-mobile">
+            <div className="stat-info-mobile">
+              <div className="stat-label-mobile">Total expedientes</div>
+              <div className="stat-number-mobile">{stats.total}</div>
+              <div className="stat-subtext-mobile">Todos los casos</div>
+            </div>
+            <div className="stat-icon-mobile stat-icon-blue">
+              <FolderOpen className="w-5 h-5" />
+            </div>
           </div>
         </div>
-        <div className="metric-card metric-orange">
-          <Clock className="metric-icon" />
-          <div>
-            <p className="metric-label">En proceso</p>
-            <p className="metric-value">{stats.enProceso}</p>
+        
+        <div className="stat-card-mobile stat-card-amber">
+          <div className="stat-content-mobile">
+            <div className="stat-info-mobile">
+              <div className="stat-label-mobile">En proceso</div>
+              <div className="stat-number-mobile">{stats.enProceso}</div>
+              <div className="stat-subtext-mobile">Activos</div>
+            </div>
+            <div className="stat-icon-mobile stat-icon-amber">
+              <Clock className="w-5 h-5" />
+            </div>
           </div>
         </div>
-        <div className="metric-card metric-green">
-          <CheckCircle className="metric-icon" />
-          <div>
-            <p className="metric-label">Cobrados completos</p>
-            <p className="metric-value">{stats.pagadosTotalmente}</p>
+        
+        <div className="stat-card-mobile stat-card-green">
+          <div className="stat-content-mobile">
+            <div className="stat-info-mobile">
+              <div className="stat-label-mobile">Cobrados completos</div>
+              <div className="stat-number-mobile">{stats.pagadosTotalmente}</div>
+              <div className="stat-subtext-mobile">Pagados totalmente</div>
+            </div>
+            <div className="stat-icon-mobile stat-icon-green">
+              <CheckCircle className="w-5 h-5" />
+            </div>
           </div>
         </div>
-        <div className="metric-card metric-red">
-          <AlertCircle className="metric-icon" />
-          <div>
-            <p className="metric-label">Pendientes de pago</p>
-            <p className="metric-value">{stats.pendientesPago}</p>
+        
+        <div className="stat-card-mobile stat-card-red">
+          <div className="stat-content-mobile">
+            <div className="stat-info-mobile">
+              <div className="stat-label-mobile">Pendientes de pago</div>
+              <div className="stat-number-mobile">{stats.pendientesPago}</div>
+              <div className="stat-subtext-mobile">Con saldo pendiente</div>
+            </div>
+            <div className="stat-icon-mobile stat-icon-red">
+              <AlertCircle className="w-5 h-5" />
+            </div>
           </div>
         </div>
-        <SensitiveToggle hidden={hideSensitive} onToggle={toggleSensitive} className="absolute top-2 right-2" />
+        
+        <div className="absolute top-2 right-2">
+          <SensitiveToggle hidden={hideSensitive} onToggle={toggleSensitive} />
+        </div>
       </div>
 
       {/* ─── Búsqueda y Filtros ── */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
+      <div className="search-filters-mobile mb-6">
         {/* Búsqueda Principal */}
-        <div className="mb-4">
+        <div className="search-container-mobile">
           <div className="relative">
-            <Search className="w-5 h-5 absolute left-4 top-4 text-gray-400" />
+            <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
             <input
               type="text"
-              placeholder="Buscar expedientes por cliente, título, concepto o referencia..."
+              placeholder="Buscar expedientes..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-12 py-4 text-lg border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+              className="search-input-mobile"
             />
             {searchTerm && (
               <button
@@ -457,19 +483,17 @@ export default function ExpedientesPage() {
         </div>
 
         {/* Filtros rápidos */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="filters-container-mobile">
           {/* Filtro de Estado */}
-          <div className="relative">
+          <div className="filter-dropdown-mobile">
             <select
               value={estadoFilter}
               onChange={(e) => setEstadoFilter(e.target.value)}
-              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 appearance-none bg-white pr-10 ${
-                estadoFilter !== 'todos'
-                  ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                  : 'border-gray-300 text-gray-700 hover:border-gray-400'
+              className={`filter-select-mobile ${
+                estadoFilter !== 'todos' ? 'filter-select-active' : ''
               }`}
             >
-              <option value="todos">Todos los estados</option>
+              <option value="todos">Estado</option>
               <option value="pendiente">Pendiente</option>
               <option value="pendiente_presentar">Pte. presentar</option>
               <option value="en_proceso">En proceso</option>
@@ -480,25 +504,23 @@ export default function ExpedientesPage() {
               <option value="cerrado">Cerrado</option>
               <option value="archivado">Archivado</option>
             </select>
-            <Filter className="w-4 h-4 absolute right-3 top-3 text-gray-400 pointer-events-none" />
+            <Filter className="w-3 h-3 absolute right-2 top-2 text-gray-400 pointer-events-none" />
           </div>
 
           {/* Filtro de Pago */}
-          <div className="relative">
+          <div className="filter-dropdown-mobile">
             <select
               value={pagadoFilter}
               onChange={(e) => setPagadoFilter(e.target.value)}
-              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 appearance-none bg-white pr-10 ${
-                pagadoFilter !== 'todos'
-                  ? 'border-green-500 bg-green-50 text-green-700' 
-                  : 'border-gray-300 text-gray-700 hover:border-gray-400'
+              className={`filter-select-mobile ${
+                pagadoFilter !== 'todos' ? 'filter-select-active' : ''
               }`}
             >
-              <option value="todos">Todos los pagos</option>
+              <option value="todos">Pagos</option>
               <option value="pagados">Pagados totalmente</option>
               <option value="pendientes">Con pago pendiente</option>
             </select>
-            <DollarSign className="w-4 h-4 absolute right-3 top-3 text-gray-400 pointer-events-none" />
+            <DollarSign className="w-3 h-3 absolute right-2 top-2 text-gray-400 pointer-events-none" />
           </div>
 
           {/* Botón filtros avanzados */}
