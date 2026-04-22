@@ -135,18 +135,28 @@ export const auditProcedimiento = {
 
 // Cobros
 export const auditCobro = {
-  crear: (id: string, importe: number, clienteNombre: string) => 
+  crear: (id: string, importe: number, clienteNombre: string, metodo?: string) => 
     logAudit('cobro', 'crear', { 
       entidad_id: id, 
-      entidad_nombre: `${importe}€`, 
-      descripcion: `Cobro registrado: ${importe}€ (${clienteNombre})` 
+      entidad_nombre: `${importe}€ – ${clienteNombre}`, 
+      descripcion: `Cobro registrado: ${importe}€ de ${clienteNombre}${metodo ? ` (${metodo})` : ''}` 
+    }),
+  
+  actualizar: (id: string, importe: number, clienteNombre: string, campo: string, anterior: unknown, nuevo: unknown) => 
+    logAudit('cobro', 'actualizar', { 
+      entidad_id: id, 
+      entidad_nombre: `${importe}€ – ${clienteNombre}`,
+      campo,
+      valor_anterior: String(anterior),
+      valor_nuevo: String(nuevo),
+      descripcion: `Cobro de ${clienteNombre} (${importe}€): ${campo} cambiado` 
     }),
   
   eliminar: (id: string, importe: number, clienteNombre: string) => 
     logAudit('cobro', 'eliminar', { 
       entidad_id: id, 
-      entidad_nombre: `${importe}€`, 
-      descripcion: `Cobro eliminado: ${importe}€ (${clienteNombre})` 
+      entidad_nombre: `${importe}€ – ${clienteNombre}`, 
+      descripcion: `Cobro eliminado: ${importe}€ de ${clienteNombre}` 
     }),
 };
 
@@ -159,11 +169,58 @@ export const auditGasto = {
       descripcion: `Gasto registrado: ${concepto} (${importe}€)` 
     }),
   
+  actualizar: (id: string, concepto: string, campo: string, anterior: unknown, nuevo: unknown) => 
+    logAudit('gasto', 'actualizar', { 
+      entidad_id: id, 
+      entidad_nombre: concepto,
+      campo,
+      valor_anterior: String(anterior),
+      valor_nuevo: String(nuevo),
+      descripcion: `Gasto "${concepto}": ${campo} cambiado` 
+    }),
+  
   eliminar: (id: string, importe: number, concepto: string) => 
     logAudit('gasto', 'eliminar', { 
       entidad_id: id, 
       entidad_nombre: concepto, 
       descripcion: `Gasto eliminado: ${concepto} (${importe}€)` 
+    }),
+};
+
+// Actividades
+export const auditActividad = {
+  crear: (id: string, titulo: string, clienteNombre?: string) => 
+    logAudit('actividad', 'crear', { 
+      entidad_id: id, 
+      entidad_nombre: titulo, 
+      descripcion: `Nueva actividad: ${titulo}${clienteNombre ? ` (${clienteNombre})` : ''}` 
+    }),
+  
+  actualizar: (id: string, titulo: string, campo: string, anterior: unknown, nuevo: unknown) => 
+    logAudit('actividad', 'actualizar', { 
+      entidad_id: id, 
+      entidad_nombre: titulo,
+      campo,
+      valor_anterior: String(anterior),
+      valor_nuevo: String(nuevo),
+      descripcion: `Actividad "${titulo}": ${campo} cambiado` 
+    }),
+  
+  completar: (id: string, titulo: string) => 
+    logAudit('actividad', 'actualizar', { 
+      entidad_id: id, 
+      entidad_nombre: titulo,
+      campo: 'estado',
+      valor_anterior: 'pendiente',
+      valor_nuevo: 'completada',
+      descripcion: `Actividad completada: ${titulo}` 
+    }),
+  
+  eliminar: (id: string, titulo: string) => 
+    logAudit('actividad', 'eliminar', { 
+      entidad_id: id, 
+      entidad_nombre: titulo, 
+      descripcion: `Actividad eliminada: ${titulo}` 
     }),
 };
 

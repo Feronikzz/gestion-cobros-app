@@ -9,6 +9,7 @@ import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import { useCobros } from '@/lib/hooks/use-cobros';
 import type { Cliente, ClienteInsert, EstadoProcedimiento } from '@/lib/supabase/types';
 import { createClient } from '@/lib/supabase/client';
+import { auditProcedimiento, auditCobro } from '@/lib/audit';
 import Link from 'next/link';
 import { Eye, Edit, Trash2, UserPlus, Users, TrendingUp, Calendar, Search, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, ArrowUpDown, Archive } from 'lucide-react';
 
@@ -134,6 +135,7 @@ export default function ClientesPage() {
           const supabase = createClient();
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
+            const clienteNombre = [data.nombre, (data as any).apellido1 || (data as any).apellidos].filter(Boolean).join(' ');
             const { data: newProc } = await supabase.from('procedimientos').insert({
               ...proc,
               cliente_id: newCliente.id,
@@ -145,9 +147,15 @@ export default function ClientesPage() {
               fecha_resolucion: null,
               notas: null,
             }).select().single();
+            
+            // Auditoría: nuevo expediente
+            if (newProc) {
+              await auditProcedimiento.crear(newProc.id, newProc.titulo, clienteNombre);
+            }
+            
             // Si tiene entrada, crear cobro automático
             if (newProc && proc.tiene_entrada && proc.importe_entrada > 0) {
-              await supabase.from('cobros').insert({
+              const { data: newCobro } = await supabase.from('cobros').insert({
                 user_id: user.id,
                 cliente_id: newCliente.id,
                 procedimiento_id: newProc.id,
@@ -157,7 +165,8 @@ export default function ClientesPage() {
                 notas: `Entrada del procedimiento: ${proc.titulo}`,
                 iva_tipo: 'iva_incluido',
                 iva_porcentaje: 21,
-              });
+              }).select().single();
+              if (newCobro) await auditCobro.crear(newCobro.id, proc.importe_entrada, clienteNombre, 'efectivo');
             }
           }
         }

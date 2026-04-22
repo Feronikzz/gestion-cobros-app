@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { logAudit } from '@/lib/audit';
+import { auditActividad } from '@/lib/audit';
 import type { Actividad, ActividadInsert, ActividadUpdate } from '@/lib/supabase/types';
 
 export function useActividades(clienteId?: string) {
@@ -47,17 +47,29 @@ export function useActividades(clienteId?: string) {
     await fetchActividades();
     
     // Auditoría
-    await logAudit('actividad', 'crear', {
-      descripcion: `Nueva actividad: ${data.titulo}`,
-      valor_nuevo: data
-    });
+    const acts = await supabase.from('actividades').select('id').order('created_at', { ascending: false }).limit(1);
+    const newId = acts.data?.[0]?.id || '';
+    await auditActividad.crear(newId, data.titulo || 'Sin título');
   };
 
   const updateActividad = async (id: string, data: ActividadUpdate) => {
     if (!supabase) return;
+    const actAnterior = actividades.find(a => a.id === id);
     const { error: err } = await supabase.from('actividades').update(data).eq('id', id);
     if (err) throw err;
     await fetchActividades();
+    
+    // Auditoría: detectar cambios
+    if (actAnterior) {
+      const campos = Object.keys(data) as Array<keyof ActividadUpdate>;
+      for (const campo of campos) {
+        const anterior = actAnterior[campo as keyof Actividad];
+        const nuevo = data[campo];
+        if (anterior !== nuevo) {
+          await auditActividad.actualizar(id, actAnterior.titulo || 'Sin título', String(campo), anterior, nuevo);
+        }
+      }
+    }
   };
 
   const deleteActividad = async (id: string) => {
@@ -68,11 +80,7 @@ export function useActividades(clienteId?: string) {
     await fetchActividades();
     
     // Auditoría
-    await logAudit('actividad', 'eliminar', {
-      entidad_id: id,
-      entidad_nombre: actividad?.titulo,
-      descripcion: `Actividad eliminada: ${actividad?.titulo}`
-    });
+    await auditActividad.eliminar(id, actividad?.titulo || 'Sin título');
   };
 
   const completeActividad = async (id: string, resultado?: string) => {
@@ -86,14 +94,7 @@ export function useActividades(clienteId?: string) {
     await fetchActividades();
     
     // Auditoría
-    await logAudit('actividad', 'actualizar', {
-      entidad_id: id,
-      entidad_nombre: actividad?.titulo,
-      campo: 'estado',
-      valor_anterior: 'pendiente',
-      valor_nuevo: 'completada',
-      descripcion: `Actividad completada: ${actividad?.titulo}`
-    });
+    await auditActividad.completar(id, actividad?.titulo || 'Sin título');
   };
 
   // Estadísticas

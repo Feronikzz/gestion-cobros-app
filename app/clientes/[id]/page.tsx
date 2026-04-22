@@ -25,6 +25,7 @@ import { FileDropZone } from '@/components/file-drop-zone';
 import { FileManager } from '@/components/file-manager';
 import { useActividades } from '@/lib/hooks/use-actividades';
 import { useRecibis } from '@/lib/hooks/use-recibis';
+import { auditProcedimiento, auditCobro } from '@/lib/audit';
 import type { Actividad, Recibi, RecibiInsert, ClienteInsert, ClienteUpdate } from '@/lib/supabase/types';
 
 export default function ClienteDetallePage() {
@@ -160,6 +161,8 @@ export default function ClienteDetallePage() {
       user_id: user.id,
     };
 
+    const clienteNombre = [cliente?.nombre, cliente?.apellido1 || cliente?.apellidos].filter(Boolean).join(' ');
+
     if (editingProc) {
       const { cliente_id, user_id, ...updates } = payload;
       // Filtrar campos undefined para evitar errores 400
@@ -174,9 +177,17 @@ export default function ClienteDetallePage() {
         return;
       }
       
+      // Auditoría: detectar cambios en el procedimiento
+      for (const [campo, nuevo] of Object.entries(cleanUpdates)) {
+        const anterior = (editingProc as any)[campo];
+        if (anterior !== nuevo) {
+          await auditProcedimiento.actualizar(editingProc.id, formData.titulo || editingProc.titulo, campo, anterior, nuevo);
+        }
+      }
+      
       // Si se añade entrada en edición y no existía antes, crear cobro
       if (formData.tiene_entrada && formData.importe_entrada > 0 && !editingProc.tiene_entrada) {
-        await supabase.from('cobros').insert({
+        const { data: newCobro } = await supabase.from('cobros').insert({
           user_id: user.id,
           cliente_id: id,
           procedimiento_id: editingProc.id,
@@ -186,14 +197,20 @@ export default function ClienteDetallePage() {
           notas: `Entrada del procedimiento: ${formData.titulo}`,
           iva_tipo: 'iva_incluido',
           iva_porcentaje: 21,
-        });
+        }).select().single();
+        if (newCobro) await auditCobro.crear(newCobro.id, formData.importe_entrada, clienteNombre, 'efectivo');
       }
     } else {
       const { data: newProc } = await supabase.from('procedimientos').insert(payload).select().single();
       
+      // Auditoría: nuevo expediente
+      if (newProc) {
+        await auditProcedimiento.crear(newProc.id, newProc.titulo, clienteNombre);
+      }
+      
       // Si tiene entrada, crear cobro automáticamente
       if (newProc && formData.tiene_entrada && formData.importe_entrada > 0) {
-        await supabase.from('cobros').insert({
+        const { data: newCobro } = await supabase.from('cobros').insert({
           user_id: user.id,
           cliente_id: id,
           procedimiento_id: newProc.id,
@@ -203,7 +220,8 @@ export default function ClienteDetallePage() {
           notas: `Entrada del procedimiento: ${formData.titulo}`,
           iva_tipo: 'iva_incluido',
           iva_porcentaje: 21,
-        });
+        }).select().single();
+        if (newCobro) await auditCobro.crear(newCobro.id, formData.importe_entrada, clienteNombre, 'efectivo');
       }
     }
     setShowProcModal(false);
@@ -336,7 +354,11 @@ export default function ClienteDetallePage() {
     if (!window.confirm('¿Eliminar este procedimiento?')) return;
     if (!supabase) return;
     
+    const proc = procedimientos.find(p => p.id === procId);
     await supabase.from('procedimientos').delete().eq('id', procId);
+    
+    // Auditoría
+    await auditProcedimiento.eliminar(procId, proc?.titulo || 'Expediente desconocido');
     fetchData();
   };
 
@@ -346,10 +368,20 @@ export default function ClienteDetallePage() {
     
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    const clienteNombre = [cliente?.nombre, cliente?.apellido1 || cliente?.apellidos].filter(Boolean).join(' ');
+    
     if (editingCobro) {
       await supabase.from('cobros').update(data).eq('id', editingCobro.id);
+      // Auditoría: detectar cambios
+      for (const [campo, nuevo] of Object.entries(data)) {
+        const anterior = (editingCobro as any)[campo];
+        if (anterior !== nuevo) {
+          await auditCobro.actualizar(editingCobro.id, editingCobro.importe, clienteNombre, campo, anterior, nuevo);
+        }
+      }
     } else {
-      await supabase.from('cobros').insert({ ...data, user_id: user.id });
+      const { data: newCobro } = await supabase.from('cobros').insert({ ...data, user_id: user.id }).select().single();
+      if (newCobro) await auditCobro.crear(newCobro.id, newCobro.importe, clienteNombre, newCobro.metodo_pago);
     }
     setShowCobroModal(false);
     setEditingCobro(null);
@@ -360,7 +392,12 @@ export default function ClienteDetallePage() {
     if (!window.confirm('¿Eliminar este cobro?')) return;
     if (!supabase) return;
     
+    const cobro = cobros.find(c => c.id === cobroId);
+    const clienteNombre = [cliente?.nombre, cliente?.apellido1 || cliente?.apellidos].filter(Boolean).join(' ');
     await supabase.from('cobros').delete().eq('id', cobroId);
+    
+    // Auditoría
+    await auditCobro.eliminar(cobroId, cobro?.importe || 0, clienteNombre);
     fetchData();
   };
 

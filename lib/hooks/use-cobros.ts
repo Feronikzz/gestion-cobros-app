@@ -13,6 +13,14 @@ export function useCobros() {
   // Solo crear el cliente de Supabase en el cliente
   const supabase = typeof window !== 'undefined' ? createClient() : null;
 
+  // Caché de nombres de clientes para auditoría
+  const getClienteNombre = async (clienteId: string): Promise<string> => {
+    if (!supabase || !clienteId) return 'Desconocido';
+    const { data } = await supabase.from('clientes').select('nombre, apellido1, apellidos').eq('id', clienteId).single();
+    if (!data) return 'Desconocido';
+    return [data.nombre, data.apellido1 || data.apellidos].filter(Boolean).join(' ');
+  };
+
   const fetchCobros = async () => {
     if (!supabase) return;
     
@@ -51,8 +59,9 @@ export function useCobros() {
       
       setCobros(prev => [data, ...prev]);
       
-      // Auditoría
-      await auditCobro.crear(data.id, data.importe, '');
+      // Auditoría con nombre del cliente
+      const clienteNombre = await getClienteNombre(data.cliente_id);
+      await auditCobro.crear(data.id, data.importe, clienteNombre, data.metodo_pago);
       
       return data;
     } catch (error: any) {
@@ -64,6 +73,8 @@ export function useCobros() {
     if (!supabase) throw new Error('Supabase client no disponible');
     
     try {
+      const cobroAnterior = cobros.find(c => c.id === id);
+      
       const { data, error } = await supabase
         .from('cobros')
         .update(updates)
@@ -74,6 +85,20 @@ export function useCobros() {
       if (error) throw error;
       
       setCobros(prev => prev.map(c => c.id === id ? data : c));
+      
+      // Auditoría: detectar cambios
+      if (cobroAnterior) {
+        const clienteNombre = await getClienteNombre(data.cliente_id);
+        const campos = Object.keys(updates) as Array<keyof Cobro>;
+        for (const campo of campos) {
+          const anterior = cobroAnterior[campo];
+          const nuevo = updates[campo];
+          if (anterior !== nuevo) {
+            await auditCobro.actualizar(id, data.importe, clienteNombre, String(campo), anterior, nuevo);
+          }
+        }
+      }
+      
       return data;
     } catch (error: any) {
       throw new Error(error.message || 'Error al actualizar cobro');
@@ -95,8 +120,9 @@ export function useCobros() {
       
       setCobros(prev => prev.filter(c => c.id !== id));
       
-      // Auditoría
-      await auditCobro.eliminar(id, cobro?.importe || 0, '');
+      // Auditoría con nombre del cliente
+      const clienteNombre = cobro ? await getClienteNombre(cobro.cliente_id) : 'Desconocido';
+      await auditCobro.eliminar(id, cobro?.importe || 0, clienteNombre);
     } catch (error: any) {
       throw new Error(error.message || 'Error al eliminar cobro');
     }

@@ -90,6 +90,8 @@ export function useGastos() {
     if (!supabase) throw new Error('Supabase client no disponible');
     
     try {
+      const gastoAnterior = gastos.find(g => g.id === id);
+      
       const { data, error: updateError } = await supabase
         .from('gastos')
         .update(updates)
@@ -100,6 +102,20 @@ export function useGastos() {
       if (updateError) throw updateError;
 
       setGastos(prev => prev.map(g => g.id === id ? data : g));
+      
+      // Auditoría: detectar cambios
+      if (gastoAnterior) {
+        const concepto = data.conceptos?.join(', ') || gastoAnterior.conceptos?.join(', ') || '';
+        const campos = Object.keys(updates) as Array<keyof typeof updates>;
+        for (const campo of campos) {
+          const anterior = gastoAnterior[campo as keyof Gasto];
+          const nuevo = updates[campo];
+          if (anterior !== nuevo) {
+            await auditGasto.actualizar(id, concepto, String(campo), anterior, nuevo);
+          }
+        }
+      }
+      
       return data;
     } catch (err: any) {
       setError(err.message);
