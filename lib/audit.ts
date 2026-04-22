@@ -48,7 +48,10 @@ export async function logAudit(
       user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
     };
 
-    await sb.from('audit_log').insert(insert);
+    const { error } = await sb.from('audit_log').insert(insert);
+    if (error) {
+      console.error('Error inserting audit log:', error.message, error.details, error.hint);
+    }
   } catch (err) {
     console.error('Error logging audit:', err);
   }
@@ -281,8 +284,8 @@ export async function getAuditLog(filtros: FiltrosAudit = {}): Promise<AuditLog[
   const { data, error } = await query;
   
   if (error) {
-    console.error('Error fetching audit log:', error);
-    return [];
+    console.error('Error fetching audit log:', error.message, error.details, error.hint, error.code);
+    throw new Error(`Error al cargar historial: ${error.message}`);
   }
 
   return data || [];
