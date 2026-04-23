@@ -5,6 +5,7 @@ import type { Cliente, ClienteInsert, EstadoProcedimiento } from '@/lib/supabase
 import { formatField } from '@/lib/utils/text';
 import { usePerfilRepresentante } from '@/lib/hooks/use-perfil-representante';
 import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 import { User, FileText, Plus, Trash2, ChevronDown, ChevronUp, FileSignature, Download, Save, RefreshCw, Upload, CheckCircle, X, Loader2, Printer } from 'lucide-react';
 
 // Documento de identidad en formulario (antes de guardar en BD)
@@ -375,7 +376,7 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
       setSignedFile(null);
     } catch (error: any) {
       console.error('Error subiendo designación firmada:', error);
-      alert('Error al subir: ' + error.message);
+      toast.error('Error al subir: ' + error.message);
     } finally {
       setUploadingSigned(false);
     }

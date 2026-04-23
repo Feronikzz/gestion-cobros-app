@@ -8,6 +8,8 @@ import { useFacturas } from '@/lib/hooks/use-facturas';
 import { useClientes } from '@/lib/hooks/use-clientes';
 import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import { eur } from '@/lib/utils';
+import { toast } from 'sonner';
+import Loading from '@/app/loading';
 import type { TipoFactura, FacturaLinea, Factura } from '@/lib/supabase/types';
 import { Plus, Trash2, Settings, FileText, Copy, Eye, Download } from 'lucide-react';
 
@@ -88,7 +90,7 @@ export function FacturasPageContent() {
             .single();
           
           if (facturaExistente) {
-            alert('Ya existe una factura para este cobro. No se puede crear otra factura.');
+            toast.warning('Ya existe una factura para este cobro. No se puede crear otra factura.');
             return;
           }
         }
@@ -211,7 +213,7 @@ export function FacturasPageContent() {
 
   const handleCreateFactura = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!emisor) { alert('Configura primero los datos del emisor'); return; }
+    if (!emisor) { toast.warning('Configura primero los datos del emisor'); return; }
 
     await createFactura({
       numero: nextNumero(),
@@ -276,7 +278,7 @@ export function FacturasPageContent() {
     no_contable: 'No contable',
   };
 
-  if (loading) return <LayoutShell title="Facturas"><div className="loading-state">Cargando...</div></LayoutShell>;
+  if (loading) return <Loading />;
   if (error) return <LayoutShell title="Facturas"><div className="error-state">Error: {error}</div></LayoutShell>;
 
   return (

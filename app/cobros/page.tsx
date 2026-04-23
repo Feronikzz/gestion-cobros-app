@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { LayoutShell } from '@/components/layout-shell';
 import { CobroForm } from '@/components/cobro-form';
@@ -12,6 +12,10 @@ import type { Cobro } from '@/lib/supabase/types';
 import { eur } from '@/lib/utils';
 import { useHideSensitive } from '@/lib/hooks/use-hide-sensitive';
 import { SensitiveToggle } from '@/components/sensitive-toggle';
+import { useDebounce } from '@/lib/hooks/use-debounce';
+import { usePagination } from '@/lib/hooks/use-pagination';
+import { getDisambiguatedClientNames } from '@/lib/utils/format-cliente';
+import Loading from '@/app/loading';
 import { CheckCircle, AlertCircle, Plus, FileText, DollarSign, Edit3, Trash2, Search, Filter, ChevronDown, ChevronUp, X, Users, CreditCard, Calendar, TrendingUp, Eye, ChevronLeft, ChevronRight } from 'lucide-react';
 
 export default function CobrosPage() {
@@ -25,6 +29,7 @@ export default function CobrosPage() {
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [filterCliente, setFilterCliente] = useState('');
   const [filterMetodo, setFilterMetodo] = useState('');
   const [filterTipo, setFilterTipo] = useState('');
@@ -38,16 +43,18 @@ export default function CobrosPage() {
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [itemsPerPage, setItemsPerPage] = usePagination('cobros', 20);
+
+  const clientNames = useMemo(() => getDisambiguatedClientNames(clientes), [clientes]);
 
   // Filtrado de cobros
   const filteredCobros = useMemo(() => {
     return cobros.filter(cobro => {
       // Búsqueda por texto
-      const searchMatch = !searchTerm || 
-        getClienteNombre(cobro.cliente_id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (cobro.notas && cobro.notas.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (cobro.procedimiento_id && getProcedimientoTitulo(cobro.procedimiento_id).toLowerCase().includes(searchTerm.toLowerCase()));
+      const searchMatch = !debouncedSearchTerm || 
+        (clientNames[cobro.cliente_id] || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        (cobro.notas && cobro.notas.toLowerCase().includes(debouncedSearchTerm.toLowerCase())) ||
+        (cobro.procedimiento_id && getProcedimientoTitulo(cobro.procedimiento_id).toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
 
       // Filtro por cliente
       const clienteMatch = !filterCliente || cobro.cliente_id === filterCliente;
@@ -70,7 +77,7 @@ export default function CobrosPage() {
 
       return searchMatch && clienteMatch && metodoMatch && tipoMatch && mesMatch && desdeMatch && hastaMatch;
     });
-  }, [cobros, searchTerm, filterCliente, filterMetodo, filterTipo, filterMes, filterFechaDesde, filterFechaHasta]);
+  }, [cobros, debouncedSearchTerm, filterCliente, filterMetodo, filterTipo, filterMes, filterFechaDesde, filterFechaHasta]);
 
   // Calcular total de cobros filtrados
   const totalCobradoFiltrado = useMemo(() => {
@@ -128,7 +135,7 @@ export default function CobrosPage() {
   };
 
   // Reset página al cambiar filtros
-  useMemo(() => {
+  useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, filterCliente, filterMetodo, filterTipo, filterMes, filterFechaDesde, filterFechaHasta]);
 
@@ -247,15 +254,7 @@ export default function CobrosPage() {
     window.open(`/facturas?${params.toString()}`, '_blank');
   };
 
-  if (loading) {
-    return (
-      <LayoutShell title="Cobros">
-        <div className="flex justify-center items-center h-64">
-          <div className="text-gray-500">Cargando cobros...</div>
-        </div>
-      </LayoutShell>
-    );
-  }
+  if (loading) return <Loading />;
 
   if (error) {
     return (
@@ -602,7 +601,7 @@ export default function CobrosPage() {
                       className="font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors"
                       title="Ver detalles del cliente"
                     >
-                      {getClienteNombre(cobro.cliente_id)}
+                      {clientNames[cobro.cliente_id] || getClienteNombre(cobro.cliente_id)}
                     </button>
                   </td>
                   <td>

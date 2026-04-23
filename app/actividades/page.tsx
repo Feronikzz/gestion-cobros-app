@@ -14,6 +14,9 @@ import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
 import type { Actividad, ActividadInsert, Cliente } from '@/lib/supabase/types';
 import { Plus, Activity, Clock, AlertTriangle, Calendar, Users, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
+import { getDisambiguatedClientNames } from '@/lib/utils/format-cliente';
+import { StatsAccordion } from '@/components/stats-accordion';
+import Loading from '@/app/loading';
 
 export default function ActividadesPage() {
   const { actividades, loading, createActividad, updateActividad, deleteActividad, completeActividad, stats, refetch } = useActividades();
@@ -28,12 +31,8 @@ export default function ActividadesPage() {
   // Completion workflow
   const [completingActividad, setCompletingActividad] = useState<Actividad | null>(null);
 
-  // Derivar nombres y contactos de clientes
-  const clienteNombres = useMemo(() => {
-    const map: Record<string, string> = {};
-    clientes.forEach(c => { map[c.id] = [c.nombre, c.apellido1, c.apellido2].filter(Boolean).join(' ') || [c.nombre, c.apellidos].filter(Boolean).join(' '); });
-    return map;
-  }, [clientes]);
+  // Derivar nombres desambiguados y contactos de clientes
+  const clienteNombres = useMemo(() => getDisambiguatedClientNames(clientes), [clientes]);
 
   const clienteContactos = useMemo(() => {
     const map: Record<string, { telefono?: string | null; telefono2?: string | null; email?: string | null; direccion?: string | null }> = {};
@@ -43,7 +42,7 @@ export default function ActividadesPage() {
     return map;
   }, [clientes]);
 
-  if (loading) return <LayoutShell title="Actividades"><div className="loading-state">Cargando actividades...</div></LayoutShell>;
+  if (loading) return <Loading />;
 
   return (
     <LayoutShell
@@ -63,44 +62,46 @@ export default function ActividadesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-5 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-blue-100 text-sm font-medium">Total actividades</div>
-              <div className="text-2xl font-bold">{actividades.length}</div>
+      <StatsAccordion title="Resumen de Actividades">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-5 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-blue-100 text-sm font-medium">Total actividades</div>
+                <div className="text-2xl font-bold">{actividades.length}</div>
+              </div>
+              <Activity className="w-8 h-8 text-white/50" />
             </div>
-            <Activity className="w-8 h-8 text-white/50" />
+          </div>
+          <div className="bg-gradient-to-r from-yellow-500 to-amber-600 rounded-xl p-5 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-yellow-100 text-sm font-medium">Pendientes</div>
+                <div className="text-2xl font-bold">{stats.pendientes}</div>
+              </div>
+              <Clock className="w-8 h-8 text-white/50" />
+            </div>
+          </div>
+          <div className="bg-gradient-to-r from-red-500 to-rose-600 rounded-xl p-5 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-red-100 text-sm font-medium">Vencidas</div>
+                <div className="text-2xl font-bold">{stats.vencidas}</div>
+              </div>
+              <AlertTriangle className="w-8 h-8 text-white/50" />
+            </div>
+          </div>
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-green-100 text-sm font-medium">Para hoy</div>
+                <div className="text-2xl font-bold">{stats.hoy}</div>
+              </div>
+              <Calendar className="w-8 h-8 text-white/50" />
+            </div>
           </div>
         </div>
-        <div className="bg-gradient-to-r from-yellow-500 to-amber-600 rounded-xl p-5 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-yellow-100 text-sm font-medium">Pendientes</div>
-              <div className="text-2xl font-bold">{stats.pendientes}</div>
-            </div>
-            <Clock className="w-8 h-8 text-white/50" />
-          </div>
-        </div>
-        <div className="bg-gradient-to-r from-red-500 to-rose-600 rounded-xl p-5 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-red-100 text-sm font-medium">Vencidas</div>
-              <div className="text-2xl font-bold">{stats.vencidas}</div>
-            </div>
-            <AlertTriangle className="w-8 h-8 text-white/50" />
-          </div>
-        </div>
-        <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-5 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-green-100 text-sm font-medium">Para hoy</div>
-              <div className="text-2xl font-bold">{stats.hoy}</div>
-            </div>
-            <Calendar className="w-8 h-8 text-white/50" />
-          </div>
-        </div>
-      </div>
+      </StatsAccordion>
 
       {/* Timeline */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">

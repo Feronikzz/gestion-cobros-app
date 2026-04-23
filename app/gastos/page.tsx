@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { LayoutShell } from '@/components/layout-shell';
+import { toast } from 'sonner';
 import { GastoForm } from '@/components/gasto-form';
 import { Modal } from '@/components/modal';
 import { useGastos } from '@/lib/hooks/use-gastos';
@@ -9,6 +10,7 @@ import type { Gasto } from '@/lib/supabase/types';
 import { eur, monthLabel } from '@/lib/utils';
 import { useHideSensitive } from '@/lib/hooks/use-hide-sensitive';
 import { SensitiveToggle } from '@/components/sensitive-toggle';
+import { StatsAccordion } from '@/components/stats-accordion';
 import { FileText, Download, Eye, Edit, Trash2, Receipt, TrendingUp, TrendingDown, Calendar, DollarSign, ShoppingCart, Building, Zap, Car, Phone, Mail, CreditCard, Search, Filter, ChevronDown, X, Copy, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function GastosPage() {
@@ -18,7 +20,10 @@ export default function GastosPage() {
   const [editingGasto, setEditingGasto] = useState<Gasto | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('');
-  const [mesFilter, setMesFilter] = useState('');
+  const [mesFilter, setMesFilter] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [showFilters, setShowFilters] = useState(false);
   const [showCategoriaFilter, setShowCategoriaFilter] = useState(false);
   const [showMesFilter, setShowMesFilter] = useState(false);
@@ -174,9 +179,9 @@ export default function GastosPage() {
       
       // Mostrar error más detallado
       if (error instanceof Error) {
-        alert(`Error al guardar el gasto: ${error.message}`);
+        toast.error(`Error al guardar el gasto: ${error.message}`);
       } else {
-        alert('Error inesperado al guardar el gasto. Por favor, revisa la consola para más detalles.');
+        toast.error('Error inesperado al guardar el gasto. Por favor, revisa la consola para más detalles.');
       }
     }
   };
@@ -277,30 +282,32 @@ export default function GastosPage() {
       </div>
 
       {/* Estadísticas de Gastos */}
-      <div className="dashboard-metrics" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 'var(--space-lg)' }}>
-        <div className="metric-card metric-red">
-          <TrendingDown className="metric-icon" />
-          <div>
-            <p className="metric-label">Gasto este mes</p>
-            <p className="metric-value">{mask(eur(calcularGastoMesActual()))}</p>
+      <StatsAccordion title="Resumen de Gastos">
+        <div className="dashboard-metrics" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 'var(--space-lg)' }}>
+          <div className="metric-card metric-red">
+            <TrendingDown className="metric-icon" />
+            <div>
+              <p className="metric-label">Gasto este mes</p>
+              <p className="metric-value">{mask(eur(calcularGastoMesActual()))}</p>
+            </div>
           </div>
-        </div>
-        <div className="metric-card metric-blue">
-          <Calendar className="metric-icon" />
-          <div>
-            <p className="metric-label">Media mensual</p>
-            <p className="metric-value">{mask(eur(calcularGastoMensualMedio()))}</p>
+          <div className="metric-card metric-blue">
+            <Calendar className="metric-icon" />
+            <div>
+              <p className="metric-label">Media mensual</p>
+              <p className="metric-value">{mask(eur(calcularGastoMensualMedio()))}</p>
+            </div>
           </div>
-        </div>
-        <div className="metric-card metric-purple">
-          <ShoppingCart className="metric-icon" />
-          <div>
-            <p className="metric-label">Categoría top</p>
-            <p className="metric-value" style={{ fontSize: '0.9rem' }}>{getCategoriaMasGastada().categoria || '—'}</p>
+          <div className="metric-card metric-purple">
+            <ShoppingCart className="metric-icon" />
+            <div>
+              <p className="metric-label">Categoría top</p>
+              <p className="metric-value" style={{ fontSize: '0.9rem' }}>{getCategoriaMasGastada().categoria || '—'}</p>
+            </div>
           </div>
+          <SensitiveToggle hidden={hideSensitive} onToggle={toggleSensitive} className="absolute top-2 right-2" />
         </div>
-        <SensitiveToggle hidden={hideSensitive} onToggle={toggleSensitive} className="absolute top-2 right-2" />
-      </div>
+      </StatsAccordion>
 
       {/* ── Panel gastos recurrentes pendientes ── */}
       {gastosRecurrentesPendientes.length > 0 && (

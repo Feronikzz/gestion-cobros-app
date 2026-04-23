@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Reparto } from '@/lib/supabase/types';
 
@@ -9,8 +9,7 @@ export function useRepartos() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Solo crear el cliente de Supabase en el cliente
-  const supabase = typeof window !== 'undefined' ? createClient() : null;
+  const supabase = useMemo(() => typeof window !== 'undefined' ? createClient() : null, []);
 
   const fetchRepartos = async () => {
     if (!supabase) return;

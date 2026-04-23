@@ -77,8 +77,8 @@ export function FileManager({ clienteId, clienteNombre, procedimientos = [] }: F
       if (listError) throw listError;
 
       const mapped: FileItem[] = (data || [])
-        .filter(item => item.name !== '.emptyFolderPlaceholder')
-        .map(item => ({
+        .filter((item: { name: string }) => item.name !== '.emptyFolderPlaceholder')
+        .map((item: { name: string; id: string | null; metadata?: Record<string, unknown>; created_at: string; updated_at: string }) => ({
           name: item.name,
           id: item.id,
           type: item.id === null ? 'folder' : 'file',

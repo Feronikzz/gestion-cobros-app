@@ -7,6 +7,7 @@ import { eur } from '@/lib/utils';
 import { useHideSensitive } from '@/lib/hooks/use-hide-sensitive';
 import { SensitiveToggle } from '@/components/sensitive-toggle';
 import { Lock, Unlock, TrendingUp, TrendingDown, DollarSign, Calendar } from 'lucide-react';
+import Loading from '@/app/loading';
 
 export default function CierrePage() {
   const { cierres, summary, loading, error, createCierre } = useCierreMensual();
@@ -42,7 +43,7 @@ export default function CierrePage() {
     }
   };
 
-  if (loading) return <LayoutShell title="Cierre mensual"><div className="loading-state">Calculando cierres...</div></LayoutShell>;
+  if (loading) return <Loading />;
   if (error) return <LayoutShell title="Cierre mensual"><div className="error-state">Error: {error}</div></LayoutShell>;
 
   return (

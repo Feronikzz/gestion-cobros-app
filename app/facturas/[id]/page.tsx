@@ -6,6 +6,7 @@ import { LayoutShell } from '@/components/layout-shell';
 import { createClient } from '@/lib/supabase/client';
 import { eur } from '@/lib/utils';
 import type { Factura } from '@/lib/supabase/types';
+import { toast } from 'sonner';
 import { ArrowLeft, Printer, Download, FileText, Building2, User, Calendar } from 'lucide-react';
 
 export default function FacturaViewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -54,7 +55,7 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
       // Crear una nueva ventana con el contenido de la factura
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
-        alert('No se pudo abrir la ventana de impresión. Por favor, permite las ventanas emergentes.');
+        toast.error('No se pudo abrir la ventana de impresión. Por favor, permite las ventanas emergentes.');
         return;
       }
 
@@ -88,7 +89,7 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
       };
     } catch (error) {
       console.error('Error al descargar factura:', error);
-      alert('Error al generar la factura para descargar');
+      toast.error('Error al generar la factura para descargar');
     }
   };
 

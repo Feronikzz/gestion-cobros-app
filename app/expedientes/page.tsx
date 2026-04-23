@@ -10,10 +10,17 @@ import {
   type ProcedimientoCatalogo,
   CATEGORIA_LABELS
 } from '@/lib/catalogo-procedimientos';
+import { getDisambiguatedClientNames } from '@/lib/utils/format-cliente';
 import { eur } from '@/lib/utils';
+import { useDebounce } from '@/lib/hooks/use-debounce';
 import { useHideSensitive } from '@/lib/hooks/use-hide-sensitive';
 import { SensitiveToggle } from '@/components/sensitive-toggle';
+import { usePagination } from '@/lib/hooks/use-pagination';
+import Loading from '@/app/loading';
+import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
+import { useClientes } from '@/lib/hooks/use-clientes';
+import { StatsAccordion } from '@/components/stats-accordion';
 import type { EstadoProcedimiento, CategoriaProcedimiento, Procedimiento, Cliente } from '@/lib/supabase/types';
 
 // Tipo para expedientes con cliente
@@ -54,8 +61,10 @@ export default function ExpedientesPage() {
   const router = useRouter();
   const supabase = createClient();
   const { expedientes, loading, error, stats, filtrarPorEstado, filtrarPorCliente, filtrarPorPagado, refetch } = useExpedientes();
+  const { clientes } = useClientes();
   
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [estadoFilter, setEstadoFilter] = useState('todos');
   const [pagadoFilter, setPagadoFilter] = useState('todos');
   const { hidden: hideSensitive, toggle: toggleSensitive, mask } = useHideSensitive();
@@ -85,7 +94,7 @@ export default function ExpedientesPage() {
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [itemsPerPage, setItemsPerPage] = usePagination('expedientes', 20);
   
   // Estados para modal de expediente
   const [showExpedienteModal, setShowExpedienteModal] = useState(false);
@@ -97,7 +106,10 @@ export default function ExpedientesPage() {
   const [catalogo, setCatalogo] = useState<ProcedimientoCatalogo[]>([]);
   const [categoriasLabels, setCategoriasLabels] = useState<Record<string, string>>(CATEGORIA_LABELS);
   const [catalogoLoading, setCatalogoLoading] = useState(true);
-  
+
+  // Nombres acortados de clientes para toda la base de expedientes
+  const clientNames = useMemo(() => getDisambiguatedClientNames(clientes), [clientes]);
+
   // Cargar catálogo al montar
   useEffect(() => {
     const loadCatalogo = async () => {
@@ -181,12 +193,18 @@ export default function ExpedientesPage() {
   // Aplicar filtros
   const filteredExpedientes = useMemo(() => {
     return expedientes.filter(expediente => {
+      // Extraer datos completos del cliente si existen
+      const clienteCompleto = clientes.find(c => c.id === expediente.cliente_id);
+      const textoCliente = clienteCompleto 
+        ? `${clienteCompleto.nombre} ${clienteCompleto.apellido1 || ''} ${clienteCompleto.apellido2 || ''} ${clienteCompleto.apellidos || ''}`.toLowerCase()
+        : expediente.cliente.nombre.toLowerCase();
+
       // Búsqueda por texto (cliente, título, concepto, referencia)
-      const searchMatch = !searchTerm || 
-        expediente.cliente.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        expediente.titulo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        expediente.concepto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (expediente.expediente_referencia && expediente.expediente_referencia.toLowerCase().includes(searchTerm.toLowerCase()));
+      const searchMatch = !debouncedSearchTerm || 
+        textoCliente.includes(debouncedSearchTerm.toLowerCase()) ||
+        expediente.titulo.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        expediente.concepto.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        (expediente.expediente_referencia && expediente.expediente_referencia.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
 
       // Filtro de estado
       const estadoMatch = estadoFilter === 'todos' || expediente.estado === estadoFilter;
@@ -221,7 +239,7 @@ export default function ExpedientesPage() {
 
       return searchMatch && estadoMatch && pagadoMatch && categoriaMatch && tituloMatch && docsMatch && docBusquedaMatch;
     });
-  }, [expedientes, searchTerm, estadoFilter, pagadoFilter, categoriaFilter, tituloFilter, docsFilter, docBusqueda]);
+  }, [expedientes, debouncedSearchTerm, estadoFilter, pagadoFilter, categoriaFilter, tituloFilter, docsFilter, docBusqueda]);
 
   // Expedientes paginados
   const paginatedExpedientes = useMemo(() => {
@@ -234,7 +252,7 @@ export default function ExpedientesPage() {
   // Reset página al cambiar filtros
   useMemo(() => {
     setCurrentPage(1);
-  }, [searchTerm, estadoFilter, pagadoFilter, categoriaFilter, tituloFilter, docsFilter, docBusqueda]);
+  }, [debouncedSearchTerm, estadoFilter, pagadoFilter, categoriaFilter, tituloFilter, docsFilter, docBusqueda]);
 
   // Estado labels y badges
   const estadoLabels: Record<EstadoProcedimiento, string> = {
@@ -379,7 +397,7 @@ export default function ExpedientesPage() {
       setExpedienteModalData(null);
       await refetch();
     } catch (err: any) {
-      alert('Error al guardar: ' + err.message);
+      toast.error('Error al guardar: ' + err.message);
     } finally {
       setSavingModal(false);
     }
@@ -391,7 +409,7 @@ export default function ExpedientesPage() {
     setModalForm({});
   };
 
-  if (loading) return <LayoutShell title="Expedientes"><div className="loading-state">Cargando expedientes...</div></LayoutShell>;
+  if (loading) return <Loading />;
   if (error) return <LayoutShell title="Expedientes"><div className="error-state">Error al cargar expedientes: {error}</div></LayoutShell>;
 
   return (
@@ -400,37 +418,39 @@ export default function ExpedientesPage() {
       description="Gestiona todos tus expedientes y procedimientos. Visualiza el estado de cada caso, seguimiento de pagos y acceso rápido a los detalles."
     >
       {/* ─── Métricas ── */}
-      <div className="dashboard-metrics">
-        <div className="metric-card metric-blue">
-          <FolderOpen className="metric-icon" />
-          <div>
-            <p className="metric-label">Total expedientes</p>
-            <p className="metric-value">{stats.total}</p>
+      <StatsAccordion title="Resumen y Estadísticas">
+        <div className="dashboard-metrics">
+          <div className="metric-card metric-blue">
+            <FolderOpen className="metric-icon" />
+            <div>
+              <p className="metric-label">Total expedientes</p>
+              <p className="metric-value">{stats.total}</p>
+            </div>
           </div>
-        </div>
-        <div className="metric-card metric-orange">
-          <Clock className="metric-icon" />
-          <div>
-            <p className="metric-label">En proceso</p>
-            <p className="metric-value">{stats.enProceso}</p>
+          <div className="metric-card metric-orange">
+            <Clock className="metric-icon" />
+            <div>
+              <p className="metric-label">En proceso</p>
+              <p className="metric-value">{stats.enProceso}</p>
+            </div>
           </div>
-        </div>
-        <div className="metric-card metric-green">
-          <CheckCircle className="metric-icon" />
-          <div>
-            <p className="metric-label">Cobrados completos</p>
-            <p className="metric-value">{stats.pagadosTotalmente}</p>
+          <div className="metric-card metric-green">
+            <CheckCircle className="metric-icon" />
+            <div>
+              <p className="metric-label">Cobrados completos</p>
+              <p className="metric-value">{stats.pagadosTotalmente}</p>
+            </div>
           </div>
-        </div>
-        <div className="metric-card metric-red">
-          <AlertCircle className="metric-icon" />
-          <div>
-            <p className="metric-label">Pendientes de pago</p>
-            <p className="metric-value">{stats.pendientesPago}</p>
+          <div className="metric-card metric-red">
+            <AlertCircle className="metric-icon" />
+            <div>
+              <p className="metric-label">Pendientes de pago</p>
+              <p className="metric-value">{stats.pendientesPago}</p>
+            </div>
           </div>
+          <SensitiveToggle hidden={hideSensitive} onToggle={toggleSensitive} className="absolute top-2 right-2" />
         </div>
-        <SensitiveToggle hidden={hideSensitive} onToggle={toggleSensitive} className="absolute top-2 right-2" />
-      </div>
+      </StatsAccordion>
 
       {/* ─── Búsqueda y Filtros ── */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
@@ -856,10 +876,10 @@ export default function ExpedientesPage() {
         <table className="table">
           <thead>
             <tr>
-              <th className="w-8">
+              <th className="w-8 sticky left-[0px] z-20 bg-[var(--color-surface-elevated)] !border-r !border-gray-200">
                 <button 
                   onClick={toggleSelectAll}
-                  className="p-1 hover:bg-gray-100 rounded"
+                  className="p-1 hover:bg-gray-200 rounded text-gray-500"
                   title={selectedIds.size === filteredExpedientes.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
                 >
                   {selectedIds.size === filteredExpedientes.length ? (
@@ -869,7 +889,7 @@ export default function ExpedientesPage() {
                   )}
                 </button>
               </th>
-              <th>Cliente</th>
+              <th className="sticky left-[48px] z-20 bg-[var(--color-surface-elevated)] !border-r !border-gray-200 shadow-[inset_-4px_0_4px_-4px_rgba(0,0,0,0.1)]">Cliente</th>
               <th>Expediente</th>
               <th>Docs</th>
               <th>Fecha presentación</th>
@@ -896,7 +916,7 @@ export default function ExpedientesPage() {
                 return (
                   <React.Fragment key={expediente.id}>
                     <tr className={`hover:bg-gray-50 cursor-pointer ${isSelected ? 'bg-blue-50/50' : ''} ${isExpanded ? 'border-b-0' : ''}`}>
-                      <td className="w-8" onClick={(e) => e.stopPropagation()}>
+                      <td className={`w-8 sticky left-[0px] z-10 !border-r !border-gray-200 ${isSelected ? 'bg-blue-50' : 'bg-white group-hover:bg-gray-50'}`} onClick={(e) => e.stopPropagation()}>
                         <button 
                           onClick={() => toggleSelect(expediente.id)}
                           className="p-1 hover:bg-gray-100 rounded"
@@ -908,12 +928,14 @@ export default function ExpedientesPage() {
                           )}
                         </button>
                       </td>
-                      <td onClick={() => openExpedienteModal(expediente)}>
+                      <td 
+                        className={`sticky left-[48px] z-10 !border-r !border-gray-200 shadow-[inset_-4px_0_4px_-4px_rgba(0,0,0,0.1)] ${isSelected ? 'bg-blue-50' : 'bg-white group-hover:bg-gray-50'}`}
+                        onClick={() => openExpedienteModal(expediente)}
+                      >
                         <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-gray-400" />
                           <div>
-                            <div className="font-medium">{expediente.cliente.nombre}</div>
-                            <div className="text-sm text-gray-500">{expediente.cliente.nif || '—'}</div>
+                            <div className="font-medium text-gray-900">{clientNames[expediente.cliente.id] || expediente.cliente.nombre}</div>
+                            <div className="text-xs text-gray-500">{expediente.cliente.nif || '—'}</div>
                           </div>
                         </div>
                       </td>
@@ -975,19 +997,18 @@ export default function ExpedientesPage() {
                         {hideSensitive ? (
                           <span className="text-gray-400 text-sm">******</span>
                         ) : (
-                          <div className="text-xs space-y-0.5">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-gray-500">Ppto:</span>
-                              <span className="font-medium text-gray-800">{eur(expediente.presupuesto)}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-gray-500">Cobrado:</span>
-                              <span className={expediente.total_cobrado > 0 ? 'font-medium text-green-600' : 'text-gray-400'}>{eur(expediente.total_cobrado)}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-gray-500">Pendiente:</span>
-                              <span className={expediente.total_pendiente > 0 ? 'font-medium text-red-600' : 'font-medium text-green-600'}>{eur(expediente.total_pendiente)}</span>
-                            </div>
+                          <div className="flex items-center justify-start">
+                            {expediente.total_pendiente <= 0 ? (
+                              <div className="flex items-center gap-1.5 text-green-600 bg-green-50 px-2.5 py-1.5 rounded-md" title="Pagado completamente">
+                                <CheckCircle className="w-4 h-4" />
+                                <span className="text-xs font-semibold">Pagado</span>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col">
+                                <span className="text-xs text-gray-500 mb-0.5">Pendiente</span>
+                                <span className="font-semibold text-red-600 text-sm">{eur(expediente.total_pendiente)}</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </td>

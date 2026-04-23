@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { CierreMensual, Cobro, Reparto } from '@/lib/supabase/types';
 
@@ -20,8 +20,7 @@ export function useCierreMensual() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Solo crear el cliente de Supabase en el cliente
-  const supabase = typeof window !== 'undefined' ? createClient() : null;
+  const supabase = useMemo(() => typeof window !== 'undefined' ? createClient() : null, []);
 
   const calculateMonthlySummary = async (months: string[], cobros: Cobro[], repartos: Reparto[]) => {
     const summary: MonthlySummary[] = [];

@@ -1,18 +1,16 @@
 'use client';
 import { createContext, useContext, useEffect, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import { User } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
+import type { User, SupabaseClient, Session, AuthChangeEvent } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Usa el singleton de client.ts en vez de crear otra instancia
+const supabase = createClient();
 
 interface SupabaseContextType {
   user: User | null;
   loading: boolean;
   signOut: () => Promise<void>;
-  supabase: any;
+  supabase: SupabaseClient;
 }
 
 const SupabaseContext = createContext<SupabaseContextType>({
@@ -28,7 +26,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });
@@ -36,7 +34,7 @@ export function SupabaseProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });

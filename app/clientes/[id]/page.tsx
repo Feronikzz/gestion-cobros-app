@@ -12,6 +12,7 @@ import { useHideSensitive } from '@/lib/hooks/use-hide-sensitive';
 import { SensitiveToggle } from '@/components/sensitive-toggle';
 import type { Cliente, Procedimiento, Cobro } from '@/lib/supabase/types';
 import type { Documento, EstadoProcedimiento } from '@/lib/supabase/types';
+import { toast } from 'sonner';
 import { ArrowLeft, Plus, Edit, Trash2, FileText, CreditCard, User, Paperclip, Upload, Receipt, Download, Activity, FileSignature, Printer, ChevronUp, ChevronDown, CheckSquare, Square, X, Eye, AlertTriangle, Info, ExternalLink } from 'lucide-react';
 import { formatField } from '@/lib/utils/text';
 import { ProcedimientoForm } from '@/components/procedimiento-form';
@@ -22,6 +23,7 @@ import { RecibiFormInline } from '@/components/recibi-form';
 import { ClienteFormV2 } from '@/components/cliente-form-v2';
 import { CarpetaLocalViewer } from '@/components/carpeta-local-viewer';
 import { FileDropZone } from '@/components/file-drop-zone';
+import Loading from '@/app/loading';
 import { FileManager } from '@/components/file-manager';
 import { useActividades } from '@/lib/hooks/use-actividades';
 import { useRecibis } from '@/lib/hooks/use-recibis';
@@ -102,7 +104,7 @@ export default function ClienteDetallePage() {
     setProcedimientos(procs || []);
     setCobros(cobs || []);
     setDocumentos(docs || []);
-    setDocsIdentidad((docsId || []).map(d => ({
+    setDocsIdentidad((docsId || []).map((d: { tipo: string; numero: string; fecha_expedicion: string; fecha_caducidad: string; es_principal: boolean }) => ({
       tipo: d.tipo, numero: d.numero,
       fecha_expedicion: d.fecha_expedicion || '',
       fecha_caducidad: d.fecha_caducidad || '',
@@ -173,7 +175,7 @@ export default function ClienteDetallePage() {
       const { error } = await supabase.from('procedimientos').update(cleanUpdates).eq('id', editingProc.id);
       if (error) {
         console.error('Error actualizando procedimiento:', error);
-        alert('Error al guardar: ' + error.message);
+        toast.error('Error al guardar: ' + error.message);
         return;
       }
       
@@ -286,7 +288,7 @@ export default function ClienteDetallePage() {
     }).eq('id', procedimientoId);
     
     if (actualizarEstado) {
-      alert('¡Documentación completa! Estado cambiado a "Pte. presentar"');
+      toast.success('¡Documentación completa! Estado cambiado a "Pte. presentar"');
     }
     
     fetchData();
@@ -442,7 +444,7 @@ export default function ClienteDetallePage() {
           console.error('Error al subir documento:', uploadError);
           // Si el bucket no existe, mostrar mensaje amigable
           if (uploadError.message?.includes('Bucket not found')) {
-            alert('El bucket de documentos no está configurado en Supabase. El documento se guardará sin archivo. Por favor, crea el bucket "documentos" en la configuración de Storage de Supabase.');
+            toast.warning('El bucket de documentos no está configurado en Supabase. El documento se guardará sin archivo.');
           } else {
             throw uploadError;
           }
@@ -455,7 +457,7 @@ export default function ClienteDetallePage() {
         }
       } catch (error) {
         console.error('Error completo al subir documento:', error);
-        alert('Error al subir el archivo. El documento se guardará sin archivo.');
+        toast.error('Error al subir el archivo. El documento se guardará sin archivo.');
       }
     }
 
@@ -483,7 +485,7 @@ export default function ClienteDetallePage() {
 
   const handleDownloadDoc = async (documento: Documento) => {
     if (!documento.archivo_url) {
-      alert('Este documento no tiene archivo adjunto.');
+      toast.info('Este documento no tiene archivo adjunto.');
       return;
     }
 
@@ -503,7 +505,7 @@ export default function ClienteDetallePage() {
       document.body.removeChild(link);
     } catch (error) {
       console.error('Error al descargar documento:', error);
-      alert('Error al descargar el documento. Por favor, inténtalo de nuevo.');
+      toast.error('Error al descargar el documento. Por favor, inténtalo de nuevo.');
     }
   };
 
@@ -511,7 +513,7 @@ export default function ClienteDetallePage() {
   const handleDownloadAllDocs = async (procId: string) => {
     const docs = docsForProc(procId).filter(d => d.archivo_url);
     if (docs.length === 0) {
-      alert('No hay archivos para descargar');
+      toast.info('No hay archivos para descargar');
       return;
     }
     
@@ -535,7 +537,7 @@ export default function ClienteDetallePage() {
     
     if (error) {
       console.error('Error renombrando documento:', error);
-      alert('Error al renombrar: ' + error.message);
+      toast.error('Error al renombrar: ' + error.message);
     } else {
       fetchData();
     }
@@ -587,7 +589,7 @@ export default function ClienteDetallePage() {
       fetchData();
     } catch (error) {
       console.error('Error subiendo archivos:', error);
-      alert('Error al subir archivos. Por favor, inténtalo de nuevo.');
+      toast.error('Error al subir archivos. Por favor, inténtalo de nuevo.');
     } finally {
       setUploadingFiles(false);
     }
@@ -617,7 +619,7 @@ export default function ClienteDetallePage() {
     return procedimiento.presupuesto - totalPagado;
   };
 
-  if (loading) return <LayoutShell title="Cliente"><div className="loading-state">Cargando...</div></LayoutShell>;
+  if (loading) return <Loading />;
   if (!cliente) return <LayoutShell title="Cliente"><div className="error-state">Cliente no encontrado</div></LayoutShell>;
 
   return (

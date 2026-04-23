@@ -42,6 +42,8 @@ import {
   GripVertical,
   Pencil
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useDebounce } from '@/lib/hooks/use-debounce';
 
 export default function CatalogoPage() {
   const [catalogo, setCatalogo] = useState<ProcedimientoCatalogo[]>([]);
@@ -50,6 +52,7 @@ export default function CatalogoPage() {
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [categoriaFilter, setCategoriaFilter] = useState<CategoriaProcedimiento | ''>('');
   
   // UI State
@@ -123,7 +126,7 @@ export default function CatalogoPage() {
   // Agrupar por categoría
   const catalogoPorCategoria = useMemo(() => {
     const filtered = catalogo.filter(p => {
-      const matchSearch = !searchTerm || p.titulo.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchSearch = !debouncedSearchTerm || p.titulo.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
       const matchCat = !categoriaFilter || p.categoria === categoriaFilter;
       return matchSearch && matchCat;
     });
@@ -134,7 +137,7 @@ export default function CatalogoPage() {
       grupos[p.categoria].push(p);
     });
     return grupos;
-  }, [catalogo, searchTerm, categoriaFilter]);
+  }, [catalogo, debouncedSearchTerm, categoriaFilter]);
 
   const toggleExpand = (cat: string) => {
     setExpandedCats(prev => {
@@ -160,7 +163,7 @@ export default function CatalogoPage() {
       resetForm();
       setShowAddModal(false);
     } else {
-      alert('Ya existe un procedimiento con ese título');
+      toast.error('Ya existe un procedimiento con ese título');
     }
   };
 
@@ -231,7 +234,7 @@ export default function CatalogoPage() {
       setNuevaCategoriaNombre('');
       setShowAddCategoriaModal(false);
     } else {
-      alert('Error al guardar la categoría');
+      toast.error('Error al guardar la categoría');
     }
   };
 
@@ -242,7 +245,7 @@ export default function CatalogoPage() {
     if (success) {
       await recargarCatalogo();
     } else {
-      alert('Error al eliminar la categoría');
+      toast.error('Error al eliminar la categoría');
     }
   };
 
