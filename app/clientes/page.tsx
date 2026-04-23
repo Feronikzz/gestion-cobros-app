@@ -17,8 +17,10 @@ import { getDisambiguatedClientNames } from '@/lib/utils/format-cliente';
 import { StatsAccordion } from '@/components/stats-accordion';
 import Loading from '@/app/loading';
 import { Eye, Edit, Trash2, UserPlus, Users, TrendingUp, Calendar, Search, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, ArrowUpDown, Archive } from 'lucide-react';
+import { useConfirm } from '@/components/confirm-dialog';
 
 export default function ClientesPage() {
+  const { confirm } = useConfirm();
   const { clientes, loading, error, createCliente, updateCliente, deleteCliente } = useClientes();
   const { procedimientos } = useProcedimientos();
   const { cobros } = useCobros();
@@ -206,7 +208,12 @@ export default function ClientesPage() {
   };
 
   const handleDelete = async (c: Cliente) => {
-    if (window.confirm(`¿Eliminar a ${c.nombre}?`)) {
+    if (await confirm({ 
+      title: 'Eliminar cliente', 
+      message: `¿Estás seguro de que deseas eliminar a ${c.nombre}? Esta acción no se puede deshacer.`, 
+      variant: 'danger',
+      confirmLabel: 'Eliminar' 
+    })) {
       try { await deleteCliente(c.id); } catch (err) { console.error(err); }
     }
   };

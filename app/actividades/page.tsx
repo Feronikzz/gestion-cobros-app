@@ -17,8 +17,10 @@ import Link from 'next/link';
 import { getDisambiguatedClientNames } from '@/lib/utils/format-cliente';
 import { StatsAccordion } from '@/components/stats-accordion';
 import Loading from '@/app/loading';
+import { useConfirm } from '@/components/confirm-dialog';
 
 export default function ActividadesPage() {
+  const { confirm } = useConfirm();
   const { actividades, loading, createActividad, updateActividad, deleteActividad, completeActividad, stats, refetch } = useActividades();
   const { clientes, updateCliente } = useClientes();
   const { procedimientos } = useProcedimientos();
@@ -122,7 +124,14 @@ export default function ActividadesPage() {
               if (act) setCompletingActividad(act);
             }}
             onEdit={(act) => { setEditingActividad(act); setShowModal(true); }}
-            onDelete={(actId) => { if (window.confirm('¿Eliminar esta actividad?')) deleteActividad(actId); }}
+            onDelete={async (actId) => { 
+              if (await confirm({ 
+                title: 'Eliminar actividad', 
+                message: '¿Estás seguro de que deseas eliminar esta actividad? Esta acción no se puede deshacer.', 
+                variant: 'danger', 
+                confirmLabel: 'Eliminar' 
+              })) deleteActividad(actId); 
+            }}
             showCliente
             clienteNombres={clienteNombres}
             clienteContactos={clienteContactos}

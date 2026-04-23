@@ -11,9 +11,11 @@ import { eur, monthLabel } from '@/lib/utils';
 import { useHideSensitive } from '@/lib/hooks/use-hide-sensitive';
 import { SensitiveToggle } from '@/components/sensitive-toggle';
 import { StatsAccordion } from '@/components/stats-accordion';
+import { useConfirm } from '@/components/confirm-dialog';
 import { FileText, Download, Eye, Edit, Trash2, Receipt, TrendingUp, TrendingDown, Calendar, DollarSign, ShoppingCart, Building, Zap, Car, Phone, Mail, CreditCard, Search, Filter, ChevronDown, X, Copy, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function GastosPage() {
+  const { confirm } = useConfirm();
   const { gastos, loading, error, createGasto, updateGasto, deleteGasto, uploadFactura } = useGastos();
   const { hidden: hideSensitive, toggle: toggleSensitive, mask } = useHideSensitive();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -187,7 +189,12 @@ export default function GastosPage() {
   };
 
   const handleDelete = async (gasto: Gasto) => {
-    if (window.confirm(`¿Estás seguro de eliminar el gasto de ${gasto.proveedor}?`)) {
+    if (await confirm({ 
+      title: 'Eliminar gasto', 
+      message: `¿Estás seguro de eliminar el gasto de ${gasto.proveedor}? Esta acción no se puede deshacer.`, 
+      variant: 'danger', 
+      confirmLabel: 'Eliminar' 
+    })) {
       try {
         await deleteGasto(gasto.id);
       } catch (error) {

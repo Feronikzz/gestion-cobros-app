@@ -12,8 +12,10 @@ import { toast } from 'sonner';
 import Loading from '@/app/loading';
 import type { TipoFactura, FacturaLinea, Factura } from '@/lib/supabase/types';
 import { Plus, Trash2, Settings, FileText, Copy, Eye, Download } from 'lucide-react';
+import { useConfirm } from '@/components/confirm-dialog';
 
 export function FacturasPageContent() {
+  const { confirm } = useConfirm();
   const searchParams = useSearchParams();
   const { facturas, emisor, loading, error, saveEmisor, createFactura, deleteFactura } = useFacturas();
   const { clientes } = useClientes();
@@ -251,7 +253,7 @@ export function FacturasPageContent() {
   };
 
   const handleDelete = async (f: Factura) => {
-    if (window.confirm(`¿Eliminar factura ${f.numero}?`)) {
+    if (await confirm({ title: 'Eliminar factura', message: `¿Eliminar factura ${f.numero}?`, variant: 'danger' })) {
       await deleteFactura(f.id);
     }
   };

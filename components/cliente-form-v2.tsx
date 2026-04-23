@@ -7,6 +7,7 @@ import { usePerfilRepresentante } from '@/lib/hooks/use-perfil-representante';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { User, FileText, Plus, Trash2, ChevronDown, ChevronUp, FileSignature, Download, Save, RefreshCw, Upload, CheckCircle, X, Loader2, Printer } from 'lucide-react';
+import { useConfirm } from '@/components/confirm-dialog';
 
 // Documento de identidad en formulario (antes de guardar en BD)
 interface DocIdentidadForm {
@@ -66,6 +67,7 @@ function cleanNotasLegacy(notas: string | null): string {
 
 export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowProcedimiento = true }: ClienteFormV2Props) {
   const supabase = typeof window !== 'undefined' ? createClient() : null;
+  const { confirm } = useConfirm();
   const { perfil: repte, setPerfil: setRepte, savePerfil: saveRepte, saving: savingRepte } = usePerfilRepresentante();
 
   const dirParsed = parseDireccion(cliente?.direccion);
@@ -228,9 +230,12 @@ export function ClienteFormV2({ cliente, onSubmit, onCancel, initialDocs, allowP
     // Validate required fields
     const missing = validateDesignacionFields();
     if (missing.length > 0) {
-      const proceed = window.confirm(
-        `⚠️ Faltan los siguientes campos para la designación:\n\n• ${missing.join('\n• ')}\n\n¿Deseas generar el PDF de todas formas con los campos vacíos?`
-      );
+      const proceed = await confirm({
+        title: 'Faltan datos',
+        message: `⚠️ Faltan los siguientes campos para la designación:\n\n• ${missing.join('\n• ')}\n\n¿Deseas generar el PDF de todas formas con los campos vacíos?`,
+        variant: 'warning',
+        confirmLabel: 'Generar PDF'
+      });
       if (!proceed) return;
     }
 

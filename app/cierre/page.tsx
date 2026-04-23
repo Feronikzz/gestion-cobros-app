@@ -8,8 +8,10 @@ import { useHideSensitive } from '@/lib/hooks/use-hide-sensitive';
 import { SensitiveToggle } from '@/components/sensitive-toggle';
 import { Lock, Unlock, TrendingUp, TrendingDown, DollarSign, Calendar } from 'lucide-react';
 import Loading from '@/app/loading';
+import { useConfirm } from '@/components/confirm-dialog';
 
 export default function CierrePage() {
+  const { confirm } = useConfirm();
   const { cierres, summary, loading, error, createCierre } = useCierreMensual();
   const { hidden: hideSensitive, toggle: toggleSensitive, mask } = useHideSensitive();
 
@@ -38,7 +40,12 @@ export default function CierrePage() {
   const mesesAbiertos = useMemo(() => activeMonthsSummary.filter(row => !isMesCerrado(row.mes)).length, [activeMonthsSummary, cierres]);
 
   const handleCerrarMes = async (mes: string, label: string) => {
-    if (window.confirm(`¿Cerrar el mes de ${label}? Esta acción no se puede deshacer fácilmente.`)) {
+    if (await confirm({ 
+      title: 'Cerrar mes', 
+      message: `¿Estás seguro de cerrar el mes de ${label}? Esta acción no se puede deshacer fácilmente.`, 
+      variant: 'warning', 
+      confirmLabel: 'Cerrar mes' 
+    })) {
       try { await createCierre(mes); } catch (err) { console.error(err); }
     }
   };

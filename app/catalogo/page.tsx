@@ -44,8 +44,10 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useDebounce } from '@/lib/hooks/use-debounce';
+import { useConfirm } from '@/components/confirm-dialog';
 
 export default function CatalogoPage() {
+  const { confirm } = useConfirm();
   const [catalogo, setCatalogo] = useState<ProcedimientoCatalogo[]>([]);
   const [categoriasCustom, setCategoriasCustom] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -218,9 +220,15 @@ export default function CatalogoPage() {
   };
 
   const handleDeleteProc = async (titulo: string) => {
-    if (!window.confirm(`¿Eliminar "${titulo}" del catálogo?`)) return;
-    await deleteProcedimientoCatalogo(titulo);
-    await recargarCatalogo();
+    if (await confirm({ 
+      title: 'Eliminar procedimiento', 
+      message: `¿Eliminar "${titulo}" del catálogo?`, 
+      variant: 'danger', 
+      confirmLabel: 'Eliminar' 
+    })) {
+      await deleteProcedimientoCatalogo(titulo);
+      await recargarCatalogo();
+    }
   };
 
   const handleAddCategoria = async () => {
@@ -239,13 +247,18 @@ export default function CatalogoPage() {
   };
 
   const handleDeleteCategoria = async (catId: string) => {
-    if (!window.confirm(`¿Eliminar la categoría "${todasCategorias[catId]}"? Los procedimientos pasarán a "Otro".\n\nIMPORTANTE: Esto no se puede deshacer.`)) return;
-    
-    const success = await deleteCategoriaCustom(catId);
-    if (success) {
-      await recargarCatalogo();
-    } else {
-      toast.error('Error al eliminar la categoría');
+    if (await confirm({ 
+      title: 'Eliminar categoría', 
+      message: `¿Eliminar la categoría "${todasCategorias[catId]}"? Los procedimientos pasarán a "Otro".\n\nIMPORTANTE: Esto no se puede deshacer.`, 
+      variant: 'danger', 
+      confirmLabel: 'Eliminar categoría' 
+    })) {
+      const success = await deleteCategoriaCustom(catId);
+      if (success) {
+        await recargarCatalogo();
+      } else {
+        toast.error('Error al eliminar la categoría');
+      }
     }
   };
 

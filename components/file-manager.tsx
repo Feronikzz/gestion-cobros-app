@@ -7,6 +7,7 @@ import {
   Upload, FolderPlus, Folder, FileText, Download, Trash2, ArrowLeft,
   Image as ImageIcon, File, Loader2, X, RefreshCw, Eye, AlertTriangle, Minimize2
 } from 'lucide-react';
+import { useConfirm } from '@/components/confirm-dialog';
 
 interface FileItem {
   name: string;
@@ -35,6 +36,7 @@ function isPreviewable(name: string): 'image' | 'pdf' | null {
 export function FileManager({ clienteId, clienteNombre, procedimientos = [] }: FileManagerProps) {
   const supabase = createClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { confirm } = useConfirm();
 
   const [currentPath, setCurrentPath] = useState<string[]>([]);
   const [items, setItems] = useState<FileItem[]>([]);
@@ -146,9 +148,12 @@ export function FileManager({ clienteId, clienteNombre, procedimientos = [] }: F
 
         // ── Detección de duplicados ──
         if (existingNames.has(originalFile.name)) {
-          const overwrite = window.confirm(
-            `El archivo "${originalFile.name}" ya existe en esta carpeta.\n\n¿Deseas reemplazarlo?`
-          );
+          const overwrite = await confirm({
+            title: 'Archivo existente',
+            message: `El archivo "${originalFile.name}" ya existe en esta carpeta.\n\n¿Deseas reemplazarlo?`,
+            variant: 'warning',
+            confirmLabel: 'Reemplazar'
+          });
           if (!overwrite) {
             skipped++;
             continue;
@@ -282,7 +287,7 @@ export function FileManager({ clienteId, clienteNombre, procedimientos = [] }: F
 
   // Eliminar archivo
   const deleteFile = async (fileName: string) => {
-    if (!confirm(`¿Eliminar "${fileName}"?\nEsta acción no se puede deshacer.`)) return;
+    if (!(await confirm({ title: 'Eliminar archivo', message: `¿Eliminar "${fileName}"?\nEsta acción no se puede deshacer.`, variant: 'danger' }))) return;
     try {
       const path = await getStoragePath();
       if (!path) return;

@@ -8,13 +8,16 @@ export const metadata: Metadata = {
 };
 
 import { Toaster } from 'sonner';
+import { ConfirmProvider } from '@/components/confirm-dialog';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) { 
   return (
     <html lang="es">
       <body>
-        {children}
-        <Toaster position="bottom-right" richColors closeButton theme="light" />
+        <ConfirmProvider>
+          {children}
+          <Toaster position="bottom-right" richColors closeButton theme="light" />
+        </ConfirmProvider>
       </body>
     </html>
   );

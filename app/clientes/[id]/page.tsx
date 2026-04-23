@@ -29,8 +29,10 @@ import { useActividades } from '@/lib/hooks/use-actividades';
 import { useRecibis } from '@/lib/hooks/use-recibis';
 import { auditProcedimiento, auditCobro } from '@/lib/audit';
 import type { Actividad, Recibi, RecibiInsert, ClienteInsert, ClienteUpdate } from '@/lib/supabase/types';
+import { useConfirm } from '@/components/confirm-dialog';
 
 export default function ClienteDetallePage() {
+  const { confirm } = useConfirm();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { hidden: hideSensitive, toggle: toggleSensitive, mask } = useHideSensitive();
@@ -353,7 +355,7 @@ export default function ClienteDetallePage() {
   };
 
   const handleDeleteProc = async (procId: string) => {
-    if (!window.confirm('¿Eliminar este procedimiento?')) return;
+    if (!(await confirm({ title: 'Eliminar procedimiento', message: '¿Eliminar este procedimiento?', variant: 'danger' }))) return;
     if (!supabase) return;
     
     const proc = procedimientos.find(p => p.id === procId);
@@ -391,7 +393,7 @@ export default function ClienteDetallePage() {
   };
 
   const handleDeleteCobro = async (cobroId: string) => {
-    if (!window.confirm('¿Eliminar este cobro?')) return;
+    if (!(await confirm({ title: 'Eliminar cobro', message: '¿Eliminar este cobro?', variant: 'danger' }))) return;
     if (!supabase) return;
     
     const cobro = cobros.find(c => c.id === cobroId);
@@ -476,7 +478,7 @@ export default function ClienteDetallePage() {
   };
 
   const handleDeleteDoc = async (docId: string) => {
-    if (!window.confirm('¿Eliminar este documento?')) return;
+    if (!(await confirm({ title: 'Eliminar documento', message: '¿Eliminar este documento?', variant: 'danger' }))) return;
     if (!supabase) return;
     
     await supabase.from('documentos').delete().eq('id', docId);
@@ -1088,9 +1090,9 @@ export default function ClienteDetallePage() {
         ) : (
           <ActividadTimeline
             actividades={actividades}
-            onComplete={(actId) => { if (window.confirm('¿Marcar como completada?')) completeActividad(actId); }}
+            onComplete={async (actId) => { if (await confirm({ title: 'Completar actividad', message: '¿Marcar como completada?' })) completeActividad(actId); }}
             onEdit={(act) => { setEditingActividad(act); setShowActividadModal(true); }}
-            onDelete={(actId) => { if (window.confirm('¿Eliminar esta actividad?')) deleteActividad(actId); }}
+            onDelete={async (actId) => { if (await confirm({ title: 'Eliminar actividad', message: '¿Eliminar esta actividad?', variant: 'danger' })) deleteActividad(actId); }}
           />
         )}
       </div>
@@ -1122,7 +1124,7 @@ export default function ClienteDetallePage() {
                         <button onClick={() => setViewRecibi(r)} className="action-btn action-view" title="Ver / Imprimir">
                           <Printer className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => { if (window.confirm('¿Eliminar este recibí?')) deleteRecibi(r.id); }} className="action-btn action-delete" title="Eliminar">
+                        <button onClick={async () => { if (await confirm({ title: 'Eliminar recibí', message: '¿Eliminar este recibí?', variant: 'danger' })) deleteRecibi(r.id); }} className="action-btn action-delete" title="Eliminar">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>

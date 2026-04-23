@@ -311,38 +311,8 @@ body {
   to { transform: translateX(0); }
 }
 
-// Mobile drawer
-.nav-mobile-overlay {
-  position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.4);
-}
-.nav-mobile-panel {
-  position: fixed; top: 0; right: 0; width: 16rem; height: 100%;
-  background: var(--color-surface); box-shadow: var(--shadow-lg);
-  display: flex; flex-direction: column;
-}
-.nav-mobile-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: var(--space-md) var(--space-lg); border-bottom: 1px solid var(--color-border);
-}
-.nav-mobile-title { font-size: 1rem; font-weight: 700; }
-.nav-close {
-  background: none; border: none; cursor: pointer; color: var(--color-text-secondary);
-  svg { width: 1.25rem; height: 1.25rem; }
-}
-.nav-mobile-links {
-  flex: 1; overflow-y: auto; padding: var(--space-sm) var(--space-md);
-  display: flex; flex-direction: column; gap: 0.125rem;
-}
-.nav-mobile-link {
-  display: flex; align-items: center; gap: 0.5rem;
-  padding: 0.625rem 0.75rem; border-radius: var(--radius-md);
-  font-size: 0.875rem; font-weight: 500; color: var(--color-text-secondary);
-  text-decoration: none; transition: background var(--transition-fast);
-  &:hover { background: var(--color-surface-elevated); color: var(--color-text-primary); }
-}
-.nav-mobile-footer {
-  padding: var(--space-md) var(--space-lg); border-top: 1px solid var(--color-border);
-}
+
+
 
 // =============================================================================
 // APP SHELL & PAGE HEADER

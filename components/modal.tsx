@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { X } from 'lucide-react';
+import { useConfirm } from './confirm-dialog';
 
 interface ModalProps {
   isOpen: boolean;
@@ -19,6 +20,9 @@ interface ModalProps {
 export function Modal({ isOpen, onClose, title, children, size = 'default', confirmClose = false, confirmCloseMessage, isDirty }: ModalProps) {
   const [autoIsDirty, setAutoIsDirty] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
+  
+  // Condicional safe use Confirm (por si Modal se usa fuera de provider, rara vez ok)
+  const { confirm } = useConfirm();
 
   // Reset dirty flag when modal opens/closes
   useEffect(() => {
@@ -40,15 +44,20 @@ export function Modal({ isOpen, onClose, title, children, size = 'default', conf
 
   const dirty = isDirty !== undefined ? isDirty : autoIsDirty;
 
-  const guardedClose = useCallback(() => {
+  const guardedClose = useCallback(async () => {
     if (confirmClose && dirty) {
-      if (window.confirm(confirmCloseMessage || '¿Seguro que quieres cerrar? Los datos no guardados se perderán.')) {
+      if (await confirm({ 
+        title: 'Cerrar ventana', 
+        message: confirmCloseMessage || '¿Seguro que quieres cerrar? Los datos no guardados se perderán.', 
+        variant: 'warning', 
+        confirmLabel: 'Sí, descartar' 
+      })) {
         onClose();
       }
     } else {
       onClose();
     }
-  }, [confirmClose, dirty, confirmCloseMessage, onClose]);
+  }, [confirmClose, dirty, confirmCloseMessage, onClose, confirm]);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
