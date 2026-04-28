@@ -42,14 +42,19 @@ import {
   GripVertical,
   Pencil
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useDebounce } from '@/lib/hooks/use-debounce';
+import { useConfirm } from '@/components/confirm-dialog';
 
 export default function CatalogoPage() {
+  const { confirm } = useConfirm();
   const [catalogo, setCatalogo] = useState<ProcedimientoCatalogo[]>([]);
   const [categoriasCustom, setCategoriasCustom] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   
   // Filtros
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const [categoriaFilter, setCategoriaFilter] = useState<CategoriaProcedimiento | ''>('');
   
   // UI State
@@ -123,7 +128,7 @@ export default function CatalogoPage() {
   // Agrupar por categoría
   const catalogoPorCategoria = useMemo(() => {
     const filtered = catalogo.filter(p => {
-      const matchSearch = !searchTerm || p.titulo.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchSearch = !debouncedSearchTerm || p.titulo.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
       const matchCat = !categoriaFilter || p.categoria === categoriaFilter;
       return matchSearch && matchCat;
     });
@@ -134,7 +139,7 @@ export default function CatalogoPage() {
       grupos[p.categoria].push(p);
     });
     return grupos;
-  }, [catalogo, searchTerm, categoriaFilter]);
+  }, [catalogo, debouncedSearchTerm, categoriaFilter]);
 
   const toggleExpand = (cat: string) => {
     setExpandedCats(prev => {
@@ -160,7 +165,7 @@ export default function CatalogoPage() {
       resetForm();
       setShowAddModal(false);
     } else {
-      alert('Ya existe un procedimiento con ese título');
+      toast.error('Ya existe un procedimiento con ese título');
     }
   };
 
@@ -215,9 +220,15 @@ export default function CatalogoPage() {
   };
 
   const handleDeleteProc = async (titulo: string) => {
-    if (!window.confirm(`¿Eliminar "${titulo}" del catálogo?`)) return;
-    await deleteProcedimientoCatalogo(titulo);
-    await recargarCatalogo();
+    if (await confirm({ 
+      title: 'Eliminar procedimiento', 
+      message: `¿Eliminar "${titulo}" del catálogo?`, 
+      variant: 'danger', 
+      confirmLabel: 'Eliminar' 
+    })) {
+      await deleteProcedimientoCatalogo(titulo);
+      await recargarCatalogo();
+    }
   };
 
   const handleAddCategoria = async () => {
@@ -231,18 +242,23 @@ export default function CatalogoPage() {
       setNuevaCategoriaNombre('');
       setShowAddCategoriaModal(false);
     } else {
-      alert('Error al guardar la categoría');
+      toast.error('Error al guardar la categoría');
     }
   };
 
   const handleDeleteCategoria = async (catId: string) => {
-    if (!window.confirm(`¿Eliminar la categoría "${todasCategorias[catId]}"? Los procedimientos pasarán a "Otro".\n\nIMPORTANTE: Esto no se puede deshacer.`)) return;
-    
-    const success = await deleteCategoriaCustom(catId);
-    if (success) {
-      await recargarCatalogo();
-    } else {
-      alert('Error al eliminar la categoría');
+    if (await confirm({ 
+      title: 'Eliminar categoría', 
+      message: `¿Eliminar la categoría "${todasCategorias[catId]}"? Los procedimientos pasarán a "Otro".\n\nIMPORTANTE: Esto no se puede deshacer.`, 
+      variant: 'danger', 
+      confirmLabel: 'Eliminar categoría' 
+    })) {
+      const success = await deleteCategoriaCustom(catId);
+      if (success) {
+        await recargarCatalogo();
+      } else {
+        toast.error('Error al eliminar la categoría');
+      }
     }
   };
 

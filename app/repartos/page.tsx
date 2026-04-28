@@ -8,8 +8,10 @@ import { useRepartos } from '@/lib/hooks/use-repartos';
 import { useCierreMensual } from '@/lib/hooks/use-cierre-mensual';
 import type { Reparto } from '@/lib/supabase/types';
 import { eur, monthLabel } from '@/lib/utils';
+import { useConfirm } from '@/components/confirm-dialog';
 
 export default function RepartosPage() {
+  const { confirm } = useConfirm();
   const { repartos, loading, error, createReparto, updateReparto, deleteReparto } = useRepartos();
   const { cierres } = useCierreMensual();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -46,7 +48,12 @@ export default function RepartosPage() {
   };
 
   const handleDelete = async (reparto: Reparto) => {
-    if (window.confirm(`¿Estás seguro de eliminar este reparto de ${eur(reparto.importe)} para ${reparto.destinatario}?`)) {
+    if (await confirm({ 
+      title: 'Eliminar reparto', 
+      message: `¿Estás seguro de eliminar este reparto de ${eur(reparto.importe)} para ${reparto.destinatario}? Esta acción no se puede deshacer.`, 
+      variant: 'danger', 
+      confirmLabel: 'Eliminar' 
+    })) {
       try {
         await deleteReparto(reparto.id);
       } catch (error) {

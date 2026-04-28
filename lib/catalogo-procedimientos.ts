@@ -57,7 +57,7 @@ export async function getCategoriasCustom(): Promise<Record<string, string>> {
   }
   
   const cats: Record<string, string> = {};
-  data?.forEach(cat => {
+  data?.forEach((cat: { key: string; label: string }) => {
     cats[cat.key] = cat.label;
   });
   
@@ -134,7 +134,7 @@ export async function getCustomCatalogo(): Promise<ProcedimientoCatalogo[]> {
   const { data: documentos, error: docsError } = await supabase
     .from('catalogo_documentos_requeridos')
     .select('*')
-    .in('procedimiento_id', procedimientos?.map(p => p.id) || []);
+    .in('procedimiento_id', procedimientos?.map((p: { id: string }) => p.id) || []);
   
   if (docsError) {
     console.error('Error cargando documentos:', docsError);
@@ -142,7 +142,7 @@ export async function getCustomCatalogo(): Promise<ProcedimientoCatalogo[]> {
   
   // Agrupar documentos por procedimiento
   const docsByProc: Record<string, DocumentoRequerido[]> = {};
-  documentos?.forEach(doc => {
+  documentos?.forEach((doc: { procedimiento_id: string; nombre: string; descripcion?: string; enlace?: string }) => {
     if (!docsByProc[doc.procedimiento_id]) docsByProc[doc.procedimiento_id] = [];
     docsByProc[doc.procedimiento_id].push({
       nombre: doc.nombre,
@@ -153,7 +153,7 @@ export async function getCustomCatalogo(): Promise<ProcedimientoCatalogo[]> {
     });
   });
   
-  const result: ProcedimientoCatalogo[] = procedimientos?.map(p => ({
+  const result: ProcedimientoCatalogo[] = procedimientos?.map((p: { id: string; titulo: string; categoria: string; concepto?: string }) => ({
     id: p.id,
     titulo: p.titulo,
     categoria: p.categoria as CategoriaProcedimiento,

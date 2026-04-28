@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { AuditLog, AuditFilter, AuditStats } from '@/lib/supabase/audit-types';
 
 export function useAudit() {
-  // Solo crear el cliente de Supabase en el cliente
-  const supabase = typeof window !== 'undefined' ? createClient() : null;
+  const supabase = useMemo(() => typeof window !== 'undefined' ? createClient() : null, []);
   
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [stats, setStats] = useState<AuditStats>({
@@ -144,7 +143,7 @@ export function useAudit() {
 
       if (error) throw error;
 
-      const logs = allLogs || [];
+      const logs: AuditLog[] = (allLogs || []) as AuditLog[];
       const now = new Date();
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -153,11 +152,11 @@ export function useAudit() {
       // Calcular estadísticas
       const stats = {
         total_events: logs.length,
-        events_today: logs.filter(log => new Date(log.created_at) >= today).length,
-        events_this_week: logs.filter(log => new Date(log.created_at) >= weekAgo).length,
-        events_this_month: logs.filter(log => new Date(log.created_at) >= monthStart).length,
+        events_today: logs.filter((log: AuditLog) => new Date(log.created_at) >= today).length,
+        events_this_week: logs.filter((log: AuditLog) => new Date(log.created_at) >= weekAgo).length,
+        events_this_month: logs.filter((log: AuditLog) => new Date(log.created_at) >= monthStart).length,
         top_users: Object.entries(
-          logs.reduce((acc, log) => {
+          logs.reduce((acc: Record<string, number>, log: AuditLog) => {
             if (log.user_email) {
               acc[log.user_email] = (acc[log.user_email] || 0) + 1;
             }
@@ -168,7 +167,7 @@ export function useAudit() {
           .slice(0, 5)
           .map(([email, count]) => ({ email, count: count as number })),
         top_entities: Object.entries(
-          logs.reduce((acc, log) => {
+          logs.reduce((acc: Record<string, number>, log: AuditLog) => {
             if (log.entity_type) {
               acc[log.entity_type] = (acc[log.entity_type] || 0) + 1;
             }
@@ -178,7 +177,7 @@ export function useAudit() {
           .sort(([,a], [,b]) => (b as number) - (a as number))
           .slice(0, 5)
           .map(([type, count]) => ({ type, count: count as number })),
-        recent_restores: logs.filter(log => log.restored_at).length,
+        recent_restores: logs.filter((log: AuditLog) => log.restored_at).length,
       };
 
       setStats(stats);

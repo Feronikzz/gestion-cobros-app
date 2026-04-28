@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { auditCobro } from '@/lib/audit';
 import type { Cobro } from '@/lib/supabase/types';
@@ -10,8 +10,7 @@ export function useCobros() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Solo crear el cliente de Supabase en el cliente
-  const supabase = typeof window !== 'undefined' ? createClient() : null;
+  const supabase = useMemo(() => typeof window !== 'undefined' ? createClient() : null, []);
 
   // Caché de nombres de clientes para auditoría
   const getClienteNombre = async (clienteId: string): Promise<string> => {

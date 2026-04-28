@@ -11,6 +11,7 @@ import {
   FileUp, FileMinus, Send, CheckSquare, X, Wrench, ShieldAlert,
   Loader2, Database, Copy, TrendingUp, Calendar
 } from 'lucide-react';
+import { StatsAccordion } from '@/components/stats-accordion';
 
 type FiltroRapido = 'hoy' | 'ayer' | 'semana' | 'mes' | 'todo';
 
@@ -68,7 +69,7 @@ export default function HistorialPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filtroRapido, setFiltroRapido] = useState<FiltroRapido>('mes');
+  const [filtroRapido, setFiltroRapido] = useState<FiltroRapido>('hoy');
   const [entidadFilter, setEntidadFilter] = useState<TipoEntidad | ''>('');
   const [accionFilter, setAccionFilter] = useState<TipoAccion | ''>('');
   const [busqueda, setBusqueda] = useState('');
@@ -296,48 +297,50 @@ export default function HistorialPage() {
       )}
 
       {/* Estadísticas — gradient cards como clientes/cobros */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-blue-100 text-sm font-medium mb-1">Total eventos</div>
-              <div className="text-2xl font-bold">{stats.total}</div>
-              <div className="text-blue-100 text-xs mt-1">{LABELS_FILTRO[filtroRapido]}</div>
+      <StatsAccordion title="Resumen de Registros">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-blue-100 text-sm font-medium mb-1">Total eventos</div>
+                <div className="text-2xl font-bold">{stats.total}</div>
+                <div className="text-blue-100 text-xs mt-1">{LABELS_FILTRO[filtroRapido]}</div>
+              </div>
+              <div className="p-3 bg-white/20 rounded-lg"><Activity className="w-6 h-6 text-white" /></div>
             </div>
-            <div className="p-3 bg-white/20 rounded-lg"><Activity className="w-6 h-6 text-white" /></div>
+          </div>
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-green-100 text-sm font-medium mb-1">Creados</div>
+                <div className="text-2xl font-bold">{stats.porAccion.get('crear') || 0}</div>
+                <div className="text-green-100 text-xs mt-1">Registros nuevos</div>
+              </div>
+              <div className="p-3 bg-white/20 rounded-lg"><Plus className="w-6 h-6 text-white" /></div>
+            </div>
+          </div>
+          <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-amber-100 text-sm font-medium mb-1">Actualizados</div>
+                <div className="text-2xl font-bold">{stats.porAccion.get('actualizar') || 0}</div>
+                <div className="text-amber-100 text-xs mt-1">Modificaciones</div>
+              </div>
+              <div className="p-3 bg-white/20 rounded-lg"><Pencil className="w-6 h-6 text-white" /></div>
+            </div>
+          </div>
+          <div className="bg-gradient-to-r from-red-500 to-rose-600 rounded-xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-red-100 text-sm font-medium mb-1">Eliminados</div>
+                <div className="text-2xl font-bold">{stats.porAccion.get('eliminar') || 0}</div>
+                <div className="text-red-100 text-xs mt-1">Registros borrados</div>
+              </div>
+              <div className="p-3 bg-white/20 rounded-lg"><Trash2 className="w-6 h-6 text-white" /></div>
+            </div>
           </div>
         </div>
-        <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-green-100 text-sm font-medium mb-1">Creados</div>
-              <div className="text-2xl font-bold">{stats.porAccion.get('crear') || 0}</div>
-              <div className="text-green-100 text-xs mt-1">Registros nuevos</div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg"><Plus className="w-6 h-6 text-white" /></div>
-          </div>
-        </div>
-        <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-amber-100 text-sm font-medium mb-1">Actualizados</div>
-              <div className="text-2xl font-bold">{stats.porAccion.get('actualizar') || 0}</div>
-              <div className="text-amber-100 text-xs mt-1">Modificaciones</div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg"><Pencil className="w-6 h-6 text-white" /></div>
-          </div>
-        </div>
-        <div className="bg-gradient-to-r from-red-500 to-rose-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-red-100 text-sm font-medium mb-1">Eliminados</div>
-              <div className="text-2xl font-bold">{stats.porAccion.get('eliminar') || 0}</div>
-              <div className="text-red-100 text-xs mt-1">Registros borrados</div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg"><Trash2 className="w-6 h-6 text-white" /></div>
-          </div>
-        </div>
-      </div>
+      </StatsAccordion>
 
       {/* Búsqueda y Filtros — mismo estilo que clientes */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">

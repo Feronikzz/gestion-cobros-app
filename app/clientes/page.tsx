@@ -11,15 +11,23 @@ import type { Cliente, ClienteInsert, EstadoProcedimiento } from '@/lib/supabase
 import { createClient } from '@/lib/supabase/client';
 import { auditProcedimiento, auditCobro } from '@/lib/audit';
 import Link from 'next/link';
+import { useDebounce } from '@/lib/hooks/use-debounce';
+import { usePagination } from '@/lib/hooks/use-pagination';
+import { getDisambiguatedClientNames } from '@/lib/utils/format-cliente';
+import { StatsAccordion } from '@/components/stats-accordion';
+import Loading from '@/app/loading';
 import { Eye, Edit, Trash2, UserPlus, Users, TrendingUp, Calendar, Search, ChevronDown, ChevronUp, X, ChevronLeft, ChevronRight, ArrowUpDown, Archive } from 'lucide-react';
+import { useConfirm } from '@/components/confirm-dialog';
 
 export default function ClientesPage() {
+  const { confirm } = useConfirm();
   const { clientes, loading, error, createCliente, updateCliente, deleteCliente } = useClientes();
   const { procedimientos } = useProcedimientos();
   const { cobros } = useCobros();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCliente, setEditingCliente] = useState<Cliente | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [estadoFilter, setEstadoFilter] = useState('');
   const [showEstadoFilter, setShowEstadoFilter] = useState(false);
 
@@ -29,7 +37,10 @@ export default function ClientesPage() {
 
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [itemsPerPage, setItemsPerPage] = usePagination('clientes', 20);
+
+  // Nombres acortados y desambiguados
+  const clientNames = useMemo(() => getDisambiguatedClientNames(clientes), [clientes]);
 
   // Funciones de estadísticas
   const calcularClientesActivos = () => {
@@ -79,7 +90,7 @@ export default function ClientesPage() {
 
   const filteredClientes = useMemo(() => {
     const filtered = clientes.filter(c => {
-      const q = searchQuery.toLowerCase();
+      const q = debouncedSearchQuery.toLowerCase();
       const fullApellidos = [c.apellido1, c.apellido2].filter(Boolean).join(' ') || c.apellidos || '';
       const matchesSearch = !q ||
         c.nombre.toLowerCase().includes(q) ||
@@ -110,7 +121,7 @@ export default function ClientesPage() {
     });
 
     return filtered;
-  }, [clientes, searchQuery, estadoFilter, sortField, sortDir]);
+  }, [clientes, debouncedSearchQuery, estadoFilter, sortField, sortDir]);
 
   // Clientes paginados
   const paginatedClientes = useMemo(() => {
@@ -197,7 +208,12 @@ export default function ClientesPage() {
   };
 
   const handleDelete = async (c: Cliente) => {
-    if (window.confirm(`¿Eliminar a ${c.nombre}?`)) {
+    if (await confirm({ 
+      title: 'Eliminar cliente', 
+      message: `¿Estás seguro de que deseas eliminar a ${c.nombre}? Esta acción no se puede deshacer.`, 
+      variant: 'danger',
+      confirmLabel: 'Eliminar' 
+    })) {
       try { await deleteCliente(c.id); } catch (err) { console.error(err); }
     }
   };
@@ -212,7 +228,7 @@ export default function ClientesPage() {
     return map[estado] || 'badge-gray';
   };
 
-  if (loading) return <LayoutShell title="Clientes"><div className="loading-state">Cargando clientes...</div></LayoutShell>;
+  if (loading) return <Loading />;
   if (error) return <LayoutShell title="Clientes"><div className="error-state">Error: {error}</div></LayoutShell>;
 
   return (
@@ -228,59 +244,61 @@ export default function ClientesPage() {
       </div>
 
       {/* Estadísticas de Clientes */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-blue-100 text-sm font-medium mb-1">Clientes activos</div>
-              <div className="text-2xl font-bold">{calcularClientesActivos()}</div>
-              <div className="text-blue-100 text-xs mt-1">De {clientes.length} totales</div>
+      <StatsAccordion title="Resumen de Cartera">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-blue-100 text-sm font-medium mb-1">Clientes activos</div>
+                <div className="text-2xl font-bold">{calcularClientesActivos()}</div>
+                <div className="text-blue-100 text-xs mt-1">De {clientes.length} totales</div>
+              </div>
+              <div className="p-3 bg-white/20 rounded-lg">
+                <Users className="w-6 h-6 text-white" />
+              </div>
             </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <Users className="w-6 h-6 text-white" />
+          </div>
+          
+          <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-amber-100 text-sm font-medium mb-1">Pendientes</div>
+                <div className="text-2xl font-bold">{calcularClientesPendientes()}</div>
+                <div className="text-amber-100 text-xs mt-1">Clientes pendientes</div>
+              </div>
+              <div className="p-3 bg-white/20 rounded-lg">
+                <Calendar className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-r from-gray-500 to-gray-600 rounded-xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-gray-200 text-sm font-medium mb-1">Archivados</div>
+                <div className="text-2xl font-bold">{calcularClientesArchivados()}</div>
+                <div className="text-gray-200 text-xs mt-1">Clientes archivados</div>
+              </div>
+              <div className="p-3 bg-white/20 rounded-lg">
+                <Archive className="w-6 h-6 text-white" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-green-100 text-sm font-medium mb-1">Nuevos este mes</div>
+                <div className="text-2xl font-bold">{calcularClientesNuevosMes()}</div>
+                <div className="text-green-100 text-xs mt-1">Clientes nuevos</div>
+              </div>
+              <div className="p-3 bg-white/20 rounded-lg">
+                <TrendingUp className="w-6 h-6 text-white" />
+              </div>
             </div>
           </div>
         </div>
-        
-        <div className="bg-gradient-to-r from-amber-500 to-orange-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-amber-100 text-sm font-medium mb-1">Pendientes</div>
-              <div className="text-2xl font-bold">{calcularClientesPendientes()}</div>
-              <div className="text-amber-100 text-xs mt-1">Clientes pendientes</div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <Calendar className="w-6 h-6 text-white" />
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-r from-gray-500 to-gray-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-gray-200 text-sm font-medium mb-1">Archivados</div>
-              <div className="text-2xl font-bold">{calcularClientesArchivados()}</div>
-              <div className="text-gray-200 text-xs mt-1">Clientes archivados</div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <Archive className="w-6 h-6 text-white" />
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-green-100 text-sm font-medium mb-1">Nuevos este mes</div>
-              <div className="text-2xl font-bold">{calcularClientesNuevosMes()}</div>
-              <div className="text-green-100 text-xs mt-1">Clientes nuevos</div>
-            </div>
-            <div className="p-3 bg-white/20 rounded-lg">
-              <TrendingUp className="w-6 h-6 text-white" />
-            </div>
-          </div>
-        </div>
-      </div>
+      </StatsAccordion>
 
       {/* Búsqueda y Filtros */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
@@ -401,7 +419,7 @@ export default function ClientesPage() {
         <table className="table">
           <thead>
             <tr>
-              <th>
+              <th className="sticky left-[0px] z-20 bg-[var(--color-surface-elevated)] !border-r !border-gray-200 shadow-[inset_-4px_0_4px_-4px_rgba(0,0,0,0.1)]">
                 <button onClick={() => toggleSort(sortField === 'apellidos' ? 'nombre' : 'apellidos')} className="flex items-center gap-1 hover:text-blue-600 transition-colors">
                   Cliente
                   {sortField === 'apellidos' || sortField === 'nombre' ? (
@@ -436,8 +454,10 @@ export default function ClientesPage() {
                   !['cerrado', 'archivado'].includes(p.estado)
                 ).length;
                 return (
-                  <tr key={c.id}>
-                    <td className="font-medium">{[c.nombre, c.apellido1, c.apellido2].filter(Boolean).join(' ') || [c.nombre, c.apellidos].filter(Boolean).join(' ')}</td>
+                  <tr key={c.id} className="group">
+                    <td className="font-medium sticky left-[0px] z-10 bg-white group-hover:bg-gray-50 !border-r !border-gray-200 shadow-[inset_-4px_0_4px_-4px_rgba(0,0,0,0.1)]">
+                      {clientNames[c.id]}
+                    </td>
                     <td className="subtle-text">
                       {procsCliente.length > 0 ? (
                         <span className="inline-flex items-center gap-1">

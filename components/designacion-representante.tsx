@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import type { Cliente } from '@/lib/supabase/types';
 import { Download, Save, User, FileText, RefreshCw, Upload, CheckCircle, X, Plus, Loader2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { toast } from 'sonner';
 import { usePerfilRepresentante } from '@/lib/hooks/use-perfil-representante';
 
 const STORAGE_KEY_REP = 'designacion_representante_perfil';
@@ -209,7 +210,7 @@ export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, 
   const handleUploadSigned = async () => {
     if (!signedFile || !supabase) return;
     if (!clienteId && !cliente?.id) {
-      alert('No se puede subir: falta ID del cliente');
+      toast.error('No se puede subir: falta ID del cliente');
       return;
     }
     
@@ -248,10 +249,10 @@ export function DesignacionRepresentante({ cliente, clienteId, procedimientoId, 
       
       setUploadedSignedUrl(publicUrl);
       onUploaded?.();
-      alert('Documento firmado subido correctamente');
+      toast.success('Documento firmado subido correctamente');
     } catch (error: any) {
       console.error('Error subiendo designación firmada:', error);
-      alert('Error al subir: ' + error.message);
+      toast.error('Error al subir: ' + error.message);
     } finally {
       setUploadingSigned(false);
     }

@@ -4,12 +4,14 @@ import { useState } from 'react';
 import type { ClienteNota } from '@/lib/supabase/types';
 import { useNotas } from '@/lib/hooks/use-notas';
 import { Edit3, Trash2, Plus, ChevronDown, ChevronUp, MessageSquare } from 'lucide-react';
+import { useConfirm } from '@/components/confirm-dialog';
 
 interface ClienteNotasProps {
   clienteId: string;
 }
 
 export function ClienteNotas({ clienteId }: ClienteNotasProps) {
+  const { confirm } = useConfirm();
   const { notas, loading, createNota, updateNota, deleteNota } = useNotas(clienteId);
   const [showAll, setShowAll] = useState(false);
   const [editingNota, setEditingNota] = useState<ClienteNota | null>(null);
@@ -43,7 +45,7 @@ export function ClienteNotas({ clienteId }: ClienteNotasProps) {
   };
 
   const handleDeleteNota = async (id: string) => {
-    if (window.confirm('¿Estás seguro de eliminar esta nota?')) {
+    if (await confirm({ title: 'Eliminar nota', message: '¿Estás seguro de eliminar esta nota?', variant: 'danger' })) {
       try {
         await deleteNota(id);
       } catch (error) {

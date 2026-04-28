@@ -34,7 +34,7 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
   useEffect(() => {
     if (!clienteIdFijo) {
       const supabase = createClient();
-      supabase.from('clientes').select('*').order('nombre').then(({ data }) => {
+      supabase.from('clientes').select('*').order('nombre').then(({ data }: { data: Cliente[] | null }) => {
         setClientes(data || []);
         // Si hay un cobro existente, establecer el cliente seleccionado
         if (cobro?.cliente_id) {
@@ -83,6 +83,7 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
         .select('*')
         .eq('cliente_id', formData.cliente_id)
         .order('created_at', { ascending: false })
+<<<<<<< HEAD
         .then(({ data }) => {
           const procedimientosList = data || [];
           setProcedimientos(procedimientosList);
@@ -95,6 +96,9 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
             }));
           }
         });
+=======
+        .then(({ data }: { data: Procedimiento[] | null }) => setProcedimientos(data || []));
+>>>>>>> 50f90e748a67899b08900e896ffd47faaee149ae
     } else {
       setProcedimientos([]);
     }
@@ -126,11 +130,11 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
         .eq('procedimiento_id', formData.procedimiento_id);
 
       // Calcular pendiente
-      const totalCobrado = cobrosExistentes?.reduce((sum, c) => sum + c.importe, 0) || 0;
+      const totalCobrado = cobrosExistentes?.reduce((sum: number, c: { importe: number }) => sum + c.importe, 0) || 0;
       const entradas = procedimiento.tiene_entrada ? procedimiento.importe_entrada : 0;
       
       // Verificar si la entrada ya está incluida en los cobros
-      const entradaYaCobrada = cobrosExistentes?.some(c => 
+      const entradaYaCobrada = cobrosExistentes?.some((c: { notas: string | null }) => 
         c.notas && c.notas.includes('Entrada del procedimiento')
       );
       
