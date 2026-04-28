@@ -83,8 +83,7 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
         .select('*')
         .eq('cliente_id', formData.cliente_id)
         .order('created_at', { ascending: false })
-<<<<<<< HEAD
-        .then(({ data }) => {
+        .then(({ data }: { data: Procedimiento[] | null }) => {
           const procedimientosList = data || [];
           setProcedimientos(procedimientosList);
           
@@ -96,9 +95,6 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
             }));
           }
         });
-=======
-        .then(({ data }: { data: Procedimiento[] | null }) => setProcedimientos(data || []));
->>>>>>> 50f90e748a67899b08900e896ffd47faaee149ae
     } else {
       setProcedimientos([]);
     }
