@@ -12,6 +12,14 @@ export function useGastos() {
 
   const supabase = useMemo(() => typeof window !== 'undefined' ? createClient() : null, []);
 
+  // Helper para obtener nombre del cliente
+  const getClienteNombre = async (clienteId: string): Promise<string> => {
+    if (!supabase || !clienteId) return 'Desconocido';
+    const { data } = await supabase.from('clientes').select('nombre, apellido1, apellidos').eq('id', clienteId).single();
+    if (!data) return 'Desconocido';
+    return [data.nombre, data.apellido1 || data.apellidos].filter(Boolean).join(' ');
+  };
+
   const fetchGastos = useCallback(async () => {
     if (!supabase) return;
     

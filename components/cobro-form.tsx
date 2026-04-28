@@ -18,9 +18,9 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
     procedimiento_id: cobro?.procedimiento_id || null as string | null,
     fecha_cobro: cobro?.fecha_cobro || new Date().toISOString().split('T')[0],
     importe: cobro?.importe || 0,
-    metodo_pago: cobro?.metodo_pago || 'transferencia',
+    metodo_pago: cobro?.metodo_pago || 'efectivo',
     notas: cobro?.notas || '',
-    iva_tipo: cobro?.iva_tipo || 'sin_iva' as 'sin_iva' | 'iva_incluido' | 'iva_sobre_precio',
+    iva_tipo: cobro?.iva_tipo || 'iva_incluido' as 'sin_iva' | 'iva_incluido' | 'iva_sobre_precio',
     iva_porcentaje: cobro?.iva_porcentaje || 21,
   });
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -83,11 +83,22 @@ export function CobroForm({ cobro, clienteIdFijo, onSubmit, onCancel }: CobroFor
         .select('*')
         .eq('cliente_id', formData.cliente_id)
         .order('created_at', { ascending: false })
-        .then(({ data }) => setProcedimientos(data || []));
+        .then(({ data }) => {
+          const procedimientosList = data || [];
+          setProcedimientos(procedimientosList);
+          
+          // Auto-seleccionar el primer procedimiento si no hay uno seleccionado y no es edición
+          if (!cobro && !formData.procedimiento_id && procedimientosList.length > 0) {
+            setFormData(prev => ({ 
+              ...prev, 
+              procedimiento_id: procedimientosList[0].id 
+            }));
+          }
+        });
     } else {
       setProcedimientos([]);
     }
-  }, [formData.cliente_id]);
+  }, [formData.cliente_id, cobro, formData.procedimiento_id]);
 
   // Verificar si el importe supera el pendiente
   useEffect(() => {

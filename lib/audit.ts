@@ -162,28 +162,28 @@ export const auditCobro = {
 
 // Gastos
 export const auditGasto = {
-  crear: (id: string, importe: number, concepto: string) => 
+  crear: (id: string, importe: number, concepto: string, clienteNombre?: string) => 
     logAudit('gasto', 'crear', { 
       entidad_id: id, 
       entidad_nombre: concepto, 
-      descripcion: `Gasto registrado: ${concepto} (${importe}€)` 
+      descripcion: `Gasto registrado: ${concepto} (${importe}€)${clienteNombre ? ` - ${clienteNombre}` : ''}` 
     }),
   
-  actualizar: (id: string, concepto: string, campo: string, anterior: unknown, nuevo: unknown) => 
+  actualizar: (id: string, concepto: string, campo: string, anterior: unknown, nuevo: unknown, clienteNombre?: string) => 
     logAudit('gasto', 'actualizar', { 
       entidad_id: id, 
       entidad_nombre: concepto,
       campo,
       valor_anterior: String(anterior),
       valor_nuevo: String(nuevo),
-      descripcion: `Gasto "${concepto}": ${campo} cambiado` 
+      descripcion: `Gasto "${concepto}"${clienteNombre ? ` (${clienteNombre})` : ''}: ${campo} cambiado` 
     }),
   
-  eliminar: (id: string, importe: number, concepto: string) => 
+  eliminar: (id: string, importe: number, concepto: string, clienteNombre?: string) => 
     logAudit('gasto', 'eliminar', { 
       entidad_id: id, 
       entidad_nombre: concepto, 
-      descripcion: `Gasto eliminado: ${concepto} (${importe}€)` 
+      descripcion: `Gasto eliminado: ${concepto} (${importe}€)${clienteNombre ? ` - ${clienteNombre}` : ''}` 
     }),
 };
 
@@ -226,18 +226,18 @@ export const auditActividad = {
 
 // Facturas
 export const auditFactura = {
-  crear: (id: string, numero: string, importe: number) => 
+  crear: (id: string, numero: string, importe: number, clienteNombre?: string) => 
     logAudit('factura', 'crear', { 
       entidad_id: id, 
       entidad_nombre: numero, 
-      descripcion: `Factura generada: ${numero} (${importe}€)` 
+      descripcion: `Factura generada: ${numero} (${importe}€)${clienteNombre ? ` - ${clienteNombre}` : ''}` 
     }),
   
-  eliminar: (id: string, numero: string) => 
+  eliminar: (id: string, numero: string, clienteNombre?: string) => 
     logAudit('factura', 'eliminar', { 
       entidad_id: id, 
       entidad_nombre: numero, 
-      descripcion: `Factura eliminada: ${numero}` 
+      descripcion: `Factura eliminada: ${numero}${clienteNombre ? ` - ${clienteNombre}` : ''}` 
     }),
 };
 
@@ -260,18 +260,18 @@ export const auditDocumento = {
 
 // Recibís
 export const auditRecibi = {
-  crear: (id: string, numero: string, importe: number) => 
+  crear: (id: string, numero: string, importe: number, clienteNombre?: string) => 
     logAudit('recibi', 'crear', { 
       entidad_id: id, 
       entidad_nombre: numero, 
-      descripcion: `Recibí generado: ${numero} (${importe}€)` 
+      descripcion: `Recibí generado: ${numero} (${importe}€)${clienteNombre ? ` - ${clienteNombre}` : ''}` 
     }),
   
-  eliminar: (id: string, numero: string) => 
+  eliminar: (id: string, numero: string, clienteNombre?: string) => 
     logAudit('recibi', 'eliminar', { 
       entidad_id: id, 
       entidad_nombre: numero, 
-      descripcion: `Recibí eliminado: ${numero}` 
+      descripcion: `Recibí eliminado: ${numero}${clienteNombre ? ` - ${clienteNombre}` : ''}` 
     }),
 };
 

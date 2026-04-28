@@ -9,6 +9,14 @@ export function useActividades(clienteId?: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Helper para obtener nombre del cliente
+  const getClienteNombre = async (clienteId: string): Promise<string> => {
+    if (!supabase || !clienteId) return 'Desconocido';
+    const { data } = await supabase.from('clientes').select('nombre, apellido1, apellidos').eq('id', clienteId).single();
+    if (!data) return 'Desconocido';
+    return [data.nombre, data.apellido1 || data.apellidos].filter(Boolean).join(' ');
+  };
+
   const fetchActividades = useCallback(async () => {
     if (!supabase) return;
     setLoading(true);
@@ -46,10 +54,11 @@ export function useActividades(clienteId?: string) {
     if (err) throw err;
     await fetchActividades();
     
-    // Auditoría
+    // Auditoría con nombre del cliente
     const acts = await supabase.from('actividades').select('id').order('created_at', { ascending: false }).limit(1);
     const newId = acts.data?.[0]?.id || '';
-    await auditActividad.crear(newId, data.titulo || 'Sin título');
+    const clienteNombre = data.cliente_id ? await getClienteNombre(data.cliente_id) : undefined;
+    await auditActividad.crear(newId, data.titulo || 'Sin título', clienteNombre);
   };
 
   const updateActividad = async (id: string, data: ActividadUpdate) => {
@@ -61,6 +70,7 @@ export function useActividades(clienteId?: string) {
     
     // Auditoría: detectar cambios
     if (actAnterior) {
+      const clienteNombre = actAnterior.cliente_id ? await getClienteNombre(actAnterior.cliente_id) : undefined;
       const campos = Object.keys(data) as Array<keyof ActividadUpdate>;
       for (const campo of campos) {
         const anterior = actAnterior[campo as keyof Actividad];
@@ -79,7 +89,8 @@ export function useActividades(clienteId?: string) {
     if (err) throw err;
     await fetchActividades();
     
-    // Auditoría
+    // Auditoría con nombre del cliente
+    const clienteNombre = actividad?.cliente_id ? await getClienteNombre(actividad.cliente_id) : undefined;
     await auditActividad.eliminar(id, actividad?.titulo || 'Sin título');
   };
 
@@ -93,7 +104,8 @@ export function useActividades(clienteId?: string) {
     }).eq('id', id);
     await fetchActividades();
     
-    // Auditoría
+    // Auditoría con nombre del cliente
+    const clienteNombre = actividad?.cliente_id ? await getClienteNombre(actividad.cliente_id) : undefined;
     await auditActividad.completar(id, actividad?.titulo || 'Sin título');
   };
 
