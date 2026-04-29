@@ -41,7 +41,7 @@ export function useRecibis(clienteId?: string) {
     await fetchRecibis();
     
     // Auditoría
-    await auditRecibi.crear('', data.numero, data.importe);
+    await auditRecibi.crear('', data.numero, data.importe, undefined, data.cliente_id);
   };
 
   const deleteRecibi = async (id: string) => {
@@ -51,7 +51,7 @@ export function useRecibis(clienteId?: string) {
     await fetchRecibis();
     
     // Auditoría
-    await auditRecibi.eliminar(id, recibi?.numero || '');
+    await auditRecibi.eliminar(id, recibi?.numero || '', undefined, recibi?.cliente_id);
   };
 
   return { recibis, loading, createRecibi, deleteRecibi, getNextNumero, refetch: fetchRecibis };

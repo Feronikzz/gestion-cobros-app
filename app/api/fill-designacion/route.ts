@@ -49,19 +49,16 @@ export async function POST(req: NextRequest) {
     const {
       representado,
       representante,
-      fecha_lugar,
+      lugar,
+      dia,
+      mes,
+      anio,
       consentimiento_dehu,
       solicitud,
     } = body;
 
     // ── REPRESENTADO (fila superior del formulario) ──
-    // Texto1=Nombre, Texto2=1er Apellido, Texto3=2º Apellido
-    // Texto4=Nacionalidad, Texto5=NIF, Texto6=Pasaporte
-    // Texto7=DD, Texto8=MM, Texto9=AAAA, Texto10=Localidad nacim, Texto11=País
-    // Texto12=Nombre padre, Texto13=Nombre madre, Casillas1-5=Estado civil
-    // Texto14=Domicilio, Texto15=Nº, Texto16=Piso
-    // Texto17=Localidad, Texto18=CP, Texto19=Provincia
-    // Texto20=Teléfono, Texto21=Email
+    // ... (rest of representado fields)
     if (representado) {
       setField('Texto1', representado.nombre || '');
       setField('Texto2', representado.apellido1 || '');
@@ -73,7 +70,7 @@ export async function POST(req: NextRequest) {
       setField('Texto8', representado.fecha_nac_mm || '');
       setField('Texto9', representado.fecha_nac_aaaa || '');
       setField('Texto10', representado.localidad_nacimiento || '');
-      setField('Texto11', representado.pais || '');
+      setField('Texto11', representado.pais || representado.pais_nacimiento || '');
       setField('Texto12', representado.nombre_padre || '');
       setField('Texto13', representado.nombre_madre || '');
       setField('Texto14', representado.domicilio || '');
@@ -96,11 +93,7 @@ export async function POST(req: NextRequest) {
     setField('Texto22', solicitud || '');
 
     // ── REPRESENTANTE ──
-    // Texto23=DNI/NIF/NIE, Texto24=Razón Social
-    // Texto25=Nombre, Texto26=1er Apellido, Texto27=2º Apellido
-    // Texto28=Domicilio, Texto29=Nº, Texto30=Piso
-    // Texto31=Localidad, Texto32=CP, Texto33=Provincia
-    // Texto34=Teléfono, Texto35=Email
+    // ...
     if (representante) {
       setField('Texto23', representante.dni_nie || '');
       setField('Texto24', representante.razon_social || '');
@@ -119,25 +112,23 @@ export async function POST(req: NextRequest) {
 
     // ── FECHA Y LUGAR ──
     // Texto36=Lugar, Texto37=Día, Texto38=Mes, Texto39=Año
-    if (fecha_lugar) {
-      setField('Texto36', fecha_lugar.lugar || '');
-      setField('Texto37', fecha_lugar.dia || '');
-      setField('Texto38', fecha_lugar.mes || '');
-      setField('Texto39', fecha_lugar.anio || '');
-    }
+    setField('Texto36', lugar || '');
+    setField('Texto37', dia || '');
+    setField('Texto38', mes || '');
+    setField('Texto39', anio || '');
 
     // Texto40 = área de firma (se deja vacío para firmar a mano)
 
     // ── CONSENTIMIENTO DEHú ──
     // El PDF original no tiene casilla para DEHú, así que la creamos como anotación de texto
+    // Ajustamos la posición para que esté más cerca de la firma y no solape con la solicitud
     if (consentimiento_dehu) {
       const page = pdfDoc.getPage(0);
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      // Dibujar marca "X" y texto de consentimiento en la zona entre solicitud (y~519) y representante (y~454)
+      const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
       page.drawText('[X] CONSIENTO que las comunicaciones y notificaciones se realicen mediante puesta a disposición en la Dirección Electrónica Habilitada Única (DEHú)', {
         x: 35,
-        y: 497,
-        size: 8,
+        y: 475, // Bajamos de 497 a 475 para evitar solape con Texto22 si este es multilínea
+        size: 7,
         font,
         color: rgb(0, 0, 0),
         maxWidth: 500,

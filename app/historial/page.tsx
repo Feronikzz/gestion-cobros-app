@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, Fragment } from 'react';
 import { LayoutShell } from '@/components/layout-shell';
 import { getAuditLog, type FiltrosAudit } from '@/lib/audit';
 import type { AuditLog, TipoEntidad, TipoAccion } from '@/lib/supabase/types';
@@ -75,6 +75,7 @@ export default function HistorialPage() {
   const [busqueda, setBusqueda] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   const [diagStatus, setDiagStatus] = useState<'idle' | 'checking' | 'ok' | 'error'>('idle');
   const [diagResult, setDiagResult] = useState<any>(null);
@@ -139,8 +140,66 @@ export default function HistorialPage() {
   const filteredLogs = useMemo(() => {
     if (!busqueda) return logs;
     const s = busqueda.toLowerCase();
-    return logs.filter(log => log.descripcion?.toLowerCase().includes(s) || log.entidad_nombre?.toLowerCase().includes(s) || log.entidad_id?.toLowerCase().includes(s) || log.accion?.toLowerCase().includes(s) || log.entidad?.toLowerCase().includes(s));
+    return logs.filter(log => 
+      log.descripcion?.toLowerCase().includes(s) || 
+      log.entidad_nombre?.toLowerCase().includes(s) || 
+      log.entidad_id?.toLowerCase().includes(s) || 
+      log.accion?.toLowerCase().includes(s) || 
+      log.entidad?.toLowerCase().includes(s)
+    );
   }, [logs, busqueda]);
+
+  // Agrupar logs por cliente y ventana de tiempo (10 min)
+  const groupedLogs = useMemo(() => {
+    const groups: {
+      id: string;
+      cliente_id: string | null;
+      cliente_nombre: string | null;
+      logs: AuditLog[];
+      created_at: string;
+      isGroup: boolean;
+    }[] = [];
+
+    let currentGroup: typeof groups[0] | null = null;
+
+    filteredLogs.forEach((log) => {
+      const logTime = new Date(log.created_at).getTime();
+      
+      // Si el log tiene cliente_id, intentamos agruparlo
+      if (log.cliente_id) {
+        if (
+          currentGroup && 
+          currentGroup.cliente_id === log.cliente_id && 
+          Math.abs(new Date(currentGroup.created_at).getTime() - logTime) < 10 * 60 * 1000
+        ) {
+          currentGroup.logs.push(log);
+        } else {
+          currentGroup = {
+            id: log.id,
+            cliente_id: log.cliente_id,
+            cliente_nombre: log.entidad === 'cliente' ? log.entidad_nombre : (log.descripcion?.match(/\((.*?)\)/)?.[1] || 'Cliente relacionado'),
+            logs: [log],
+            created_at: log.created_at,
+            isGroup: true
+          };
+          groups.push(currentGroup);
+        }
+      } else {
+        // Log sin cliente_id (ej: catálogo), no se agrupa
+        currentGroup = null;
+        groups.push({
+          id: log.id,
+          cliente_id: null,
+          cliente_nombre: null,
+          logs: [log],
+          created_at: log.created_at,
+          isGroup: false
+        });
+      }
+    });
+
+    return groups;
+  }, [filteredLogs]);
 
   const stats = useMemo(() => {
     const porAccion = new Map<string, number>();
@@ -190,6 +249,11 @@ export default function HistorialPage() {
 
   const formatDate = (d: string) => new Date(d).toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const formatTime = (d: string) => new Date(d).toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+  const toggleGroup = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedGroups(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const handleExport = () => {
     if (filteredLogs.length === 0) return;
@@ -444,40 +508,109 @@ export default function HistorialPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredLogs.map(log => (
-                <tr key={log.id} className="cursor-pointer" onClick={() => setSelectedLog(log)}>
-                  <td style={{ whiteSpace: 'nowrap' }}>
-                    <span style={{ color: 'var(--color-text-secondary)' }}>{formatDate(log.created_at)}</span>
-                  </td>
-                  <td style={{ whiteSpace: 'nowrap' }}>
-                    <span className={`badge ${accionBadgeClass(log.accion)}`}>
-                      {LABELS_ACCION[log.accion] || log.accion}
-                    </span>
-                  </td>
-                  <td style={{ whiteSpace: 'nowrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-                      {getEntityIcon(log.entidad)}
-                      <span style={{ textTransform: 'capitalize' }}>{LABELS_ENTIDAD[log.entidad] || log.entidad}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ maxWidth: 400 }}>
-                      <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={log.descripcion || ''}>
-                        {log.descripcion || '—'}
-                      </div>
-                      {log.entidad_nombre && (
-                        <div className="text-sm" style={{ color: 'var(--color-text-secondary)', marginTop: 2 }}>{log.entidad_nombre}</div>
-                      )}
-                    </div>
-                  </td>
-                  <td style={{ whiteSpace: 'nowrap' }}>
-                    <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{log.user_email?.split('@')[0] || '—'}</span>
-                  </td>
-                  <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
-                    <Eye className="w-4 h-4" style={{ color: 'var(--color-text-secondary)', display: 'inline' }} />
-                  </td>
-                </tr>
-              ))}
+              {groupedLogs.map(group => {
+                const isExpanded = expandedGroups[group.id];
+                const mainLog = group.logs[0];
+                
+                return (
+                  <Fragment key={group.id}>
+                    {/* Fila principal del grupo / log individual */}
+                    <tr 
+                      className={`cursor-pointer ${group.logs.length > 1 ? 'bg-blue-50/30' : ''}`} 
+                      onClick={() => group.logs.length > 1 ? null : setSelectedLog(mainLog)}
+                    >
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <span style={{ color: 'var(--color-text-secondary)' }}>{formatDate(group.created_at)}</span>
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        {group.logs.length > 1 ? (
+                          <button 
+                            onClick={(e) => toggleGroup(group.id, e)}
+                            className="flex items-center gap-1.5 px-2 py-1 rounded bg-blue-100 text-blue-700 text-xs font-bold hover:bg-blue-200 transition-colors"
+                          >
+                            {group.logs.length} acciones
+                            {isExpanded ? <X className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
+                          </button>
+                        ) : (
+                          <span className={`badge ${accionBadgeClass(mainLog.accion)}`}>
+                            {LABELS_ACCION[mainLog.accion] || mainLog.accion}
+                          </span>
+                        )}
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                          {getEntityIcon(group.logs.length > 1 ? 'cliente' : mainLog.entidad)}
+                          <span style={{ textTransform: 'capitalize' }}>
+                            {group.logs.length > 1 ? 'Cliente' : (LABELS_ENTIDAD[mainLog.entidad] || mainLog.entidad)}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ maxWidth: 400 }}>
+                          <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={group.logs.length > 1 ? `Múltiples acciones en ${group.cliente_nombre}` : (mainLog.descripcion || '')}>
+                            {group.logs.length > 1 
+                              ? <span>Sesión de cambios: {group.cliente_nombre}</span>
+                              : (mainLog.descripcion || '—')
+                            }
+                          </div>
+                          {(group.logs.length === 1 && mainLog.entidad_nombre) && (
+                            <div className="text-sm" style={{ color: 'var(--color-text-secondary)', marginTop: 2 }}>{mainLog.entidad_nombre}</div>
+                          )}
+                          {group.logs.length > 1 && !isExpanded && (
+                            <div className="text-xs text-blue-600 mt-1">Haz clic para ver el detalle de las {group.logs.length} acciones</div>
+                          )}
+                        </div>
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>{mainLog.user_email?.split('@')[0] || '—'}</span>
+                      </td>
+                      <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
+                        {group.logs.length > 1 ? (
+                          <button onClick={(e) => toggleGroup(group.id, e)} className="p-1 hover:bg-blue-100 rounded transition-colors">
+                            <History className={`w-4 h-4 text-blue-500 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                          </button>
+                        ) : (
+                          <Eye className="w-4 h-4 text-gray-400 inline" />
+                        )}
+                      </td>
+                    </tr>
+
+                    {/* Acciones desglosadas (si está expandido) */}
+                    {group.logs.length > 1 && isExpanded && group.logs.map((log, idx) => (
+                      <tr 
+                        key={log.id} 
+                        className="bg-gray-50/50 border-l-4 border-blue-400 hover:bg-gray-100/80 transition-colors"
+                        onClick={() => setSelectedLog(log)}
+                      >
+                        <td className="pl-8 py-2 text-xs text-gray-400">
+                          {formatTime(log.created_at)}
+                        </td>
+                        <td className="py-2">
+                          <span className={`badge ${accionBadgeClass(log.accion)} scale-90`}>
+                            {LABELS_ACCION[log.accion] || log.accion}
+                          </span>
+                        </td>
+                        <td className="py-2">
+                          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                            {getEntityIcon(log.entidad)}
+                            <span>{LABELS_ENTIDAD[log.entidad] || log.entidad}</span>
+                          </div>
+                        </td>
+                        <td className="py-2">
+                          <div className="text-sm text-gray-700">{log.descripcion}</div>
+                          {log.entidad_nombre && (
+                            <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mt-0.5">{log.entidad_nombre}</div>
+                          )}
+                        </td>
+                        <td className="py-2"></td>
+                        <td className="py-2 text-right pr-4">
+                          <Eye className="w-3.5 h-3.5 text-gray-300 inline" />
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

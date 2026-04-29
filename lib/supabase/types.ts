@@ -44,6 +44,12 @@ export interface Cliente {
   localidad_nacimiento: string | null;
   pais_nacimiento: string | null;
   pasaporte: string | null;
+  designacion_lugar: string | null;
+  designacion_dia: string | null;
+  designacion_mes: string | null;
+  designacion_anio: string | null;
+  designacion_solicitud: string | null;
+  designacion_consentimiento_dehu: boolean;
   created_at: string;
 }
 
@@ -271,7 +277,7 @@ export interface FacturaLinea {
 }
 
 // ─── Helpers TS para Insert / Update ───────────────────────
-export type ClienteInsert = Omit<Cliente, 'id' | 'created_at' | 'apellido1' | 'apellido2' | 'nombre_padre' | 'nombre_madre' | 'estado_civil' | 'localidad_nacimiento' | 'pais_nacimiento' | 'pasaporte' | 'carpeta_local'> & {
+export type ClienteInsert = Omit<Cliente, 'id' | 'created_at' | 'apellido1' | 'apellido2' | 'nombre_padre' | 'nombre_madre' | 'estado_civil' | 'localidad_nacimiento' | 'pais_nacimiento' | 'pasaporte' | 'carpeta_local' | 'designacion_lugar' | 'designacion_dia' | 'designacion_mes' | 'designacion_anio' | 'designacion_solicitud' | 'designacion_consentimiento_dehu'> & {
   apellido1?: string | null;
   apellido2?: string | null;
   nombre_padre?: string | null;
@@ -281,6 +287,12 @@ export type ClienteInsert = Omit<Cliente, 'id' | 'created_at' | 'apellido1' | 'a
   pais_nacimiento?: string | null;
   pasaporte?: string | null;
   carpeta_local?: string | null;
+  designacion_lugar?: string | null;
+  designacion_dia?: string | null;
+  designacion_mes?: string | null;
+  designacion_anio?: string | null;
+  designacion_solicitud?: string | null;
+  designacion_consentimiento_dehu?: boolean;
 };
 export type ClienteUpdate = Partial<Omit<Cliente, 'id' | 'user_id' | 'created_at'>>;
 export type ProcedimientoInsert = Omit<Procedimiento, 'id' | 'created_at'>;
@@ -331,6 +343,7 @@ export interface AuditLog {
   id: string;
   user_id: string;
   user_email: string | null;
+  cliente_id: string | null;
   entidad: TipoEntidad;
   entidad_id: string | null;
   entidad_nombre: string | null;

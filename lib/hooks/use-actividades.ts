@@ -58,7 +58,7 @@ export function useActividades(clienteId?: string) {
     const acts = await supabase.from('actividades').select('id').order('created_at', { ascending: false }).limit(1);
     const newId = acts.data?.[0]?.id || '';
     const clienteNombre = data.cliente_id ? await getClienteNombre(data.cliente_id) : undefined;
-    await auditActividad.crear(newId, data.titulo || 'Sin título', clienteNombre);
+    await auditActividad.crear(newId, data.titulo || 'Sin título', clienteNombre, data.cliente_id || undefined);
   };
 
   const updateActividad = async (id: string, data: ActividadUpdate) => {
@@ -76,7 +76,7 @@ export function useActividades(clienteId?: string) {
         const anterior = actAnterior[campo as keyof Actividad];
         const nuevo = data[campo];
         if (anterior !== nuevo) {
-          await auditActividad.actualizar(id, actAnterior.titulo || 'Sin título', String(campo), anterior, nuevo);
+          await auditActividad.actualizar(id, actAnterior.titulo || 'Sin título', String(campo), anterior, nuevo, actAnterior.cliente_id || undefined);
         }
       }
     }
@@ -91,7 +91,7 @@ export function useActividades(clienteId?: string) {
     
     // Auditoría con nombre del cliente
     const clienteNombre = actividad?.cliente_id ? await getClienteNombre(actividad.cliente_id) : undefined;
-    await auditActividad.eliminar(id, actividad?.titulo || 'Sin título');
+    await auditActividad.eliminar(id, actividad?.titulo || 'Sin título', actividad?.cliente_id || undefined);
   };
 
   const completeActividad = async (id: string, resultado?: string) => {
@@ -106,7 +106,7 @@ export function useActividades(clienteId?: string) {
     
     // Auditoría con nombre del cliente
     const clienteNombre = actividad?.cliente_id ? await getClienteNombre(actividad.cliente_id) : undefined;
-    await auditActividad.completar(id, actividad?.titulo || 'Sin título');
+    await auditActividad.completar(id, actividad?.titulo || 'Sin título', actividad?.cliente_id || undefined);
   };
 
   // Estadísticas

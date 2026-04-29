@@ -16,6 +16,7 @@ export async function logAudit(
   accion: TipoAccion,
   data: {
     entidad_id?: string;
+    cliente_id?: string;
     entidad_nombre?: string;
     campo?: string;
     valor_anterior?: string | object;
@@ -32,6 +33,7 @@ export async function logAudit(
     const insert: AuditLogInsert = {
       user_id: user.id,
       user_email: user.email || null,
+      cliente_id: data.cliente_id || null,
       entidad,
       accion,
       entidad_id: data.entidad_id || null,
@@ -64,11 +66,12 @@ export async function logAudit(
 // Clientes
 export const auditCliente = {
   crear: (id: string, nombre: string, data: object) => 
-    logAudit('cliente', 'crear', { entidad_id: id, entidad_nombre: nombre, descripcion: `Nuevo cliente: ${nombre}`, valor_nuevo: data }),
+    logAudit('cliente', 'crear', { entidad_id: id, cliente_id: id, entidad_nombre: nombre, descripcion: `Nuevo cliente: ${nombre}`, valor_nuevo: data }),
   
   actualizar: (id: string, nombre: string, campo: string, anterior: unknown, nuevo: unknown) => 
     logAudit('cliente', 'actualizar', { 
       entidad_id: id, 
+      cliente_id: id,
       entidad_nombre: nombre, 
       campo, 
       valor_anterior: String(anterior), 
@@ -77,21 +80,23 @@ export const auditCliente = {
     }),
   
   eliminar: (id: string, nombre: string) => 
-    logAudit('cliente', 'eliminar', { entidad_id: id, entidad_nombre: nombre, descripcion: `Cliente eliminado: ${nombre}` }),
+    logAudit('cliente', 'eliminar', { entidad_id: id, cliente_id: id, entidad_nombre: nombre, descripcion: `Cliente eliminado: ${nombre}` }),
 };
 
 // Procedimientos/Expedientes
 export const auditProcedimiento = {
-  crear: (id: string, titulo: string, clienteNombre: string) => 
+  crear: (id: string, titulo: string, clienteNombre: string, clienteId: string) => 
     logAudit('procedimiento', 'crear', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: titulo, 
       descripcion: `Nuevo expediente: ${titulo} (${clienteNombre})` 
     }),
   
-  actualizar: (id: string, titulo: string, campo: string, anterior: unknown, nuevo: unknown) => 
+  actualizar: (id: string, titulo: string, campo: string, anterior: unknown, nuevo: unknown, clienteId: string) => 
     logAudit('procedimiento', 'actualizar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: titulo, 
       campo,
       valor_anterior: String(anterior),
@@ -99,34 +104,38 @@ export const auditProcedimiento = {
       descripcion: `Expediente "${titulo}": ${campo} cambiado`
     }),
   
-  eliminar: (id: string, titulo: string) => 
-    logAudit('procedimiento', 'eliminar', { entidad_id: id, entidad_nombre: titulo, descripcion: `Expediente eliminado: ${titulo}` }),
+  eliminar: (id: string, titulo: string, clienteId: string) => 
+    logAudit('procedimiento', 'eliminar', { entidad_id: id, cliente_id: clienteId, entidad_nombre: titulo, descripcion: `Expediente eliminado: ${titulo}` }),
   
-  presentar: (id: string, titulo: string, referencia: string) => 
+  presentar: (id: string, titulo: string, referencia: string, clienteId: string) => 
     logAudit('procedimiento', 'presentar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: titulo, 
       descripcion: `Expediente presentado: ${titulo} (${referencia})` 
     }),
   
-  resolver: (id: string, titulo: string, estado: string) => 
+  resolver: (id: string, titulo: string, estado: string, clienteId: string) => 
     logAudit('procedimiento', 'resolver', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: titulo, 
       descripcion: `Expediente resuelto: ${titulo} (${estado})` 
     }),
   
-  docAdjuntar: (id: string, titulo: string, docNombre: string) => 
+  docAdjuntar: (id: string, titulo: string, docNombre: string, clienteId: string) => 
     logAudit('procedimiento', 'adjuntar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: titulo, 
       campo: 'documento',
       descripcion: `Documento adjuntado: ${docNombre}` 
     }),
   
-  docDesadjuntar: (id: string, titulo: string, docNombre: string) => 
+  docDesadjuntar: (id: string, titulo: string, docNombre: string, clienteId: string) => 
     logAudit('procedimiento', 'desadjuntar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: titulo, 
       campo: 'documento',
       descripcion: `Documento desmarcado: ${docNombre}` 
@@ -135,16 +144,18 @@ export const auditProcedimiento = {
 
 // Cobros
 export const auditCobro = {
-  crear: (id: string, importe: number, clienteNombre: string, metodo?: string) => 
+  crear: (id: string, importe: number, clienteNombre: string, clienteId: string, metodo?: string) => 
     logAudit('cobro', 'crear', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: `${importe}€ – ${clienteNombre}`, 
       descripcion: `Cobro registrado: ${importe}€ de ${clienteNombre}${metodo ? ` (${metodo})` : ''}` 
     }),
   
-  actualizar: (id: string, importe: number, clienteNombre: string, campo: string, anterior: unknown, nuevo: unknown) => 
+  actualizar: (id: string, importe: number, clienteNombre: string, clienteId: string, campo: string, anterior: unknown, nuevo: unknown) => 
     logAudit('cobro', 'actualizar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: `${importe}€ – ${clienteNombre}`,
       campo,
       valor_anterior: String(anterior),
@@ -152,9 +163,10 @@ export const auditCobro = {
       descripcion: `Cobro de ${clienteNombre} (${importe}€): ${campo} cambiado` 
     }),
   
-  eliminar: (id: string, importe: number, clienteNombre: string) => 
+  eliminar: (id: string, importe: number, clienteNombre: string, clienteId: string) => 
     logAudit('cobro', 'eliminar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: `${importe}€ – ${clienteNombre}`, 
       descripcion: `Cobro eliminado: ${importe}€ de ${clienteNombre}` 
     }),
@@ -162,16 +174,18 @@ export const auditCobro = {
 
 // Gastos
 export const auditGasto = {
-  crear: (id: string, importe: number, concepto: string, clienteNombre?: string) => 
+  crear: (id: string, importe: number, concepto: string, clienteNombre?: string, clienteId?: string) => 
     logAudit('gasto', 'crear', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: concepto, 
       descripcion: `Gasto registrado: ${concepto} (${importe}€)${clienteNombre ? ` - ${clienteNombre}` : ''}` 
     }),
   
-  actualizar: (id: string, concepto: string, campo: string, anterior: unknown, nuevo: unknown, clienteNombre?: string) => 
+  actualizar: (id: string, concepto: string, campo: string, anterior: unknown, nuevo: unknown, clienteNombre?: string, clienteId?: string) => 
     logAudit('gasto', 'actualizar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: concepto,
       campo,
       valor_anterior: String(anterior),
@@ -179,9 +193,10 @@ export const auditGasto = {
       descripcion: `Gasto "${concepto}"${clienteNombre ? ` (${clienteNombre})` : ''}: ${campo} cambiado` 
     }),
   
-  eliminar: (id: string, importe: number, concepto: string, clienteNombre?: string) => 
+  eliminar: (id: string, importe: number, concepto: string, clienteNombre?: string, clienteId?: string) => 
     logAudit('gasto', 'eliminar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: concepto, 
       descripcion: `Gasto eliminado: ${concepto} (${importe}€)${clienteNombre ? ` - ${clienteNombre}` : ''}` 
     }),
@@ -189,16 +204,18 @@ export const auditGasto = {
 
 // Actividades
 export const auditActividad = {
-  crear: (id: string, titulo: string, clienteNombre?: string) => 
+  crear: (id: string, titulo: string, clienteNombre?: string, clienteId?: string) => 
     logAudit('actividad', 'crear', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: titulo, 
       descripcion: `Nueva actividad: ${titulo}${clienteNombre ? ` (${clienteNombre})` : ''}` 
     }),
   
-  actualizar: (id: string, titulo: string, campo: string, anterior: unknown, nuevo: unknown) => 
+  actualizar: (id: string, titulo: string, campo: string, anterior: unknown, nuevo: unknown, clienteId?: string) => 
     logAudit('actividad', 'actualizar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: titulo,
       campo,
       valor_anterior: String(anterior),
@@ -206,9 +223,10 @@ export const auditActividad = {
       descripcion: `Actividad "${titulo}": ${campo} cambiado` 
     }),
   
-  completar: (id: string, titulo: string) => 
+  completar: (id: string, titulo: string, clienteId?: string) => 
     logAudit('actividad', 'actualizar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: titulo,
       campo: 'estado',
       valor_anterior: 'pendiente',
@@ -216,9 +234,10 @@ export const auditActividad = {
       descripcion: `Actividad completada: ${titulo}` 
     }),
   
-  eliminar: (id: string, titulo: string) => 
+  eliminar: (id: string, titulo: string, clienteId?: string) => 
     logAudit('actividad', 'eliminar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: titulo, 
       descripcion: `Actividad eliminada: ${titulo}` 
     }),
@@ -226,16 +245,18 @@ export const auditActividad = {
 
 // Facturas
 export const auditFactura = {
-  crear: (id: string, numero: string, importe: number, clienteNombre?: string) => 
+  crear: (id: string, numero: string, importe: number, clienteNombre?: string, clienteId?: string) => 
     logAudit('factura', 'crear', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: numero, 
       descripcion: `Factura generada: ${numero} (${importe}€)${clienteNombre ? ` - ${clienteNombre}` : ''}` 
     }),
   
-  eliminar: (id: string, numero: string, clienteNombre?: string) => 
+  eliminar: (id: string, numero: string, clienteNombre?: string, clienteId?: string) => 
     logAudit('factura', 'eliminar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: numero, 
       descripcion: `Factura eliminada: ${numero}${clienteNombre ? ` - ${clienteNombre}` : ''}` 
     }),
@@ -243,16 +264,18 @@ export const auditFactura = {
 
 // Documentos subidos
 export const auditDocumento = {
-  subir: (id: string, nombre: string, clienteNombre: string) => 
+  subir: (id: string, nombre: string, clienteNombre: string, clienteId?: string) => 
     logAudit('documento', 'adjuntar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: nombre, 
       descripcion: `Documento subido: ${nombre} (${clienteNombre})` 
     }),
   
-  eliminar: (id: string, nombre: string, clienteNombre: string) => 
+  eliminar: (id: string, nombre: string, clienteNombre: string, clienteId?: string) => 
     logAudit('documento', 'eliminar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: nombre, 
       descripcion: `Documento eliminado: ${nombre} (${clienteNombre})` 
     }),
@@ -260,16 +283,18 @@ export const auditDocumento = {
 
 // Recibís
 export const auditRecibi = {
-  crear: (id: string, numero: string, importe: number, clienteNombre?: string) => 
+  crear: (id: string, numero: string, importe: number, clienteNombre?: string, clienteId?: string) => 
     logAudit('recibi', 'crear', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: numero, 
       descripcion: `Recibí generado: ${numero} (${importe}€)${clienteNombre ? ` - ${clienteNombre}` : ''}` 
     }),
   
-  eliminar: (id: string, numero: string, clienteNombre?: string) => 
+  eliminar: (id: string, numero: string, clienteNombre?: string, clienteId?: string) => 
     logAudit('recibi', 'eliminar', { 
       entidad_id: id, 
+      cliente_id: clienteId,
       entidad_nombre: numero, 
       descripcion: `Recibí eliminado: ${numero}${clienteNombre ? ` - ${clienteNombre}` : ''}` 
     }),

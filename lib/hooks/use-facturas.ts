@@ -69,7 +69,7 @@ export function useFacturas() {
     
     // Auditoría
     const importeTotal = data.lineas?.reduce((sum, l) => sum + (l.importe || 0), 0) || 0;
-    await auditFactura.crear(data.numero, data.numero, importeTotal);
+    await auditFactura.crear(data.numero, data.numero, importeTotal, undefined, data.cliente_id);
   };
 
   const deleteFactura = async (id: string) => {
@@ -81,7 +81,7 @@ export function useFacturas() {
     await fetchFacturas();
     
     // Auditoría
-    await auditFactura.eliminar(id, factura?.numero || '');
+    await auditFactura.eliminar(id, factura?.numero || '', undefined, factura?.cliente_id);
   };
 
   return { facturas, emisor, loading, error, saveEmisor, createFactura, deleteFactura, refetch: fetchFacturas };
