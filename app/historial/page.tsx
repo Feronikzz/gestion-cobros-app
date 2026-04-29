@@ -430,21 +430,67 @@ export default function HistorialPage() {
 
         {/* Filtros de período */}
         <div className="flex flex-wrap items-center gap-3 mb-4">
-          <span className="text-sm font-semibold" style={{ color: 'var(--color-text-secondary)' }}>Período:</span>
-          {(Object.keys(LABELS_FILTRO) as FiltroRapido[]).map(tipo => (
+          <span className="text-sm font-semibold" style={{ color: 'var(--color-text-secondary)', minWidth: '60px' }}>Período:</span>
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(LABELS_FILTRO) as FiltroRapido[]).map(tipo => (
+              <button
+                key={tipo}
+                onClick={() => setFiltroRapido(tipo)}
+                className={`px-3 py-1.5 rounded-lg border-2 font-medium transition-all duration-200 text-sm ${
+                  filtroRapido === tipo
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                }`}
+              >
+                {LABELS_FILTRO[tipo]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Filtros rápidos de entidad */}
+        <div className="flex flex-wrap items-center gap-3 mb-6">
+          <span className="text-sm font-semibold" style={{ color: 'var(--color-text-secondary)', minWidth: '60px' }}>Ver solo:</span>
+          <div className="flex flex-wrap gap-2">
             <button
-              key={tipo}
-              onClick={() => setFiltroRapido(tipo)}
-              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 ${
-                filtroRapido === tipo
+              onClick={() => setEntidadFilter(entidadFilter === 'procedimiento' ? '' : 'procedimiento')}
+              className={`px-3 py-1.5 rounded-lg border-2 font-medium transition-all duration-200 text-sm flex items-center gap-1.5 ${
+                entidadFilter === 'procedimiento'
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Expedientes
+            </button>
+            <button
+              onClick={() => setEntidadFilter(entidadFilter === 'cobro' ? '' : 'cobro')}
+              className={`px-3 py-1.5 rounded-lg border-2 font-medium transition-all duration-200 text-sm flex items-center gap-1.5 ${
+                entidadFilter === 'cobro'
+                  ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+              }`}
+            >
+              <CreditCard className="w-4 h-4" />
+              Cobros
+            </button>
+            <button
+              onClick={() => setEntidadFilter(entidadFilter === 'cliente' ? '' : 'cliente')}
+              className={`px-3 py-1.5 rounded-lg border-2 font-medium transition-all duration-200 text-sm flex items-center gap-1.5 ${
+                entidadFilter === 'cliente'
                   ? 'border-blue-500 bg-blue-50 text-blue-700'
                   : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
               }`}
-              style={{ fontSize: '0.875rem' }}
             >
-              {LABELS_FILTRO[tipo]}
+              <Users className="w-4 h-4" />
+              Clientes
             </button>
-          ))}
+            {entidadFilter && !['procedimiento', 'cobro', 'cliente'].includes(entidadFilter) && (
+              <span className="px-3 py-1.5 rounded-lg border-2 border-amber-500 bg-amber-50 text-amber-700 font-medium text-sm">
+                Filtro: {LABELS_ENTIDAD[entidadFilter]}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Filtros avanzados */}
