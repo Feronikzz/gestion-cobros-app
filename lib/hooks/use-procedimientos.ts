@@ -44,7 +44,7 @@ export function useProcedimientos(clienteId?: string) {
     setProcedimientos(prev => [data, ...prev]);
     
     // Auditoría
-    await auditProcedimiento.crear(data.id, data.titulo, '');
+    await auditProcedimiento.crear(data.id, data.titulo, '', data.cliente_id);
     
     return data;
   };
@@ -75,7 +75,8 @@ export function useProcedimientos(clienteId?: string) {
             data.titulo,
             String(campo),
             valorAnterior,
-            valorNuevo
+            valorNuevo,
+            data.cliente_id
           );
         }
       }
@@ -94,7 +95,7 @@ export function useProcedimientos(clienteId?: string) {
     setProcedimientos(prev => prev.filter(p => p.id !== id));
     
     // Auditoría
-    await auditProcedimiento.eliminar(id, proc?.titulo || 'Expediente desconocido');
+    await auditProcedimiento.eliminar(id, proc?.titulo || 'Expediente desconocido', proc?.cliente_id || '');
   };
 
   useEffect(() => {

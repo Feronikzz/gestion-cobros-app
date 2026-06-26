@@ -185,7 +185,7 @@ export default function ClienteDetallePage() {
       for (const [campo, nuevo] of Object.entries(cleanUpdates)) {
         const anterior = (editingProc as any)[campo];
         if (anterior !== nuevo) {
-          await auditProcedimiento.actualizar(editingProc.id, formData.titulo || editingProc.titulo, campo, anterior, nuevo);
+          await auditProcedimiento.actualizar(editingProc.id, formData.titulo || editingProc.titulo, campo, anterior, nuevo, id);
         }
       }
       
@@ -202,14 +202,14 @@ export default function ClienteDetallePage() {
           iva_tipo: 'iva_incluido',
           iva_porcentaje: 21,
         }).select().single();
-        if (newCobro) await auditCobro.crear(newCobro.id, formData.importe_entrada, clienteNombre, 'efectivo');
+        if (newCobro) await auditCobro.crear(newCobro.id, formData.importe_entrada, clienteNombre, id, 'efectivo');
       }
     } else {
       const { data: newProc } = await supabase.from('procedimientos').insert(payload).select().single();
       
       // Auditoría: nuevo expediente
       if (newProc) {
-        await auditProcedimiento.crear(newProc.id, newProc.titulo, clienteNombre);
+        await auditProcedimiento.crear(newProc.id, newProc.titulo, clienteNombre, id);
       }
       
       // Si tiene entrada, crear cobro automáticamente
@@ -225,7 +225,7 @@ export default function ClienteDetallePage() {
           iva_tipo: 'iva_incluido',
           iva_porcentaje: 21,
         }).select().single();
-        if (newCobro) await auditCobro.crear(newCobro.id, formData.importe_entrada, clienteNombre, 'efectivo');
+        if (newCobro) await auditCobro.crear(newCobro.id, formData.importe_entrada, clienteNombre, id, 'efectivo');
       }
     }
     setShowProcModal(false);
@@ -362,7 +362,7 @@ export default function ClienteDetallePage() {
     await supabase.from('procedimientos').delete().eq('id', procId);
     
     // Auditoría
-    await auditProcedimiento.eliminar(procId, proc?.titulo || 'Expediente desconocido');
+    await auditProcedimiento.eliminar(procId, proc?.titulo || 'Expediente desconocido', id);
     fetchData();
   };
 
@@ -380,12 +380,12 @@ export default function ClienteDetallePage() {
       for (const [campo, nuevo] of Object.entries(data)) {
         const anterior = (editingCobro as any)[campo];
         if (anterior !== nuevo) {
-          await auditCobro.actualizar(editingCobro.id, editingCobro.importe, clienteNombre, campo, anterior, nuevo);
+          await auditCobro.actualizar(editingCobro.id, editingCobro.importe, clienteNombre, id, campo, anterior, nuevo);
         }
       }
     } else {
       const { data: newCobro } = await supabase.from('cobros').insert({ ...data, user_id: user.id }).select().single();
-      if (newCobro) await auditCobro.crear(newCobro.id, newCobro.importe, clienteNombre, newCobro.metodo_pago);
+      if (newCobro) await auditCobro.crear(newCobro.id, newCobro.importe, clienteNombre, id, newCobro.metodo_pago);
     }
     setShowCobroModal(false);
     setEditingCobro(null);
@@ -401,7 +401,7 @@ export default function ClienteDetallePage() {
     await supabase.from('cobros').delete().eq('id', cobroId);
     
     // Auditoría
-    await auditCobro.eliminar(cobroId, cobro?.importe || 0, clienteNombre);
+    await auditCobro.eliminar(cobroId, cobro?.importe || 0, clienteNombre, id);
     fetchData();
   };
 

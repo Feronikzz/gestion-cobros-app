@@ -60,7 +60,7 @@ export function useCobros() {
       
       // Auditoría con nombre del cliente
       const clienteNombre = await getClienteNombre(data.cliente_id);
-      await auditCobro.crear(data.id, data.importe, clienteNombre, data.metodo_pago);
+      await auditCobro.crear(data.id, data.importe, clienteNombre, data.cliente_id, data.metodo_pago);
       
       return data;
     } catch (error: any) {
@@ -93,7 +93,7 @@ export function useCobros() {
           const anterior = cobroAnterior[campo];
           const nuevo = updates[campo];
           if (anterior !== nuevo) {
-            await auditCobro.actualizar(id, data.importe, clienteNombre, String(campo), anterior, nuevo);
+            await auditCobro.actualizar(id, data.importe, clienteNombre, data.cliente_id, String(campo), anterior, nuevo);
           }
         }
       }
@@ -121,7 +121,7 @@ export function useCobros() {
       
       // Auditoría con nombre del cliente
       const clienteNombre = cobro ? await getClienteNombre(cobro.cliente_id) : 'Desconocido';
-      await auditCobro.eliminar(id, cobro?.importe || 0, clienteNombre);
+      await auditCobro.eliminar(id, cobro?.importe || 0, clienteNombre, cobro?.cliente_id || '');
     } catch (error: any) {
       throw new Error(error.message || 'Error al eliminar cobro');
     }

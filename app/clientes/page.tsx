@@ -161,7 +161,7 @@ export default function ClientesPage() {
             
             // Auditoría: nuevo expediente
             if (newProc) {
-              await auditProcedimiento.crear(newProc.id, newProc.titulo, clienteNombre);
+              await auditProcedimiento.crear(newProc.id, newProc.titulo, clienteNombre, newCliente.id);
             }
             
             // Si tiene entrada, crear cobro automático
@@ -177,7 +177,7 @@ export default function ClientesPage() {
                 iva_tipo: 'iva_incluido',
                 iva_porcentaje: 21,
               }).select().single();
-              if (newCobro) await auditCobro.crear(newCobro.id, proc.importe_entrada, clienteNombre, 'efectivo');
+              if (newCobro) await auditCobro.crear(newCobro.id, proc.importe_entrada, clienteNombre, newCliente.id, 'efectivo');
             }
           }
         }
