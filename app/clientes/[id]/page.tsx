@@ -405,15 +405,40 @@ export default function ClienteDetallePage() {
     fetchData();
   };
 
-  const handleCreateFacturaFromCobro = (cobro: Cobro) => {
+  const handleCreateFacturaFromCobro = async (cobro: Cobro) => {
+    // Obtener procedimiento si existe
+    let procedimientoNombre = '';
+    if (cobro.procedimiento_id && supabase) {
+      const { data: proc } = await supabase.from('procedimientos').select('titulo').eq('id', cobro.procedimiento_id).single();
+      procedimientoNombre = proc?.titulo || '';
+    }
+    
+    // Obtener documento principal del cliente
+    let documentoTipo = '';
+    let documentoNumero = '';
+    if (supabase) {
+      const { data: docs } = await supabase.from('documentos_identidad').select('*').eq('cliente_id', cobro.cliente_id).eq('es_principal', true).limit(1).single();
+      if (docs) {
+        documentoTipo = docs.tipo || '';
+        documentoNumero = docs.numero || '';
+      }
+    }
+    
     // Redirigir a página de facturas con parámetros prellenados
     const params = new URLSearchParams({
       cliente_id: cobro.cliente_id,
       cliente_nombre: cliente?.nombre || '',
       cliente_nif: cliente?.nif || '',
       cliente_direccion: cliente?.direccion || '',
+      cliente_codigo_postal: cliente?.codigo_postal || '',
+      cliente_localidad: cliente?.localidad || '',
+      cliente_provincia: cliente?.provincia || '',
+      cliente_documento_tipo: documentoTipo,
+      cliente_documento_numero: documentoNumero,
+      cliente_pasaporte: cliente?.pasaporte || '',
       importe: cobro.importe.toString(),
-      concepto: cobro.notas || 'Cobro sin concepto específico',
+      concepto: cobro.notas || '',
+      procedimiento_nombre: procedimientoNombre,
       fecha: cobro.fecha_cobro,
       iva_tipo: cobro.iva_tipo,
       iva_porcentaje: cobro.iva_porcentaje.toString(),

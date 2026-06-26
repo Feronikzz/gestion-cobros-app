@@ -93,7 +93,54 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
     }
   };
 
+  // Función para convertir número a letras
+  const numeroALetras = (numero: number): string => {
+    const unidades = ['cero', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve'];
+    const especiales = ['diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve'];
+    const decenas = ['', '', 'veinte', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+    const centenas = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+    
+    const convertirEntero = (n: number): string => {
+      if (n === 0) return '';
+      if (n < 10) return unidades[n];
+      if (n < 20) return especiales[n - 10];
+      if (n < 100) {
+        const d = Math.floor(n / 10);
+        const u = n % 10;
+        return decenas[d] + (u > 0 ? ' y ' + unidades[u] : '');
+      }
+      if (n < 1000) {
+        const c = Math.floor(n / 100);
+        const resto = n % 100;
+        if (n === 100) return 'cien';
+        return centenas[c] + (resto > 0 ? ' ' + convertirEntero(resto) : '');
+      }
+      if (n < 1000000) {
+        const miles = Math.floor(n / 1000);
+        const resto = n % 1000;
+        if (miles === 1) return 'mil' + (resto > 0 ? ' ' + convertirEntero(resto) : '');
+        return convertirEntero(miles) + ' mil' + (resto > 0 ? ' ' + convertirEntero(resto) : '');
+      }
+      return n.toString();
+    };
+    
+    if (numero === 0) return 'cero euros';
+    
+    const partes = numero.toFixed(2).split('.');
+    const parteEntera = parseInt(partes[0]);
+    const parteDecimal = parseInt(partes[1]);
+    
+    let resultado = convertirEntero(parteEntera);
+    if (parteDecimal > 0) {
+      resultado += ' con ' + convertirEntero(parteDecimal) + ' céntimos';
+    }
+    return resultado + ' euros';
+  };
+
   const generateFacturaHTML = (factura: Factura) => {
+    // Determinar si todas las líneas tienen cantidad 0
+    const todasCantidadCero = factura.lineas.every(l => l.cantidad === 0);
+    
     return `
       <div class="factura-container">
         <div class="factura-header">
@@ -115,7 +162,7 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
           <div class="factura-receptor">
             <h3>CLIENTE</h3>
             <p><strong>${factura.receptor_nombre}</strong></p>
-            ${factura.receptor_nif ? `<p>NIF/CIF: ${factura.receptor_nif}</p>` : ''}
+            ${factura.receptor_nif ? `<p>${factura.receptor_nif}</p>` : ''}
             ${factura.receptor_direccion ? `<p>${factura.receptor_direccion}</p>` : ''}
           </div>
         </div>
@@ -125,7 +172,7 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
             <thead>
               <tr>
                 <th>Descripción</th>
-                <th>Cantidad</th>
+                ${!todasCantidadCero ? '<th>Cantidad</th>' : ''}
                 <th>Precio Unitario</th>
                 <th>Importe</th>
               </tr>
@@ -134,13 +181,17 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
               ${factura.lineas.map(linea => `
                 <tr>
                   <td>${linea.descripcion}</td>
-                  <td>${linea.cantidad}</td>
+                  ${!todasCantidadCero ? `<td>${linea.cantidad}</td>` : ''}
                   <td>${eur(linea.precio_unitario)}</td>
                   <td>${eur(linea.importe)}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
+        </div>
+
+        <div class="factura-importe-letras">
+          <p><strong>El importe del procedimiento es de ${numeroALetras(factura.total)}</strong></p>
         </div>
 
         <div class="factura-totales">
@@ -180,7 +231,12 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
     return `
       @page {
         size: A4;
-        margin: 2cm;
+        margin: 1.5cm;
+      }
+      
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
       
       body {
@@ -195,6 +251,7 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
       .factura-container {
         max-width: 100%;
         margin: 0 auto;
+        page-break-inside: avoid;
       }
       
       .factura-header {
@@ -224,6 +281,7 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
       
       .factura-emisor, .factura-receptor {
         flex: 1;
+        page-break-inside: avoid;
       }
       
       .factura-emisor h3, .factura-receptor h3 {
@@ -244,6 +302,7 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 20px;
+        page-break-inside: avoid;
       }
       
       .factura-lineas th, .factura-lineas td {
@@ -253,7 +312,7 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
       }
       
       .factura-lineas th {
-        background-color: #f5f5f5;
+        background-color: #f5f5f5 !important;
         font-weight: bold;
         font-size: 12px;
       }
@@ -266,9 +325,25 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
         text-align: right;
       }
       
+      .factura-importe-letras {
+        margin: 20px 0;
+        padding: 15px;
+        background-color: #f9fafb !important;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        page-break-inside: avoid;
+      }
+      
+      .factura-importe-letras p {
+        margin: 0;
+        font-size: 12px;
+        color: #374151;
+      }
+      
       .factura-totales {
         margin-top: 20px;
         text-align: right;
+        page-break-inside: avoid;
       }
       
       .totales-row {
@@ -289,6 +364,7 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
         margin-top: 30px;
         padding-top: 20px;
         border-top: 1px solid #ccc;
+        page-break-inside: avoid;
       }
       
       .factura-notas h4 {
@@ -306,6 +382,8 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
       @media print {
         body { margin: 0; }
         .factura-container { margin: 0; }
+        .factura-lineas table { page-break-inside: auto; }
+        .factura-lineas tr { page-break-inside: avoid; }
       }
     `;
   };
@@ -572,17 +650,19 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
                         letterSpacing: '0.05em',
                         borderRight: '1px solid rgba(229, 231, 235, 0.3)'
                       }}>Descripción</th>
-                      <th style={{ 
-                        textAlign: 'center', 
-                        padding: '1.25rem 1rem', 
-                        fontSize: '0.8125rem', 
-                        fontWeight: '600', 
-                        color: '#3730a3', 
-                        textTransform: 'uppercase', 
-                        letterSpacing: '0.05em',
-                        width: '6rem',
-                        borderRight: '1px solid rgba(229, 231, 235, 0.3)'
-                      }}>Cant.</th>
+                      {!factura.lineas.every(l => l.cantidad === 0) && (
+                        <th style={{ 
+                          textAlign: 'center', 
+                          padding: '1.25rem 1rem', 
+                          fontSize: '0.8125rem', 
+                          fontWeight: '600', 
+                          color: '#3730a3', 
+                          textTransform: 'uppercase', 
+                          letterSpacing: '0.05em',
+                          width: '6rem',
+                          borderRight: '1px solid rgba(229, 231, 235, 0.3)'
+                        }}>Cant.</th>
+                      )}
                       <th style={{ 
                         textAlign: 'right', 
                         padding: '1.25rem 1rem', 
@@ -621,14 +701,16 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
                           fontWeight: '500',
                           borderRight: '1px solid rgba(229, 231, 235, 0.3)'
                         }}>{linea.descripcion}</td>
-                        <td style={{ 
-                          padding: '1.25rem 1rem', 
-                          fontSize: '0.9375rem', 
-                          textAlign: 'center', 
-                          color: '#6b7280',
-                          fontWeight: '500',
-                          borderRight: '1px solid rgba(229, 231, 235, 0.3)'
-                        }}>{linea.cantidad}</td>
+                        {!factura.lineas.every(l => l.cantidad === 0) && (
+                          <td style={{ 
+                            padding: '1.25rem 1rem', 
+                            fontSize: '0.9375rem', 
+                            textAlign: 'center', 
+                            color: '#6b7280',
+                            fontWeight: '500',
+                            borderRight: '1px solid rgba(229, 231, 235, 0.3)'
+                          }}>{linea.cantidad}</td>
+                        )}
                         <td style={{ 
                           padding: '1.25rem 1rem', 
                           fontSize: '0.9375rem', 
@@ -650,6 +732,25 @@ export default function FacturaViewPage({ params }: { params: Promise<{ id: stri
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* Importe en letras */}
+            <div style={{ 
+              marginBottom: '2rem', 
+              padding: '1.5rem', 
+              backgroundColor: '#f9fafb', 
+              border: '1px solid #e5e7eb', 
+              borderRadius: '12px',
+              textAlign: 'center'
+            }}>
+              <p style={{ 
+                fontSize: '0.9375rem', 
+                color: '#374151', 
+                margin: 0,
+                fontWeight: '500'
+              }}>
+                El importe del procedimiento es de {numeroALetras(factura.total)}
+              </p>
             </div>
 
             {/* Totales - Diseño moderno */}

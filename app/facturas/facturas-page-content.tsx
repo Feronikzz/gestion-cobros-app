@@ -35,7 +35,7 @@ export function FacturasPageContent() {
   });
 
   // Factura form
-  const emptyLinea: FacturaLinea = { descripcion: '', cantidad: 1, precio_unitario: 0, importe: 0 };
+  const emptyLinea: FacturaLinea = { descripcion: '', cantidad: 0, precio_unitario: 0, importe: 0 };
   const [facForm, setFacForm] = useState({
     cliente_id: '',
     procedimiento_id: '',
@@ -67,8 +67,15 @@ export function FacturasPageContent() {
       const clienteNombre = searchParams.get('cliente_nombre');
       const clienteNif = searchParams.get('cliente_nif');
       const clienteDireccion = searchParams.get('cliente_direccion');
+      const clienteCodigoPostal = searchParams.get('cliente_codigo_postal');
+      const clienteLocalidad = searchParams.get('cliente_localidad');
+      const clienteProvincia = searchParams.get('cliente_provincia');
+      const clienteDocumentoTipo = searchParams.get('cliente_documento_tipo');
+      const clienteDocumentoNumero = searchParams.get('cliente_documento_numero');
+      const clientePasaporte = searchParams.get('cliente_pasaporte');
       const importe = searchParams.get('importe');
       const concepto = searchParams.get('concepto');
+      const procedimientoNombre = searchParams.get('procedimiento_nombre');
       const fecha = searchParams.get('fecha');
       const ivaTipo = searchParams.get('iva_tipo');
       const ivaPorcentaje = searchParams.get('iva_porcentaje');
@@ -116,22 +123,38 @@ export function FacturasPageContent() {
           incluirIva = true;
         }
         
+        // Construir dirección completa
+        const direccionCompleta = [clienteDireccion, clienteCodigoPostal, clienteLocalidad, clienteProvincia]
+          .filter(Boolean)
+          .join(', ');
+        
+        // Construir documento con tipo
+        let documentoConTipo = clienteNif || '';
+        if (clienteDocumentoTipo && clienteDocumentoNumero) {
+          documentoConTipo = `${clienteDocumentoTipo}: ${clienteDocumentoNumero}`;
+        } else if (clientePasaporte) {
+          documentoConTipo = `Pasaporte: ${clientePasaporte}`;
+        }
+        
+        // Usar procedimiento como descripción si no hay concepto
+        const descripcionFinal = concepto || procedimientoNombre || 'Servicio profesional';
+        
         setFacForm({
           cliente_id: clienteId,
           procedimiento_id: '',
           tipo: 'normal',
           fecha: fecha || new Date().toISOString().slice(0, 10),
           receptor_nombre: clienteNombre,
-          receptor_nif: clienteNif || '',
-          receptor_direccion: clienteDireccion || '',
+          receptor_nif: documentoConTipo,
+          receptor_direccion: direccionCompleta,
           incluir_iva: incluirIva,
           iva_porcentaje: ivaPorc,
           incluir_irpf: false,
           irpf_porcentaje: 15,
           lineas: [
             {
-              descripcion: concepto || 'Servicio profesional',
-              cantidad: 1,
+              descripcion: descripcionFinal,
+              cantidad: 0, // Por defecto 0 como solicitado
               precio_unitario: baseImponible,
               importe: baseImponible
             }
@@ -163,7 +186,12 @@ export function FacturasPageContent() {
   const updateLinea = (idx: number, field: keyof FacturaLinea, value: string | number) => {
     const lineas = [...facForm.lineas];
     const l = { ...lineas[idx], [field]: value };
-    l.importe = l.cantidad * l.precio_unitario;
+    // Si cantidad es 0, el importe es solo el precio unitario
+    if (l.cantidad === 0) {
+      l.importe = l.precio_unitario;
+    } else {
+      l.importe = l.cantidad * l.precio_unitario;
+    }
     lineas[idx] = l;
     setFacForm(prev => ({ ...prev, lineas }));
   };
@@ -194,12 +222,15 @@ export function FacturasPageContent() {
   const irpfImporte = facForm.incluir_irpf ? Math.round(baseImponible * facForm.irpf_porcentaje * 100) / 10000 : 0;
   const total = Math.round((baseImponible + ivaImporte - irpfImporte) * 100) / 100;
 
-  // Generar número factura
+  // Generar número factura con punto de partida configurable
   const nextNumero = () => {
     const year = new Date().getFullYear();
     const count = facturas.filter(f => f.numero.startsWith(`FAC-${year}`)).length + 1;
     return `FAC-${year}/${String(count).padStart(4, '0')}`;
   };
+
+  const [numeroManual, setNumeroManual] = useState('');
+  const [usarNumeroManual, setUsarNumeroManual] = useState(false);
 
   const handleSaveEmisor = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,7 +249,7 @@ export function FacturasPageContent() {
     if (!emisor) { toast.warning('Configura primero los datos del emisor'); return; }
 
     await createFactura({
-      numero: nextNumero(),
+      numero: usarNumeroManual ? numeroManual : nextNumero(),
       cliente_id: facForm.cliente_id,
       procedimiento_id: facForm.procedimiento_id || null,
       tipo: facForm.tipo,
@@ -405,6 +436,33 @@ export function FacturasPageContent() {
                 <option value="">Seleccionar...</option>
                 {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="form-label">Número de factura</label>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  id="usar_numero_manual" 
+                  checked={usarNumeroManual} 
+                  onChange={e => setUsarNumeroManual(e.target.checked)} 
+                  className="form-checkbox" 
+                />
+                <label htmlFor="usar_numero_manual" className="text-sm">Usar número manual</label>
+              </div>
+              {usarNumeroManual ? (
+                <input 
+                  type="text" 
+                  value={numeroManual} 
+                  onChange={e => setNumeroManual(e.target.value)} 
+                  placeholder="FAC-2026/0001" 
+                  className="form-input mt-2" 
+                />
+              ) : (
+                <div className="text-sm text-gray-500 mt-2">Auto: {nextNumero()}</div>
+              )}
             </div>
           </div>
 
