@@ -76,6 +76,10 @@ export default function ExpedientesPage() {
   const [docsFilter, setDocsFilter] = useState<'todos' | 'completos' | 'incompletos' | 'sin_docs'>('todos');
   const [docBusqueda, setDocBusqueda] = useState('');
   
+  // Ordenamiento
+  const [sortBy, setSortBy] = useState<'created_at' | 'fecha_presentacion' | null>(null);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  
   // Expandir documentos por expediente
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   
@@ -190,9 +194,9 @@ export default function ExpedientesPage() {
     return count;
   }, [estadoFilter, pagadoFilter, categoriaFilter, tituloFilter, docsFilter, docBusqueda]);
 
-  // Aplicar filtros
+  // Aplicar filtros y ordenamiento
   const filteredExpedientes = useMemo(() => {
-    return expedientes.filter(expediente => {
+    let filtered = expedientes.filter(expediente => {
       // Extraer datos completos del cliente si existen
       const clienteCompleto = clientes.find(c => c.id === expediente.cliente_id);
       const textoCliente = clienteCompleto 
@@ -239,7 +243,23 @@ export default function ExpedientesPage() {
 
       return searchMatch && estadoMatch && pagadoMatch && categoriaMatch && tituloMatch && docsMatch && docBusquedaMatch;
     });
-  }, [expedientes, debouncedSearchTerm, estadoFilter, pagadoFilter, categoriaFilter, tituloFilter, docsFilter, docBusqueda]);
+
+    // Aplicar ordenamiento
+    if (sortBy) {
+      filtered.sort((a, b) => {
+        const aVal = sortBy === 'created_at' ? a.created_at : a.fecha_presentacion;
+        const bVal = sortBy === 'created_at' ? b.created_at : b.fecha_presentacion;
+        
+        if (!aVal) return sortOrder === 'asc' ? 1 : -1;
+        if (!bVal) return sortOrder === 'asc' ? -1 : 1;
+        
+        const comparison = aVal.localeCompare(bVal);
+        return sortOrder === 'asc' ? comparison : -comparison;
+      });
+    }
+
+    return filtered;
+  }, [expedientes, debouncedSearchTerm, estadoFilter, pagadoFilter, categoriaFilter, tituloFilter, docsFilter, docBusqueda, sortBy, sortOrder]);
 
   // Expedientes paginados
   const paginatedExpedientes = useMemo(() => {
@@ -520,6 +540,40 @@ export default function ExpedientesPage() {
             </select>
             <DollarSign className="w-4 h-4 absolute right-3 top-3 text-gray-400 pointer-events-none" />
           </div>
+
+          {/* Ordenamiento */}
+          <div className="relative">
+            <select
+              value={sortBy || ''}
+              onChange={(e) => setSortBy((e.target.value as 'created_at' | 'fecha_presentacion' | null) || null)}
+              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 appearance-none bg-white pr-10 ${
+                sortBy
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700' 
+                  : 'border-gray-300 text-gray-700 hover:border-gray-400'
+              }`}
+            >
+              <option value="">Ordenar por...</option>
+              <option value="created_at">Fecha de creación</option>
+              <option value="fecha_presentacion">Fecha de presentación</option>
+            </select>
+            <ChevronDown className="w-4 h-4 absolute right-3 top-3 text-gray-400 pointer-events-none" />
+          </div>
+
+          {/* Toggle orden ascendente/descendente */}
+          {sortBy && (
+            <button
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className={`px-4 py-2 rounded-lg border-2 font-medium transition-all duration-200 flex items-center gap-2 ${
+                sortOrder === 'asc'
+                  ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                  : 'border-indigo-500 bg-indigo-100 text-indigo-900'
+              }`}
+              title={sortOrder === 'asc' ? 'Ascendente' : 'Descendente'}
+            >
+              {sortOrder === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {sortOrder === 'asc' ? 'Asc' : 'Desc'}
+            </button>
+          )}
 
           {/* Botón filtros avanzados */}
           <button

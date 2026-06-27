@@ -32,6 +32,7 @@ export function FacturasPageContent() {
     direccion: emisor?.direccion || '',
     telefono: emisor?.telefono || '',
     email: emisor?.email || '',
+    numero_inicial: emisor?.numero_inicial || 1,
   });
 
   // Factura form
@@ -225,12 +226,12 @@ export function FacturasPageContent() {
   // Generar número factura con punto de partida configurable
   const nextNumero = () => {
     const year = new Date().getFullYear();
-    const count = facturas.filter(f => f.numero.startsWith(`FAC-${year}`)).length + 1;
-    return `FAC-${year}/${String(count).padStart(4, '0')}`;
+    const yearFacturas = facturas.filter(f => f.numero.startsWith(`FAC-${year}`));
+    const count = yearFacturas.length;
+    const inicio = emisor?.numero_inicial || 1;
+    const nextNum = inicio + count;
+    return `FAC-${year}/${String(nextNum).padStart(4, '0')}`;
   };
-
-  const [numeroManual, setNumeroManual] = useState('');
-  const [usarNumeroManual, setUsarNumeroManual] = useState(false);
 
   const handleSaveEmisor = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -240,6 +241,7 @@ export function FacturasPageContent() {
       direccion: emisorForm.direccion || null,
       telefono: emisorForm.telefono || null,
       email: emisorForm.email || null,
+      numero_inicial: emisorForm.numero_inicial || 1,
     });
     setShowEmisorModal(false);
   };
@@ -249,7 +251,7 @@ export function FacturasPageContent() {
     if (!emisor) { toast.warning('Configura primero los datos del emisor'); return; }
 
     await createFactura({
-      numero: usarNumeroManual ? numeroManual : nextNumero(),
+      numero: nextNumero(),
       cliente_id: facForm.cliente_id,
       procedimiento_id: facForm.procedimiento_id || null,
       tipo: facForm.tipo,
@@ -296,6 +298,7 @@ export function FacturasPageContent() {
       direccion: emisor?.direccion || '',
       telefono: emisor?.telefono || '',
       email: emisor?.email || '',
+      numero_inicial: emisor?.numero_inicial || 1,
     });
     setShowEmisorModal(true);
   };
@@ -406,6 +409,17 @@ export function FacturasPageContent() {
               <label className="form-label">Email</label>
               <input type="email" value={emisorForm.email} onChange={e => setEmisorForm({ ...emisorForm, email: e.target.value })} className="form-input" />
             </div>
+            <div>
+              <label className="form-label">Número inicial de facturas</label>
+              <input 
+                type="number" 
+                min="1" 
+                value={emisorForm.numero_inicial} 
+                onChange={e => setEmisorForm({ ...emisorForm, numero_inicial: parseInt(e.target.value) || 1 })} 
+                className="form-input" 
+              />
+              <p className="text-xs text-gray-500 mt-1">Punto de partida para numeración (ej: 1 para FAC-2026/0001)</p>
+            </div>
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setShowEmisorModal(false)} className="btn btn-secondary">Cancelar</button>
@@ -442,27 +456,7 @@ export function FacturasPageContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="form-label">Número de factura</label>
-              <div className="flex items-center gap-2">
-                <input 
-                  type="checkbox" 
-                  id="usar_numero_manual" 
-                  checked={usarNumeroManual} 
-                  onChange={e => setUsarNumeroManual(e.target.checked)} 
-                  className="form-checkbox" 
-                />
-                <label htmlFor="usar_numero_manual" className="text-sm">Usar número manual</label>
-              </div>
-              {usarNumeroManual ? (
-                <input 
-                  type="text" 
-                  value={numeroManual} 
-                  onChange={e => setNumeroManual(e.target.value)} 
-                  placeholder="FAC-2026/0001" 
-                  className="form-input mt-2" 
-                />
-              ) : (
-                <div className="text-sm text-gray-500 mt-2">Auto: {nextNumero()}</div>
-              )}
+              <div className="text-sm text-gray-500 mt-2">Auto: {nextNumero()}</div>
             </div>
           </div>
 

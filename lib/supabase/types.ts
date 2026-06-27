@@ -230,6 +230,7 @@ export interface DatosEmisor {
   direccion: string | null;
   telefono: string | null;
   email: string | null;
+  numero_inicial: number | null; // Punto de partida para numeración de facturas
   created_at: string;
 }
 
