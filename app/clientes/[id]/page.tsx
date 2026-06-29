@@ -424,10 +424,13 @@ export default function ClienteDetallePage() {
       }
     }
     
+    // Construir nombre completo del cliente
+    const nombreCompleto = [cliente?.nombre, cliente?.apellido1, cliente?.apellido2].filter(Boolean).join(' ') || [cliente?.nombre, cliente?.apellidos].filter(Boolean).join(' ') || '';
+    
     // Redirigir a página de facturas con parámetros prellenados
     const params = new URLSearchParams({
       cliente_id: cobro.cliente_id,
-      cliente_nombre: cliente?.nombre || '',
+      cliente_nombre: nombreCompleto,
       cliente_nif: cliente?.nif || '',
       cliente_direccion: cliente?.direccion || '',
       cliente_codigo_postal: cliente?.codigo_postal || '',
