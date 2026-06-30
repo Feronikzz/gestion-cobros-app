@@ -11,7 +11,7 @@ import { eur } from '@/lib/utils';
 import { toast } from 'sonner';
 import Loading from '@/app/loading';
 import type { TipoFactura, FacturaLinea, Factura } from '@/lib/supabase/types';
-import { Plus, Trash2, Settings, FileText, Copy, Eye, Download } from 'lucide-react';
+import { Plus, Trash2, Settings, FileText, Copy, Eye, Download, Archive } from 'lucide-react';
 import { useConfirm } from '@/components/confirm-dialog';
 
 export function FacturasPageContent() {
@@ -24,6 +24,12 @@ export function FacturasPageContent() {
   const [showEmisorModal, setShowEmisorModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
   const [filterTipo, setFilterTipo] = useState('');
+  const [filterYear, setFilterYear] = useState<string>(new Date().getFullYear().toString());
+  const [filterMonth, setFilterMonth] = useState<string>('');
+  const [sortBy, setSortBy] = useState<keyof Factura | null>('fecha');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [selectedFacturas, setSelectedFacturas] = useState<Set<string>>(new Set());
+  const [showStats, setShowStats] = useState(false);
 
   // Emisor form
   const [emisorForm, setEmisorForm] = useState({
@@ -56,9 +62,43 @@ export function FacturasPageContent() {
   });
 
   const filteredFacturas = useMemo(() => {
-    if (!filterTipo) return facturas;
-    return facturas.filter(f => f.tipo === filterTipo);
-  }, [facturas, filterTipo]);
+    let filtered = facturas;
+    
+    // Filtro por tipo
+    if (filterTipo) {
+      filtered = filtered.filter(f => f.tipo === filterTipo);
+    }
+    
+    // Filtro por año
+    if (filterYear) {
+      filtered = filtered.filter(f => f.fecha.startsWith(filterYear));
+    }
+    
+    // Filtro por mes
+    if (filterMonth) {
+      filtered = filtered.filter(f => f.fecha.startsWith(`${filterYear}-${filterMonth.padStart(2, '0')}`));
+    }
+    
+    // Ordenamiento
+    if (sortBy) {
+      filtered.sort((a, b) => {
+        const aVal = a[sortBy];
+        const bVal = b[sortBy];
+        
+        if (aVal === null || aVal === undefined) return sortOrder === 'asc' ? 1 : -1;
+        if (bVal === null || bVal === undefined) return sortOrder === 'asc' ? -1 : 1;
+        
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+        }
+        
+        const comparison = String(aVal).localeCompare(String(bVal));
+        return sortOrder === 'asc' ? comparison : -comparison;
+      });
+    }
+    
+    return filtered;
+  }, [facturas, filterTipo, filterYear, filterMonth, sortBy, sortOrder]);
 
   // Prellenar formulario desde parámetros de cobro
   useEffect(() => {
@@ -314,6 +354,101 @@ export function FacturasPageContent() {
     no_contable: 'No contable',
   };
 
+  // Funciones de selección
+  const toggleFacturaSelection = (id: string) => {
+    setSelectedFacturas(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      return newSet;
+    });
+  };
+
+  const selectMonth = (month: string) => {
+    const monthFacturas = filteredFacturas.filter(f => f.fecha.startsWith(`${filterYear}-${month.padStart(2, '0')}`));
+    const ids = monthFacturas.map(f => f.id);
+    setSelectedFacturas(new Set(ids));
+  };
+
+  const selectQuarter = (quarter: number) => {
+    const months = quarter === 1 ? ['1', '2', '3'] : quarter === 2 ? ['4', '5', '6'] : quarter === 3 ? ['7', '8', '9'] : ['10', '11', '12'];
+    const quarterFacturas = filteredFacturas.filter(f => months.some(m => f.fecha.startsWith(`${filterYear}-${m.padStart(2, '0')}`)));
+    const ids = quarterFacturas.map(f => f.id);
+    setSelectedFacturas(new Set(ids));
+  };
+
+  const clearSelection = () => setSelectedFacturas(new Set());
+
+  // Función de descarga masiva agrupada por mes
+  const handleBulkDownload = async () => {
+    if (selectedFacturas.size === 0) {
+      toast.warning('Selecciona al menos una factura');
+      return;
+    }
+
+    const selectedFacturaData = facturas.filter(f => selectedFacturas.has(f.id));
+    
+    // Agrupar por mes
+    const groupedByMonth = selectedFacturaData.reduce((acc, factura) => {
+      const month = factura.fecha.substring(0, 7); // YYYY-MM
+      if (!acc[month]) acc[month] = [];
+      acc[month].push(factura);
+      return acc;
+    }, {} as Record<string, Factura[]>);
+
+    // Abrir facturas en nuevas ventanas agrupadas por mes
+    Object.entries(groupedByMonth).forEach(([month, facturas]) => {
+      const [year, monthNum] = month.split('-');
+      const monthName = new Date(parseInt(year), parseInt(monthNum) - 1).toLocaleString('es-ES', { month: 'long', year: 'numeric' });
+      
+      toast.info(`Abriendo ${facturas.length} facturas de ${monthName}...`);
+      
+      // Abrir cada factura con un pequeño delay entre ellas
+      facturas.forEach((factura, index) => {
+        setTimeout(() => {
+          window.open(`/facturas/${factura.id}`, '_blank');
+        }, index * 500); // 500ms entre cada factura
+      });
+    });
+
+    toast.success(`Se abrirán ${selectedFacturas.size} facturas agrupadas por mes`);
+  };
+
+  // Función de ordenamiento
+  const handleSort = (column: keyof Factura) => {
+    if (sortBy === column) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortOrder('asc');
+    }
+  };
+
+  // Cálculo de estadísticas
+  const stats = useMemo(() => {
+    const totalFacturado = filteredFacturas.reduce((sum, f) => sum + (f.total || 0), 0);
+    const totalBase = filteredFacturas.reduce((sum, f) => sum + (f.base_imponible || 0), 0);
+    const totalIva = filteredFacturas.reduce((sum, f) => sum + (f.iva_importe || 0), 0);
+    const totalIrpf = filteredFacturas.reduce((sum, f) => sum + (f.irpf_importe || 0), 0);
+    
+    // Estimación de cobrado (basado en cobros asociados)
+    const totalCobrado = 0; // TODO: Implementar cuando tengamos relación con cobros
+    
+    // IVA a pagar (IVA facturado - IVA soportado en gastos)
+    // Por ahora solo IVA facturado
+    const ivaAPagar = totalIva;
+    
+    return {
+      totalFacturado,
+      totalBase,
+      totalIva,
+      totalIrpf,
+      totalCobrado,
+      ivaAPagar,
+      pendienteCobro: totalFacturado - totalCobrado,
+    };
+  }, [filteredFacturas]);
+
   if (loading) return <Loading />;
   if (error) return <LayoutShell title="Facturas"><div className="error-state">Error: {error}</div></LayoutShell>;
 
@@ -327,21 +462,113 @@ export function FacturasPageContent() {
           <button onClick={openEmisorModal} className="btn btn-secondary">
             <Settings className="w-4 h-4" /> Datos emisor
           </button>
+          
+          {/* Filtros de fecha */}
+          <select value={filterYear} onChange={e => setFilterYear(e.target.value)} className="form-input search-select">
+            {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
+              <option key={year} value={year.toString()}>{year}</option>
+            ))}
+          </select>
+          <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="form-input search-select">
+            <option value="">Todos los meses</option>
+            {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+              <option key={month} value={month.toString()}>
+                {new Date(0, month - 1).toLocaleString('es-ES', { month: 'long' })}
+              </option>
+            ))}
+          </select>
+          
           <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)} className="form-input search-select">
             <option value="">Todas</option>
             <option value="normal">Normal</option>
             <option value="rectificativa">Rectificativa</option>
             <option value="no_contable">No contable</option>
           </select>
+          
+          {/* Selección por mes/trimestre */}
+          <div className="flex items-center gap-2 border-l border-gray-300 pl-3">
+            <span className="text-sm text-gray-600">Seleccionar:</span>
+            <select onChange={e => selectMonth(e.target.value)} className="form-input search-select text-sm">
+              <option value="">Mes...</option>
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                <option key={month} value={month.toString()}>
+                  {new Date(0, month - 1).toLocaleString('es-ES', { month: 'long' })}
+                </option>
+              ))}
+            </select>
+            <select onChange={e => selectQuarter(parseInt(e.target.value))} className="form-input search-select text-sm">
+              <option value="">Trimestre...</option>
+              <option value="1">Q1 (Ene-Mar)</option>
+              <option value="2">Q2 (Abr-Jun)</option>
+              <option value="3">Q3 (Jul-Sep)</option>
+              <option value="4">Q4 (Oct-Dic)</option>
+            </select>
+            {selectedFacturas.size > 0 && (
+              <button onClick={clearSelection} className="text-sm text-red-600 hover:text-red-800">
+                Limpiar ({selectedFacturas.size})
+              </button>
+            )}
+          </div>
+          
+          {/* Estadísticas */}
+          <button onClick={() => setShowStats(!showStats)} className="btn btn-secondary">
+            <FileText className="w-4 h-4" /> Estadísticas
+          </button>
         </div>
-        <button onClick={() => setShowFacturaModal(true)} className="btn btn-primary">
-          <Plus className="w-4 h-4" /> Nueva factura
-        </button>
+        <div className="flex items-center gap-3">
+          {selectedFacturas.size > 0 && (
+            <button onClick={handleBulkDownload} className="btn btn-secondary">
+              <Archive className="w-4 h-4" /> Descargar ({selectedFacturas.size})
+            </button>
+          )}
+          <button onClick={() => setShowFacturaModal(true)} className="btn btn-primary">
+            <Plus className="w-4 h-4" /> Nueva factura
+          </button>
+        </div>
       </div>
 
       {!emisor && (
         <div className="error-state" style={{ padding: '1rem', marginBottom: '1rem' }}>
           Configura los datos del emisor antes de crear facturas.
+        </div>
+      )}
+
+      {/* Panel de estadísticas */}
+      {showStats && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Resumen de Facturación</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="text-sm text-gray-600 mb-1">Total Facturado</div>
+              <div className="text-xl font-bold text-gray-900">{eur(stats.totalFacturado)}</div>
+            </div>
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="text-sm text-gray-600 mb-1">Base Imponible</div>
+              <div className="text-xl font-bold text-gray-900">{eur(stats.totalBase)}</div>
+            </div>
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="text-sm text-gray-600 mb-1">IVA Facturado</div>
+              <div className="text-xl font-bold text-blue-600">{eur(stats.totalIva)}</div>
+            </div>
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="text-sm text-gray-600 mb-1">IRPF</div>
+              <div className="text-xl font-bold text-orange-600">{eur(stats.totalIrpf)}</div>
+            </div>
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="text-sm text-gray-600 mb-1">Cobrado</div>
+              <div className="text-xl font-bold text-green-600">{eur(stats.totalCobrado)}</div>
+            </div>
+            <div className="bg-white rounded-lg p-4 shadow-sm">
+              <div className="text-sm text-gray-600 mb-1">IVA a Pagar</div>
+              <div className="text-xl font-bold text-purple-600">{eur(stats.ivaAPagar)}</div>
+            </div>
+          </div>
+          <div className="mt-4 pt-4 border-t border-blue-200">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600">Pendiente de cobro:</span>
+              <span className="font-semibold text-red-600">{eur(stats.pendienteCobro)}</span>
+            </div>
+          </div>
         </div>
       )}
 
@@ -351,12 +578,37 @@ export function FacturasPageContent() {
         <table className="table">
           <thead>
             <tr>
-              <th>Número</th>
-              <th>Fecha</th>
-              <th>Cliente</th>
-              <th>Tipo</th>
-              <th>Base</th>
-              <th>Total</th>
+              <th style={{ width: '40px' }}>
+                <input
+                  type="checkbox"
+                  checked={selectedFacturas.size === filteredFacturas.length && filteredFacturas.length > 0}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedFacturas(new Set(filteredFacturas.map(f => f.id)));
+                    } else {
+                      setSelectedFacturas(new Set());
+                    }
+                  }}
+                />
+              </th>
+              <th onClick={() => handleSort('numero')} className="cursor-pointer hover:bg-gray-50">
+                Número {sortBy === 'numero' && (sortOrder === 'asc' ? '↑' : '↓')}
+              </th>
+              <th onClick={() => handleSort('fecha')} className="cursor-pointer hover:bg-gray-50">
+                Fecha {sortBy === 'fecha' && (sortOrder === 'asc' ? '↑' : '↓')}
+              </th>
+              <th onClick={() => handleSort('receptor_nombre')} className="cursor-pointer hover:bg-gray-50">
+                Cliente {sortBy === 'receptor_nombre' && (sortOrder === 'asc' ? '↑' : '↓')}
+              </th>
+              <th onClick={() => handleSort('tipo')} className="cursor-pointer hover:bg-gray-50">
+                Tipo {sortBy === 'tipo' && (sortOrder === 'asc' ? '↑' : '↓')}
+              </th>
+              <th onClick={() => handleSort('base_imponible')} className="cursor-pointer hover:bg-gray-50">
+                Base {sortBy === 'base_imponible' && (sortOrder === 'asc' ? '↑' : '↓')}
+              </th>
+              <th onClick={() => handleSort('total')} className="cursor-pointer hover:bg-gray-50">
+                Total {sortBy === 'total' && (sortOrder === 'asc' ? '↑' : '↓')}
+              </th>
               <th></th>
             </tr>
           </thead>
@@ -365,7 +617,14 @@ export function FacturasPageContent() {
               <tr><td colSpan={8} className="empty-state">No hay facturas</td></tr>
             ) : (
               filteredFacturas.map(f => (
-                <tr key={f.id}>
+                <tr key={f.id} className={selectedFacturas.has(f.id) ? 'bg-blue-50' : ''}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selectedFacturas.has(f.id)}
+                      onChange={() => toggleFacturaSelection(f.id)}
+                    />
+                  </td>
                   <td className="font-medium">{f.numero}</td>
                   <td>{f.fecha}</td>
                   <td>{f.receptor_nombre}</td>
