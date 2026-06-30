@@ -2,7 +2,7 @@
 -- This allows tracking which cobro a factura was generated from
 
 ALTER TABLE facturas 
-ADD COLUMN cobro_id TEXT;
+ADD COLUMN cobro_id UUID;
 
 -- Add foreign key constraint to cobros table
 ALTER TABLE facturas 

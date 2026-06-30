@@ -14,6 +14,7 @@ import Loading from '@/app/loading';
 import type { TipoFactura, FacturaLinea, Factura } from '@/lib/supabase/types';
 import { Plus, Trash2, Settings, FileText, Copy, Eye, Download, Archive } from 'lucide-react';
 import { useConfirm } from '@/components/confirm-dialog';
+import JSZip from 'jszip';
 
 export function FacturasPageContent() {
   const { confirm } = useConfirm();
@@ -392,6 +393,11 @@ export function FacturasPageContent() {
 
     const selectedFacturaData = facturas.filter(f => selectedFacturas.has(f.id));
     
+    if (selectedFacturaData.length === 0) {
+      toast.error('No se encontraron las facturas seleccionadas');
+      return;
+    }
+
     // Agrupar por mes
     const groupedByMonth = selectedFacturaData.reduce((acc, factura) => {
       const month = factura.fecha.substring(0, 7); // YYYY-MM
@@ -400,22 +406,31 @@ export function FacturasPageContent() {
       return acc;
     }, {} as Record<string, Factura[]>);
 
+    toast.info(`Preparando descarga de ${selectedFacturas.size} facturas...`);
+
     // Abrir facturas en nuevas ventanas agrupadas por mes
+    let delayCounter = 0;
     Object.entries(groupedByMonth).forEach(([month, facturas]) => {
       const [year, monthNum] = month.split('-');
       const monthName = new Date(parseInt(year), parseInt(monthNum) - 1).toLocaleString('es-ES', { month: 'long', year: 'numeric' });
       
       toast.info(`Abriendo ${facturas.length} facturas de ${monthName}...`);
       
-      // Abrir cada factura con un pequeño delay entre ellas
+      // Abrir cada factura con un delay incremental para evitar bloqueo del navegador
       facturas.forEach((factura, index) => {
         setTimeout(() => {
-          window.open(`/facturas/${factura.id}`, '_blank');
-        }, index * 500); // 500ms entre cada factura
+          const url = `/facturas/${factura.id}`;
+          const newWindow = window.open(url, '_blank');
+          
+          if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+            toast.error(`No se pudo abrir la factura ${factura.numero}. Verifica que tu navegador permita abrir ventanas emergentes.`);
+          }
+        }, delayCounter * 300); // 300ms entre cada factura
+        delayCounter++;
       });
     });
 
-    toast.success(`Se abrirán ${selectedFacturas.size} facturas agrupadas por mes`);
+    toast.success(`Se están abriendo ${selectedFacturas.size} facturas agrupadas por mes. Por favor, permite las ventanas emergentes en tu navegador.`);
   };
 
   // Función de ordenamiento
