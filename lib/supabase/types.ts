@@ -243,6 +243,7 @@ export interface Factura {
   numero: string;
   cliente_id: string;
   procedimiento_id: string | null;
+  cobro_id: string | null; // Relación con cobro si la factura se generó desde uno
   tipo: TipoFactura;
   fecha: string;
   // Datos emisor snapshot

@@ -7,6 +7,7 @@ import { Modal } from '@/components/modal';
 import { useFacturas } from '@/lib/hooks/use-facturas';
 import { useClientes } from '@/lib/hooks/use-clientes';
 import { useProcedimientos } from '@/lib/hooks/use-procedimientos';
+import { useCobros } from '@/lib/hooks/use-cobros';
 import { eur } from '@/lib/utils';
 import { toast } from 'sonner';
 import Loading from '@/app/loading';
@@ -20,6 +21,7 @@ export function FacturasPageContent() {
   const { facturas, emisor, loading, error, saveEmisor, createFactura, deleteFactura } = useFacturas();
   const { clientes } = useClientes();
   const { procedimientos } = useProcedimientos();
+  const { cobros } = useCobros();
 
   const [showEmisorModal, setShowEmisorModal] = useState(false);
   const [showFacturaModal, setShowFacturaModal] = useState(false);
@@ -46,6 +48,7 @@ export function FacturasPageContent() {
   const [facForm, setFacForm] = useState({
     cliente_id: '',
     procedimiento_id: '',
+    cobro_id: '',
     tipo: 'normal' as TipoFactura,
     fecha: new Date().toISOString().slice(0, 10),
     receptor_nombre: '',
@@ -129,18 +132,17 @@ export function FacturasPageContent() {
         // Verificar si ya existe una factura para este cobro
         if (cobroId) {
           const { createClient } = await import('@/lib/supabase/client');
-          // Solo crear el cliente de Supabase en el cliente
           const supabase = typeof window !== 'undefined' ? createClient() : null;
           if (!supabase) return;
           
           const { data: facturaExistente } = await supabase
             .from('facturas')
             .select('*')
-            .eq('notas', `Factura generada desde cobro ID: ${cobroId}`)
+            .eq('cobro_id', cobroId)
             .single();
           
           if (facturaExistente) {
-            toast.warning('Ya existe una factura para este cobro. No se puede crear otra factura.');
+            toast.warning(`Ya existe la factura ${facturaExistente.numero} para este cobro. No se puede crear otra factura.`);
             return;
           }
         }
@@ -183,6 +185,7 @@ export function FacturasPageContent() {
         setFacForm({
           cliente_id: clienteId,
           procedimiento_id: '',
+          cobro_id: cobroId || '',
           tipo: 'normal',
           fecha: fecha || new Date().toISOString().slice(0, 10),
           receptor_nombre: clienteNombre,
@@ -294,6 +297,7 @@ export function FacturasPageContent() {
       numero: nextNumero(),
       cliente_id: facForm.cliente_id,
       procedimiento_id: facForm.procedimiento_id || null,
+      cobro_id: facForm.cobro_id || null,
       tipo: facForm.tipo,
       fecha: facForm.fecha,
       emisor_nombre: emisor.nombre,
@@ -317,7 +321,7 @@ export function FacturasPageContent() {
     });
     setShowFacturaModal(false);
     setFacForm({
-      cliente_id: '', procedimiento_id: '', tipo: 'normal', fecha: new Date().toISOString().slice(0, 10),
+      cliente_id: '', procedimiento_id: '', cobro_id: '', tipo: 'normal', fecha: new Date().toISOString().slice(0, 10),
       receptor_nombre: '', receptor_nif: '', receptor_direccion: '',
       incluir_iva: true, iva_porcentaje: 21, incluir_irpf: false, irpf_porcentaje: 15,
       lineas: [{ ...emptyLinea }],
@@ -431,8 +435,10 @@ export function FacturasPageContent() {
     const totalIva = filteredFacturas.reduce((sum, f) => sum + (f.iva_importe || 0), 0);
     const totalIrpf = filteredFacturas.reduce((sum, f) => sum + (f.irpf_importe || 0), 0);
     
-    // Estimación de cobrado (basado en cobros asociados)
-    const totalCobrado = 0; // TODO: Implementar cuando tengamos relación con cobros
+    // Calcular cobrado real basado en cobros asociados a facturas
+    const cobrosIds = filteredFacturas.map(f => f.cobro_id).filter(Boolean) as string[];
+    const cobrosAsociados = cobros.filter(c => cobrosIds.includes(c.id));
+    const totalCobrado = cobrosAsociados.reduce((sum, c) => sum + c.importe, 0);
     
     // IVA a pagar (IVA facturado - IVA soportado en gastos)
     // Por ahora solo IVA facturado
@@ -447,7 +453,7 @@ export function FacturasPageContent() {
       ivaAPagar,
       pendienteCobro: totalFacturado - totalCobrado,
     };
-  }, [filteredFacturas]);
+  }, [filteredFacturas, cobros]);
 
   if (loading) return <Loading />;
   if (error) return <LayoutShell title="Facturas"><div className="error-state">Error: {error}</div></LayoutShell>;

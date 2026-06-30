@@ -22,7 +22,7 @@ import { useConfirm } from '@/components/confirm-dialog';
 export default function CobrosPage() {
   const router = useRouter();
   const { confirm } = useConfirm();
-  const { cobros, loading, error, createCobro, updateCobro, deleteCobro } = useCobros();
+  const { cobros, facturas, loading, error, createCobro, updateCobro, deleteCobro, isCobroFacturado, getCobroFactura } = useCobros();
   const { hidden: hideSensitive, toggle: toggleSensitive, mask } = useHideSensitive();
   const { clientes } = useClientes();
   const { procedimientos } = useProcedimientos();
@@ -587,6 +587,7 @@ export default function CobrosPage() {
               <th>Método</th>
               <th>Importe</th>
               <th>Notas</th>
+              <th>Facturado</th>
               <th>Pago completo</th>
               <th>Acciones</th>
             </tr>
@@ -594,7 +595,7 @@ export default function CobrosPage() {
           <tbody>
             {filteredCobros.length === 0 ? (
               <tr>
-                <td colSpan={8} className="text-center py-8 text-gray-500">
+                <td colSpan={9} className="text-center py-8 text-gray-500">
                   {cobros.length === 0 ? 'No hay cobros registrados' : 'No hay cobros que coincidan con los filtros'}
                 </td>
               </tr>
@@ -627,6 +628,19 @@ export default function CobrosPage() {
                   <td className="font-medium text-green-600">{eur(cobro.importe)}</td>
                   <td className="text-sm text-gray-600 max-w-xs truncate" title={cobro.notas || ''}>
                     {cobro.notas || '-'}
+                  </td>
+                  <td className="text-center">
+                    {isCobroFacturado(cobro.id) ? (
+                      <div className="flex items-center justify-center gap-1 text-green-600">
+                        <CheckCircle className="w-4 h-4" />
+                        <span className="text-sm">Sí</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-1 text-gray-400">
+                        <AlertCircle className="w-4 h-4" />
+                        <span className="text-sm">No</span>
+                      </div>
+                    )}
                   </td>
                   <td className="text-center">
                     {cobro.procedimiento_id ? (

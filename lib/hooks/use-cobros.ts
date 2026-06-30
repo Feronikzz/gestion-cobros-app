@@ -3,10 +3,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { auditCobro } from '@/lib/audit';
-import type { Cobro } from '@/lib/supabase/types';
+import type { Cobro, Factura } from '@/lib/supabase/types';
 
 export function useCobros() {
   const [cobros, setCobros] = useState<Cobro[]>([]);
+  const [facturas, setFacturas] = useState<Factura[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -27,13 +28,16 @@ export function useCobros() {
       setLoading(true);
       setError(null);
       
-      const { data, error } = await supabase
-        .from('cobros')
-        .select('*')
-        .order('fecha_cobro', { ascending: false });
+      const [{ data: cobrosData, error: cobrosError }, { data: facturasData, error: facturasError }] = await Promise.all([
+        supabase.from('cobros').select('*').order('fecha_cobro', { ascending: false }),
+        supabase.from('facturas').select('id, cobro_id, numero, total').not('cobro_id', 'is', null)
+      ]);
 
-      if (error) throw error;
-      setCobros(data || []);
+      if (cobrosError) throw cobrosError;
+      if (facturasError) throw facturasError;
+      
+      setCobros(cobrosData || []);
+      setFacturas(facturasData || []);
     } catch (error: any) {
       setError(error.message || 'Error al cargar cobros');
     } finally {
@@ -136,11 +140,14 @@ export function useCobros() {
 
   return {
     cobros,
+    facturas,
     loading,
     error,
     fetchCobros,
     createCobro,
     updateCobro,
     deleteCobro,
+    getCobroFactura: (cobroId: string) => facturas.find(f => f.cobro_id === cobroId),
+    isCobroFacturado: (cobroId: string) => facturas.some(f => f.cobro_id === cobroId),
   };
 }
